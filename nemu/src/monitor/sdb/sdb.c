@@ -74,6 +74,21 @@ static int cmd_si(char *args) {
 /* 命令：显示所有支持的命令 */
 static int cmd_help(char *args);
 
+/* 命令：信息查询 */
+static int cmd_info(char *args) {
+    if (args == NULL) {
+        printf("Usage: info r\n");
+        return 0;
+    }
+
+    if (strcmp(args, "r") == 0) {
+        isa_reg_display(); // 调用API打印寄存器值
+    } else {
+        printf("Unknown argument '%s' for info\n", args);
+    }
+    return 0;
+}
+
 /* 命令表，包含命令名称、描述和处理函数 */
 static struct {
     const char *name;        // 命令名称
@@ -84,6 +99,7 @@ static struct {
     {"c", "Continue the execution of the program", cmd_c},
     {"q", "Exit NEMU", cmd_q},
     {"si", "Step through N instructions (default 1)", cmd_si},
+    {"info", "Print information (e.g., info r for registers)", cmd_info},
 
     /* TODO: Add more commands */
 };
