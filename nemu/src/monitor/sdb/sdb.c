@@ -44,14 +44,26 @@ static char *rl_gets() {
 }
 
 static int cmd_c(char *args) {
-    // cpu_exec(-1);
-    cpu_exec(1);
+    cpu_exec(-1);
     return 0;
 }
 
 static int cmd_q(char *args) {
     nemu_state.state = NEMU_QUIT;
     return -1;
+}
+
+static int cmd_si(char *args) {
+    int n = 1; // 默认执行1步
+    if (args != NULL) {
+        n = atoi(args); // 将参数转换为整数
+        if (n <= 0) {
+            printf("Invalid argument for 'si'. Please provide a positive number.\n");
+            return 0;
+        }
+    }
+    cpu_exec(n);
+    return 0;
 }
 
 static int cmd_help(char *args);
@@ -64,6 +76,7 @@ static struct {
     {"help", "Display information about all supported commands", cmd_help},
     {"c", "Continue the execution of the program", cmd_c},
     {"q", "Exit NEMU", cmd_q},
+    {"si", "Step through N instructions (default 1)", cmd_si},
 
     /* TODO: Add more commands */
 
