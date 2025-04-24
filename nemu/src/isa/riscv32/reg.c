@@ -25,7 +25,13 @@ const char *regs[] = {
 
 void isa_reg_display() {
   for (int i = 0; i < sizeof(cpu.gpr) / sizeof(cpu.gpr[0]); i++) {
-    printf("%-3s: 0x%08x\n", regs[i], cpu.gpr[i]);
+    printf("%-3s: 0x%08x\t", regs[i], cpu.gpr[i]);
+    if ((i + 1) % 4 == 0) {
+      printf("\n"); // 每 4 个寄存器换行
+    }
+  }
+  if (sizeof(cpu.gpr) / sizeof(cpu.gpr[0]) % 4 != 0) {
+    printf("\n"); // 如果最后一行不足 4 个寄存器，手动换行
   }
   printf("pc : 0x%08x\n", cpu.pc);
 }
