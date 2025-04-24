@@ -14,6 +14,7 @@
  ***************************************************************************************/
 
 #include "sdb.h"
+#include "memory/vaddr.h"
 #include <cpu/cpu.h>
 #include <isa.h>
 #include <readline/history.h>
@@ -89,6 +90,51 @@ static int cmd_info(char *args) {
     return 0;
 }
 
+static int cmd_x(char *args) {
+    if (args == NULL) {
+        printf("Usage: x N EXPR\n");
+        return 0;
+    }
+
+    // 提取 N 和 EXPR
+    char *n_str = strtok(args, " ");
+    char *expr_str = strtok(NULL, " ");
+    if (n_str == NULL || expr_str == NULL) {
+        printf("Usage: x N EXPR\n");
+        return 0;
+    }
+
+    // 将 N 转换为整数
+    int n = atoi(n_str);
+    if (n <= 0) {
+        printf("Invalid N. Please provide a positive number.\n");
+        return 0;
+    }
+
+    // 将 EXPR 转换为地址（假设 EXPR 是十六进制数）
+    vaddr_t addr = 0;
+    if (sscanf(expr_str, "%x", &addr) != 1) {
+        printf("Invalid EXPR. Please provide a valid hexadecimal address.\n");
+        return 0;
+    }
+
+    // 扫描内存并打印
+    for (int i = 0; i < n; i++) {
+        if (i % 4 == 0) {
+            printf("0x%08x: ", addr + i * 4); // 每 4 个字打印地址
+        }
+        printf("0x%08x ", vaddr_read(addr + i * 4, 4)); // 读取并打印 4 字节
+        if ((i + 1) % 4 == 0) {
+            printf("\n"); // 每 4 个字换行
+        }
+    }
+    if (n % 4 != 0) {
+        printf("\n"); // 如果最后一行不足 4 个字，手动换行
+    }
+
+    return 0;
+}
+
 /* 命令表，包含命令名称、描述和处理函数 */
 static struct {
     const char *name;        // 命令名称
@@ -100,6 +146,7 @@ static struct {
     {"q", "Exit NEMU", cmd_q},
     {"si", "Step through N instructions (default 1)", cmd_si},
     {"info", "Print information (e.g., info r for registers)", cmd_info},
+    {"x", "Examine memory: x N EXPR", cmd_x},
 
     /* TODO: Add more commands */
 };
