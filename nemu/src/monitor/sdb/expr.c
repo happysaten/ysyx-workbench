@@ -74,7 +74,7 @@ typedef struct token {
     char str[32]; // token字符串
 } Token;
 
-static Token tokens[32] __attribute__((used)) = {}; // 存储token的数组
+static Token tokens[256] __attribute__((used)) = {}; // 存储token的数组
 static int nr_token __attribute__((used)) = 0;      // token数量
 
 /* 解析表达式并生成token */
