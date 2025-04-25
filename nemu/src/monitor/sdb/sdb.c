@@ -184,7 +184,24 @@ static int cmd_test(char *args) {
     return 0;
 }
 
-/* 命令表，包含命令名称、描述和处理函数 */
+/* 命令：求表达式 EXPR 的值 */
+static int cmd_p(char *args) {
+    if (args == NULL) {
+        printf("Usage: p EXPR\n");
+        return 0;
+    }
+
+    bool success = false;
+    word_t result = expr(args, &success);
+    if (!success) {
+        printf("Failed to evaluate expression: %s\n", args);
+    } else {
+        printf("Result: %u (0x%x)\n", result, result);
+    }
+
+    return 0;
+}
+
 static struct {
     const char *name;        // 命令名称
     const char *description; // 命令描述
@@ -197,6 +214,7 @@ static struct {
     {"info", "Print information (e.g., info r for registers)", cmd_info},
     {"x", "Examine memory: x N EXPR", cmd_x},
     {"test", "Test expression evaluation", cmd_test}, // 添加 test 命令
+    {"p", "Evaluate the value of an expression", cmd_p},
 
     /* TODO: Add more commands */
 };
