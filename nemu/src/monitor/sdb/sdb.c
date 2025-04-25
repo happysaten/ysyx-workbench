@@ -154,7 +154,16 @@ static int cmd_test(char *args) {
     int total_tests = 0;
     int passed_tests = 0;
 
-    while (fscanf(fp, "%s = %u\n", buf, &expected_result) == 2) {
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        char *equals_sign = strchr(buf, '=');
+        if (equals_sign == NULL) {
+            printf("Invalid test case format: %s\n", buf);
+            continue;
+        }
+
+        *equals_sign = '\0'; // 将 '=' 替换为字符串结束符
+        expected_result = atoi(equals_sign + 1); // 提取期望结果
+
         total_tests++;
         word_t result = expr(buf, &success);
         if (!success) {
