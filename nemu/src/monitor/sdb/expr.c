@@ -195,6 +195,11 @@ static int find_main_operator(int p, int q) {
             default:
                 continue;
             }
+            // 如果是负号，且前一个主运算符也是负号，则优先选择前一个负号
+            if (tokens[i].type == TK_NEG && op != -1 &&
+                tokens[op].type == TK_NEG) {
+                continue;
+            }
             if (priority <= min_priority) {
                 min_priority = priority;
                 op = i;
@@ -218,8 +223,8 @@ static word_t eval(int p, int q, bool *success) {
             return strtoul(tokens[p].str, NULL, 16);
         } else {
             *success = false;
-            printf("Error: Invalid token %d at position %d.\n",
-                   tokens[p].type, p);
+            printf("Error: Invalid token %d at position %d.\n", tokens[p].type,
+                   p);
             assert(tokens[p].type == TK_NEG);
             return 0;
         }
