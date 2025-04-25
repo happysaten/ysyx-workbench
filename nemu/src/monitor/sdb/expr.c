@@ -218,8 +218,8 @@ static word_t eval(int p, int q, bool *success) {
             return strtoul(tokens[p].str, NULL, 16);
         } else {
             *success = false;
-            printf("Error: Invalid token %c at position %d.\n", tokens[p].type,
-                   p);
+            printf("Error: Invalid token %c at position %d.\n",
+                   (char)tokens[p].type, p);
             return 0;
         }
     } else if (check_parentheses(p, q)) {
