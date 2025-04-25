@@ -51,9 +51,14 @@ static void gen_space() {
 static void gen_num() {
     int len = choose(8) + 1; // 随机生成1到8位的数字长度
     for (int i = 0; i < len; i++) {
-        char digit = '0' + choose(10); // 随机生成字符 '0' 到 '9'
-        char str[2] = {digit, '\0'};   // 将字符转换为字符串
-        gen(str);                      // 追加到 buf 中
+        char digit;
+        if (i == 0) {
+            digit = '1' + choose(9); // 确保首位数字为 '1' 到 '9'
+        } else {
+            digit = '0' + choose(10); // 随机生成字符 '0' 到 '9'
+        }
+        char str[2] = {digit, '\0'}; // 将字符转换为字符串
+        gen(str);                    // 追加到 buf 中
     }
 }
 
