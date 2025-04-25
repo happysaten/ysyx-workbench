@@ -36,14 +36,20 @@ uint32_t choose(uint32_t n) {
     return num;
 }
 
-// 将字符串追加到buf中
-static void gen(const char *str) { strcat(buf, str); }
+// 将字符追加到 buf 中
+static void gen(char c) {
+    int len = strlen(buf);
+    if (len < sizeof(buf) - 1) { // 确保不会溢出
+        buf[len] = c;
+        buf[len + 1] = '\0';
+    }
+}
 
 // 随机插入空格
 static void gen_space() {
     int spaces = choose(2); // 随机生成0到1个空格
     for (int i = 0; i < spaces; i++) {
-        gen(" ");
+        gen(' ');
     }
 }
 
@@ -57,33 +63,33 @@ static void gen_num() {
         } else {
             digit = '0' + choose(10); // 随机生成字符 '0' 到 '9'
         }
-        char str[2] = {digit, '\0'}; // 将字符转换为字符串
-        gen(str);                    // 追加到 buf 中
+        gen(digit); // 追加到 buf 中
     }
+    gen('u'); // 确保 buf 中的数字是无符号的
 }
 
 // 生成一个随机运算符
 static void gen_rand_op() {
     switch (choose(4)) {
     case 0:
-        gen("+");
+        gen('+');
         break; // 加法
     case 1:
-        gen("-");
+        gen('-');
         break; // 减法
     case 2:
-        gen("*");
+        gen('*');
         break; // 乘法
     case 3:
-        gen("/");
+        gen('/');
         break; // 除法
     }
 }
 
 // 生成随机表达式
 static void gen_rand_expr() {
-    if (strlen(buf) > 60000){
-        gen_num(); // 如果buf长度超过60000，直接生成数字
+    if (strlen(buf) > 1000) {
+        gen_num(); // 如果buf长度过长，直接生成数字
         return;
     }
     gen_space(); // 随机插入空格
@@ -92,9 +98,9 @@ static void gen_rand_expr() {
         gen_num();
         break; // 生成一个数字
     case 1:
-        gen("(");
+        gen('(');
         gen_rand_expr();
-        gen(")");
+        gen(')');
         break; // 生成带括号的表达式
     default:
         gen_rand_expr();
