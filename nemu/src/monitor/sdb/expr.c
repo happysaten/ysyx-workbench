@@ -144,18 +144,41 @@ static bool make_token(char *e) {
 /* 检查表达式是否被一对匹配的括号包围 */
 static bool check_parentheses(int p, int q) {
     if (tokens[p].type != '(' || tokens[q].type != ')') {
-        return false;
+        return false; // 首尾不是括号，直接返回 false
     }
+
     int balance = 0;
     for (int i = p; i <= q; i++) {
-        if (tokens[i].type == '(')
+        if (tokens[i].type == '(') {
             balance++;
-        else if (tokens[i].type == ')')
+        } else if (tokens[i].type == ')') {
             balance--;
-        if (balance < 0)
-            return false; // 括号不匹配
+        }
+
+        if (balance < 0) {
+            return false; // 如果在遍历过程中右括号多于左括号，返回 false
+        }
     }
-    return balance == 0;
+
+    if (balance != 0) {
+        return false; // 如果最终左右括号数量不匹配，返回 false
+    }
+
+    // 检查最外层括号是否匹配
+    balance = 0;
+    for (int i = p + 1; i < q; i++) {
+        if (tokens[i].type == '(') {
+            balance++;
+        } else if (tokens[i].type == ')') {
+            balance--;
+        }
+
+        if (balance < 0) {
+            return false; // 如果在最外层括号内右括号多于左括号，返回 false
+        }
+    }
+
+    return balance == 0; // 如果最外层括号内匹配，返回 true
 }
 
 /* 在表达式中寻找主运算符 */
