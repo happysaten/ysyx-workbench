@@ -75,7 +75,7 @@ typedef struct token {
 } Token;
 
 static Token tokens[1024] __attribute__((used)) = {}; // 存储token的数组
-static int nr_token __attribute__((used)) = 0;       // token数量
+static int nr_token __attribute__((used)) = 0;        // token数量
 
 /* 解析表达式并生成token */
 static bool make_token(char *e) {
@@ -93,9 +93,8 @@ static bool make_token(char *e) {
                 char *substr_start = e + position;
                 int substr_len = pmatch.rm_eo;
 
-                // 日志记录匹配
-                // Log("match rules[%d] = \"%s\" at position %d with len %d:
-                // %.*s",
+                // 日志记录匹配情况
+                // Log("match rules[%d] = \"%s\" at position %d with len %d:%.*s",
                 //     i, rules[i].regex, position, substr_len, substr_len,
                 //     substr_start);
 
@@ -148,7 +147,7 @@ static bool check_parentheses(int p, int q) {
     }
 
     int balance = 0;
-    for (int i = p; i <= q; i++) {
+    for (int i = p+1; i <= q-1; i++) {
         if (tokens[i].type == '(') {
             balance++;
         } else if (tokens[i].type == ')') {
@@ -163,22 +162,7 @@ static bool check_parentheses(int p, int q) {
     if (balance != 0) {
         return false; // 如果最终左右括号数量不匹配，返回 false
     }
-
-    // 检查最外层括号是否匹配
-    balance = 0;
-    for (int i = p + 1; i < q; i++) {
-        if (tokens[i].type == '(') {
-            balance++;
-        } else if (tokens[i].type == ')') {
-            balance--;
-        }
-
-        if (balance < 0) {
-            return false; // 如果在最外层括号内右括号多于左括号，返回 false
-        }
-    }
-
-    return balance == 0; // 如果最外层括号内匹配，返回 true
+    return true; // 如果括号匹配，返回 true
 }
 
 /* 在表达式中寻找主运算符 */

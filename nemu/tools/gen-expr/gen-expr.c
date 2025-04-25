@@ -138,14 +138,14 @@ int main(int argc, char *argv[]) {
 
         int result;
         int status;
-        ret = fscanf(fp, "%d", &result);
-        status = pclose(fp);
-        // printf("WIFEXITED(status):%d ----- WEXITSTATUS(status):%d\n",
-        // WIFEXITED(status), WEXITSTATUS(status));
+        ret = fscanf(fp, "%d", &result); // 获取程序输出的结果
+        status = pclose(fp); // 关闭程序并获取其退出状态
+
+        // 检查程序是否正常退出
         if (WIFEXITED(status)) {
-            /*indicates a divide-by-zero operation*/
+            // 如果退出状态为 136，表示发生了除零操作
             if (WEXITSTATUS(status) == 136)
-                continue;
+                continue; // 跳过该表达式
         }
 
         printf("%s = %u\n", buf, result); // 修改输出格式为“表达式 = 结果”
