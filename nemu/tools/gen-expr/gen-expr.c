@@ -137,11 +137,16 @@ int main(int argc, char *argv[]) {
         assert(fp != NULL);
 
         int result;
-        ret = fscanf(fp, "%d", &result); // 获取程序输出的结果
-        pclose(fp);
-
-        if (ret != 1)
-            continue; // 过滤除零行为的表达式
+        int status;
+        ret = fscanf(fp, "%d", &result);
+        status = pclose(fp);
+        // printf("WIFEXITED(status):%d ----- WEXITSTATUS(status):%d\n",
+        // WIFEXITED(status), WEXITSTATUS(status));
+        if (WIFEXITED(status)) {
+            /*indicates a divide-by-zero operation*/
+            if (WEXITSTATUS(status) == 136)
+                continue;
+        }
 
         printf("%s = %u\n", buf, result); // 修改输出格式为“表达式 = 结果”
     }
