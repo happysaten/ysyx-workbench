@@ -14,16 +14,18 @@
  ***************************************************************************************/
 
 #include "sdb.h"
+#include "debug.h"
 #include "memory/vaddr.h"
 #include <cpu/cpu.h>
 #include <isa.h>
 #include <readline/history.h>
 #include <readline/readline.h>
+#include <stdio.h>
 
 static int is_batch_mode = false; // 是否为批处理模式
 
-void init_regex();      // 初始化正则表达式
-void init_wp_pool();    // 初始化监视点池
+void init_regex();   // 初始化正则表达式
+void init_wp_pool(); // 初始化监视点池
 
 /* 使用 `readline` 库从标准输入读取命令 */
 static char *rl_gets() {
@@ -55,7 +57,7 @@ static int cmd_c(char *args) {
 /* 命令：退出 NEMU */
 static int cmd_q(char *args) {
     nemu_state.state = NEMU_QUIT; // 设置状态为退出
-    return -1; // 返回负值表示退出
+    return -1;                    // 返回负值表示退出
 }
 
 /* 命令：单步执行 N 条指令 */
@@ -64,7 +66,8 @@ static int cmd_si(char *args) {
     if (args != NULL) {
         n = atoi(args); // 将参数转换为整数
         if (n <= 0) {
-            printf("Invalid argument for 'si'. Please provide a positive number.\n");
+            printf("Invalid argument for 'si'. Please provide a positive "
+                   "number.\n");
             return 0;
         }
     }
@@ -135,7 +138,70 @@ static int cmd_x(char *args) {
     return 0;
 }
 
-/* 命令表，包含命令名称、描述和处理函数 */
+/* 命令：测试表达式求值 */
+static int cmd_test(char *args) {
+    char *test_file = "/home/saten/Code/Other/ysyx-workbench/nemu/tools/gen-expr/build/input";
+    FILE *fp = fopen(test_file, "r");
+    if (fp == NULL) {
+        printf("Failed to open test file: %s\n", test_file);
+        return 0;
+    }
+
+    char buf[65536];
+    unsigned expected_result;
+    bool success;
+
+    int total_tests = 0;
+    int passed_tests = 0;
+
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        char *equals_sign = strchr(buf, '=');
+        if (equals_sign == NULL) {
+            printf("Invalid test case format: %s\n", buf);
+            continue;
+        }
+
+        *equals_sign = '\0'; // 将 '=' 替换为字符串结束符
+        expected_result = atoi(equals_sign + 1); // 提取期望结果
+
+        total_tests++;
+        word_t result = expr(buf, &success);
+        if (!success) {
+            Log("Expression evaluation failed for: %s\n", buf);
+        } else if (result != expected_result) {
+            Log("Test failed: %s = %u (expected %u)\n", buf, result, expected_result);
+        } else {
+            Log("Test passed: %s = %u\n", buf, result);
+            passed_tests++;
+        }
+    }
+
+    fclose(fp);
+
+    // 打印统计信息
+    printf("Tests: %d, Passed: %d\n", total_tests, passed_tests);
+
+    return 0;
+}
+
+/* 命令：求表达式 EXPR 的值 */
+static int cmd_p(char *args) {
+    if (args == NULL) {
+        printf("Usage: p EXPR\n");
+        return 0;
+    }
+
+    bool success;
+    word_t result = expr(args, &success);
+    if (!success) {
+        printf("Failed to evaluate expression: %s\n", args);
+    } else {
+        printf("Result: %u (0x%x)\n", result, result);
+    }
+
+    return 0;
+}
+
 static struct {
     const char *name;        // 命令名称
     const char *description; // 命令描述
@@ -147,6 +213,8 @@ static struct {
     {"si", "Step through N instructions (default 1)", cmd_si},
     {"info", "Print information (e.g., info r for registers)", cmd_info},
     {"x", "Examine memory: x N EXPR", cmd_x},
+    {"test", "Test expression evaluation", cmd_test}, // 添加 test 命令
+    {"p", "Evaluate the value of an expression", cmd_p},
 
     /* TODO: Add more commands */
 };
@@ -167,7 +235,8 @@ static int cmd_help(char *args) {
         // 查找并显示指定命令的信息
         for (i = 0; i < NR_CMD; i++) {
             if (strcmp(arg, cmd_table[i].name) == 0) {
-                printf("%s - %s\n", cmd_table[i].name, cmd_table[i].description);
+                printf("%s - %s\n", cmd_table[i].name,
+                       cmd_table[i].description);
                 return 0;
             }
         }
@@ -225,6 +294,6 @@ void sdb_mainloop() {
 
 /* 初始化调试器 */
 void init_sdb() {
-    init_regex();    // 编译正则表达式
-    init_wp_pool();  // 初始化监视点池
+    init_regex();   // 编译正则表达式
+    init_wp_pool(); // 初始化监视点池
 }
