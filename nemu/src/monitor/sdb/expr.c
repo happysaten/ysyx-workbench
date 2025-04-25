@@ -19,13 +19,12 @@
  * 输入'man regex'以获取有关POSIX正则表达式函数的更多信息。
  */
 #include <regex.h>
+#include <stdio.h>
 
 enum {
     TK_NOTYPE = 256, // 无类型
     TK_EQ,           // 等于
     TK_NUM,          // 数字
-    TK_HEX,          // 十六进制
-    TK_REG,          // 寄存器
     TK_NEG,          // 负号
     /* TODO: 添加更多的token类型 */
 };
@@ -34,17 +33,17 @@ static struct rule {
     const char *regex; // 正则表达式
     int token_type;    // token类型
 } rules[] = {
-    {" +", TK_NOTYPE},                   // 空格
-    {"\\+", '+'},                        // 加号
-    {"-", '-'},                          // 减号
-    {"\\*", '*'},                        // 乘号
-    {"/", '/'},                          // 除号
-    {"\\(", '('},                        // 左括号
-    {"\\)", ')'},                        // 右括号
-    {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
-    {"[0-9]+u?", TK_NUM},                // 支持数字后面带有可选的 'u'
-    {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
-    {"==", TK_EQ},                       // 等于
+    {" +", TK_NOTYPE}, // 空格
+    {"\\+", '+'},      // 加号
+    {"-", '-'},        // 减号
+    {"\\*", '*'},      // 乘号
+    {"/", '/'},        // 除号
+    {"\\(", '('},      // 左括号
+    {"\\)", ')'},      // 右括号
+    // {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
+    {"[0-9]+u?", TK_NUM}, // 支持数字后面带有可选的 'u'
+    // {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
+    {"==", TK_EQ}, // 等于
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -75,7 +74,7 @@ typedef struct token {
 } Token;
 
 static Token tokens[1024] __attribute__((used)) = {}; // 存储token的数组
-static int nr_token __attribute__((used)) = 0;       // token数量
+static int nr_token __attribute__((used)) = 0;        // token数量
 
 /* 解析表达式并生成token */
 static bool make_token(char *e) {
@@ -93,9 +92,9 @@ static bool make_token(char *e) {
                 char *substr_start = e + position;
                 int substr_len = pmatch.rm_eo;
 
-                // 日志记录匹配
-                // Log("match rules[%d] = \"%s\" at position %d with len %d:
-                // %.*s",
+                // 日志记录匹配情况
+                // Log("match rules[%d] = \"%s\" at position %d with len
+                // %d:%.*s",
                 //     i, rules[i].regex, position, substr_len, substr_len,
                 //     substr_start);
 
@@ -120,6 +119,7 @@ static bool make_token(char *e) {
                          tokens[nr_token - 1].type == '-' ||
                          tokens[nr_token - 1].type == '*' ||
                          tokens[nr_token - 1].type == '/' ||
+                         tokens[nr_token - 1].type == TK_NEG ||
                          tokens[nr_token - 1].type == TK_EQ)) {
                         tokens[nr_token].type = TK_NEG; // 将减号解释为负号
                     }
@@ -148,7 +148,7 @@ static bool check_parentheses(int p, int q) {
     }
 
     int balance = 0;
-    for (int i = p; i <= q; i++) {
+    for (int i = p + 1; i <= q - 1; i++) {
         if (tokens[i].type == '(') {
             balance++;
         } else if (tokens[i].type == ')') {
@@ -163,22 +163,7 @@ static bool check_parentheses(int p, int q) {
     if (balance != 0) {
         return false; // 如果最终左右括号数量不匹配，返回 false
     }
-
-    // 检查最外层括号是否匹配
-    balance = 0;
-    for (int i = p + 1; i < q; i++) {
-        if (tokens[i].type == '(') {
-            balance++;
-        } else if (tokens[i].type == ')') {
-            balance--;
-        }
-
-        if (balance < 0) {
-            return false; // 如果在最外层括号内右括号多于左括号，返回 false
-        }
-    }
-
-    return balance == 0; // 如果最外层括号内匹配，返回 true
+    return true; // 如果括号匹配，返回 true
 }
 
 /* 在表达式中寻找主运算符 */
@@ -203,9 +188,18 @@ static int find_main_operator(int p, int q) {
             case '/':
                 priority = 2;
                 break;
+            case TK_NEG:
+                priority = 3; // 负号优先级高于加减乘除
+                break;
             default:
                 continue;
             }
+            // 如果是负号，且前一个主运算符也是负号，则优先选择前一个负号
+            if (tokens[i].type == TK_NEG && op != -1 &&
+                tokens[op].type == TK_NEG) {
+                continue;
+            }
+            // 如果当前运算符优先级更低，则更新主运算符
             if (priority <= min_priority) {
                 min_priority = priority;
                 op = i;
@@ -225,11 +219,8 @@ static word_t eval(int p, int q, bool *success) {
         // 单个token，必须是数字或十六进制
         if (tokens[p].type == TK_NUM) {
             return strtoul(tokens[p].str, NULL, 10);
-        } else if (tokens[p].type == TK_HEX) {
-            return strtoul(tokens[p].str, NULL, 16);
         } else {
             *success = false;
-            printf("Error: Invalid token '%s'.\n", tokens[p].str);
             return 0;
         }
     } else if (check_parentheses(p, q)) {
