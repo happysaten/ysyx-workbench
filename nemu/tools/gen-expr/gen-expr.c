@@ -82,8 +82,10 @@ static void gen_rand_op() {
 
 // 生成随机表达式
 static void gen_rand_expr() {
-    if (strlen(buf) > 65500)
-        return;  // 防止buf溢出
+    if (strlen(buf) > 60000){
+        gen_num(); // 如果buf长度超过60000，直接生成数字
+        return;
+    }
     gen_space(); // 随机插入空格
     switch (choose(3)) {
     case 0:
