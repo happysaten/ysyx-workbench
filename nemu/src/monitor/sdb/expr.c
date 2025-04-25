@@ -253,6 +253,7 @@ static word_t eval(int p, int q, bool *success) {
 
 /* 表达式求值接口 */
 word_t expr(char *e, bool *success) {
+    *success = true;
     if (!make_token(e)) {
         *success = false;
         return 0;

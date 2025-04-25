@@ -191,7 +191,7 @@ static int cmd_p(char *args) {
         return 0;
     }
 
-    bool success = false;
+    bool success;
     word_t result = expr(args, &success);
     if (!success) {
         printf("Failed to evaluate expression: %s\n", args);
