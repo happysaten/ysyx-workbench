@@ -75,7 +75,7 @@ typedef struct token {
 } Token;
 
 static Token tokens[256] __attribute__((used)) = {}; // 存储token的数组
-static int nr_token __attribute__((used)) = 0;      // token数量
+static int nr_token __attribute__((used)) = 0;       // token数量
 
 /* 解析表达式并生成token */
 static bool make_token(char *e) {
@@ -94,7 +94,8 @@ static bool make_token(char *e) {
                 int substr_len = pmatch.rm_eo;
 
                 // 日志记录匹配
-                // Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
+                // Log("match rules[%d] = \"%s\" at position %d with len %d:
+                // %.*s",
                 //     i, rules[i].regex, position, substr_len, substr_len,
                 //     substr_start);
 
@@ -195,6 +196,7 @@ static int find_main_operator(int p, int q) {
 static word_t eval(int p, int q, bool *success) {
     if (p > q) {
         *success = false; // 表达式非法
+        printf("Error: Invalid expression (p > q).\n");
         return 0;
     } else if (p == q) {
         // 单个token，必须是数字或十六进制
@@ -204,6 +206,7 @@ static word_t eval(int p, int q, bool *success) {
             return strtoul(tokens[p].str, NULL, 16);
         } else {
             *success = false;
+            printf("Error: Invalid token '%s'.\n", tokens[p].str);
             return 0;
         }
     } else if (check_parentheses(p, q)) {
@@ -213,6 +216,7 @@ static word_t eval(int p, int q, bool *success) {
         int op = find_main_operator(p, q);
         if (op == -1) {
             *success = false;
+            printf("Error: No valid operator found in expression.\n");
             return 0;
         }
 
@@ -241,11 +245,13 @@ static word_t eval(int p, int q, bool *success) {
         case '/':
             if (val2 == 0) {
                 *success = false; // 除零错误
+                printf("Error: Division by zero.\n");
                 return 0;
             }
             return val1 / val2;
         default:
             *success = false;
+            printf("Error: Unsupported operator '%c'.\n", tokens[op].type);
             return 0;
         }
     }
@@ -256,6 +262,7 @@ word_t expr(char *e, bool *success) {
     *success = true;
     if (!make_token(e)) {
         *success = false;
+        printf("Error: Failed to tokenize expression '%s'.\n", e);
         return 0;
     }
     return eval(0, nr_token - 1, success);
