@@ -187,6 +187,9 @@ static int find_main_operator(int p, int q) {
             case '/':
                 priority = 2;
                 break;
+            case TK_NEG:
+                priority = 3; // 负号优先级高于加减乘除
+                break;
             default:
                 continue;
             }
