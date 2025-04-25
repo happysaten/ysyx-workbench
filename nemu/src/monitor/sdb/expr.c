@@ -227,7 +227,7 @@ static word_t eval(int p, int q, bool *success) {
                    p);
             assert(tokens[p].type == TK_NEG);
             for (int i = 0; i < nr_token; i++) {
-                printf("tokens[%d]: %s\n", i, tokens[i].str);
+                printf("tokens[%d]: %d\n", i, tokens[i].type);
             }
             return 0;
         }
