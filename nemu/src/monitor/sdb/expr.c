@@ -220,6 +220,7 @@ static word_t eval(int p, int q, bool *success) {
             *success = false;
             printf("Error: Invalid token %d at position %d.\n",
                    tokens[p].type, p);
+            assert(tokens[p].type == TK_NEG);
             return 0;
         }
     } else if (check_parentheses(p, q)) {
