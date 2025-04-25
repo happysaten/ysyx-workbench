@@ -119,6 +119,7 @@ static bool make_token(char *e) {
                          tokens[nr_token - 1].type == '-' ||
                          tokens[nr_token - 1].type == '*' ||
                          tokens[nr_token - 1].type == '/' ||
+                         tokens[nr_token - 1].type == TK_NEG ||
                          tokens[nr_token - 1].type == TK_EQ)) {
                         tokens[nr_token].type = TK_NEG; // 将减号解释为负号
                     }
