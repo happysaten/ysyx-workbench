@@ -25,8 +25,6 @@ enum {
     TK_NOTYPE = 256, // 无类型
     TK_EQ,           // 等于
     TK_NUM,          // 数字
-    TK_HEX,          // 十六进制
-    TK_REG,          // 寄存器
     TK_NEG,          // 负号
     /* TODO: 添加更多的token类型 */
 };
@@ -35,17 +33,17 @@ static struct rule {
     const char *regex; // 正则表达式
     int token_type;    // token类型
 } rules[] = {
-    {" +", TK_NOTYPE},                   // 空格
-    {"\\+", '+'},                        // 加号
-    {"-", '-'},                          // 减号
-    {"\\*", '*'},                        // 乘号
-    {"/", '/'},                          // 除号
-    {"\\(", '('},                        // 左括号
-    {"\\)", ')'},                        // 右括号
-    {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
-    {"[0-9]+u?", TK_NUM},                // 支持数字后面带有可选的 'u'
-    {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
-    {"==", TK_EQ},                       // 等于
+    {" +", TK_NOTYPE}, // 空格
+    {"\\+", '+'},      // 加号
+    {"-", '-'},        // 减号
+    {"\\*", '*'},      // 乘号
+    {"/", '/'},        // 除号
+    {"\\(", '('},      // 左括号
+    {"\\)", ')'},      // 右括号
+    // {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
+    {"[0-9]+u?", TK_NUM}, // 支持数字后面带有可选的 'u'
+    // {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
+    {"==", TK_EQ}, // 等于
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -121,7 +119,6 @@ static bool make_token(char *e) {
                          tokens[nr_token - 1].type == '-' ||
                          tokens[nr_token - 1].type == '*' ||
                          tokens[nr_token - 1].type == '/' ||
-                         tokens[nr_token - 1].type == TK_NEG ||
                          tokens[nr_token - 1].type == TK_EQ)) {
                         tokens[nr_token].type = TK_NEG; // 将减号解释为负号
                     }
@@ -220,16 +217,8 @@ static word_t eval(int p, int q, bool *success) {
         // 单个token，必须是数字或十六进制
         if (tokens[p].type == TK_NUM) {
             return strtoul(tokens[p].str, NULL, 10);
-        } else if (tokens[p].type == TK_HEX) {
-            return strtoul(tokens[p].str, NULL, 16);
         } else {
             *success = false;
-            printf("Error: Invalid token %d at position %d.\n", tokens[p].type,
-                   p);
-            assert(tokens[p].type == TK_NEG);
-            for (int i = 0; i < nr_token; i++) {
-                printf("tokens[%d]: %d\n", i, tokens[i].type);
-            }
             return 0;
         }
     } else if (check_parentheses(p, q)) {
