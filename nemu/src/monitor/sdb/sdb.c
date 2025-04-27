@@ -167,7 +167,7 @@ static int cmd_test(char *args) {
         total_tests++;
         word_t result = expr(buf, &success);
         if (!success) {
-            Log("Expression evaluation failed for: %s\n", buf);
+            Log("Test failed: %s = %u (failed to evaluate expression)\n", buf, result);
         } else if (result != expected_result) {
             Log("Test failed: %s = %u (expected %u)\n", buf, result, expected_result);
         } else {
