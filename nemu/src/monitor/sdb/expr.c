@@ -20,30 +20,37 @@
  */
 #include <regex.h>
 #include <stdio.h>
+#include "memory/vaddr.h"
 
 enum {
     TK_NOTYPE = 256, // 无类型
     TK_EQ,           // 等于
     TK_NUM,          // 数字
     TK_NEG,          // 负号
-    /* TODO: 添加更多的token类型 */
+    TK_HEX,          // 十六进制数字
+    TK_REG,          // 寄存器
+    TK_NEQ,          // 不等于
+    TK_AND,          // 逻辑与
+    TK_DEREF,        // 指针解引用
 };
 
 static struct rule {
     const char *regex; // 正则表达式
     int token_type;    // token类型
 } rules[] = {
-    {" +", TK_NOTYPE}, // 空格
-    {"\\+", '+'},      // 加号
-    {"-", '-'},        // 减号
-    {"\\*", '*'},      // 乘号
-    {"/", '/'},        // 除号
-    {"\\(", '('},      // 左括号
-    {"\\)", ')'},      // 右括号
-    // {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
-    {"[0-9]+u?", TK_NUM}, // 支持数字后面带有可选的 'u'
-    // {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
-    {"==", TK_EQ}, // 等于
+    {" +", TK_NOTYPE},          // 空格
+    {"\\+", '+'},               // 加号
+    {"-", '-'},                 // 减号
+    {"\\*", '*'},               // 乘号或指针解引用
+    {"/", '/'},                 // 除号
+    {"\\(", '('},               // 左括号
+    {"\\)", ')'},               // 右括号
+    {"0[xX][0-9a-fA-F]+", TK_HEX}, // 十六进制数字
+    {"[0-9]+u?", TK_NUM},       // 支持数字后面带有可选的 'u'
+    {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
+    {"==", TK_EQ},              // 等于
+    {"!=", TK_NEQ},             // 不等于
+    {"&&", TK_AND},             // 逻辑与
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -105,8 +112,7 @@ static bool make_token(char *e) {
                     tokens[nr_token].type = rules[i].token_type;
                     if (substr_len < sizeof(tokens[nr_token].str)) {
                         strncpy(tokens[nr_token].str, substr_start, substr_len);
-                        tokens[nr_token].str[substr_len] =
-                            '\0'; // 字符串以空字符结尾
+                        tokens[nr_token].str[substr_len] = '\0';
                     } else {
                         printf("Token too long at position %d\n", position);
                         return false;
@@ -120,8 +126,10 @@ static bool make_token(char *e) {
                          tokens[nr_token - 1].type == '*' ||
                          tokens[nr_token - 1].type == '/' ||
                          tokens[nr_token - 1].type == TK_NEG ||
-                         tokens[nr_token - 1].type == TK_EQ)) {
-                        tokens[nr_token].type = TK_NEG; // 将减号解释为负号
+                         tokens[nr_token - 1].type == TK_EQ ||
+                         tokens[nr_token - 1].type == TK_NEQ ||
+                         tokens[nr_token - 1].type == TK_AND)) {
+                        tokens[nr_token].type = TK_NEG;
                     }
 
                     nr_token++;
@@ -135,6 +143,17 @@ static bool make_token(char *e) {
             printf("no match at position %d\n%s\n%*.s^\n", position, e,
                    position, "");
             return false;
+        }
+    }
+
+    // 区分指针解引用和乘法
+    for (int i = 0; i < nr_token; i++) {
+        if (tokens[i].type == '*' &&
+            (i == 0 || tokens[i - 1].type == '(' || tokens[i - 1].type == '+' ||
+             tokens[i - 1].type == '-' || tokens[i - 1].type == '*' ||
+             tokens[i - 1].type == '/' || tokens[i - 1].type == TK_EQ ||
+             tokens[i - 1].type == TK_NEQ || tokens[i - 1].type == TK_AND)) {
+            tokens[i].type = TK_DEREF;
         }
     }
 
@@ -199,6 +218,7 @@ static int find_main_operator(int p, int q) {
                 tokens[op].type == TK_NEG) {
                 continue;
             }
+            // 如果当前运算符优先级更低，则更新主运算符
             if (priority <= min_priority) {
                 min_priority = priority;
                 op = i;
@@ -215,9 +235,18 @@ static word_t eval(int p, int q, bool *success) {
         printf("Error: Invalid expression (p > q).\n");
         return 0;
     } else if (p == q) {
-        // 单个token，必须是数字或十六进制
+        // 单个token，必须是数字、十六进制或寄存器
         if (tokens[p].type == TK_NUM) {
             return strtoul(tokens[p].str, NULL, 10);
+        } else if (tokens[p].type == TK_HEX) {
+            return strtoul(tokens[p].str, NULL, 16);
+        } else if (tokens[p].type == TK_REG) {
+            word_t val = isa_reg_str2val(tokens[p].str + 1, success);
+            if (!*success) {
+                printf("Error: Invalid register '%s'.\n", tokens[p].str);
+                return 0;
+            }
+            return val;
         } else {
             *success = false;
             return 0;
@@ -239,6 +268,12 @@ static word_t eval(int p, int q, bool *success) {
             if (!*success)
                 return 0;
             return -val;
+        } else if (tokens[op].type == TK_DEREF) {
+            // 处理指针解引用
+            word_t addr = eval(op + 1, q, success);
+            if (!*success)
+                return 0;
+            return vaddr_read(addr, 4); // 从内存中读取4字节
         }
 
         word_t val1 = eval(p, op - 1, success);
@@ -257,11 +292,17 @@ static word_t eval(int p, int q, bool *success) {
             return val1 * val2;
         case '/':
             if (val2 == 0) {
-                *success = false; // 除零错误
+                *success = false;
                 printf("Error: Division by zero.\n");
                 return 0;
             }
             return val1 / val2;
+        case TK_EQ:
+            return val1 == val2;
+        case TK_NEQ:
+            return val1 != val2;
+        case TK_AND:
+            return val1 && val2;
         default:
             *success = false;
             printf("Error: Unsupported operator '%c'.\n", tokens[op].type);
