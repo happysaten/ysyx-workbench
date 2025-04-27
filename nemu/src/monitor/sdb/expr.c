@@ -18,44 +18,104 @@
 /* 我们使用POSIX正则表达式函数来处理正则表达式。
  * 输入'man regex'以获取有关POSIX正则表达式函数的更多信息。
  */
+#include "memory/vaddr.h"
 #include <regex.h>
 #include <stdio.h>
-#include "memory/vaddr.h"
+// #include <unordered_map>
 
 enum {
     TK_NOTYPE = 256, // 无类型
-    TK_EQ,           // 等于
     TK_NUM,          // 数字
     TK_NEG,          // 负号
     TK_HEX,          // 十六进制数字
     TK_REG,          // 寄存器
+    TK_EQ,           // 等于
     TK_NEQ,          // 不等于
     TK_AND,          // 逻辑与
     TK_DEREF,        // 指针解引用
 };
 
+// 0. 空格 数字 寄存器等等
+// 1. 后缀运算符
+// 2. 一元运算符
+// 3. 乘除运算符
+// 4. 加减运算符
+// 5. 移位运算符
+// 6. 关系运算符
+// 7. 相等运算符
+// 8. 位与 AND
+// 9. 位异或 XOR
+// 10. 位或 OR
+// 11. 逻辑与 AND
+// 12. 逻辑或 OR
+// 13. 条件运算符
+// 14. 赋值运算符
+// 15. 逗号运算符
+
 static struct rule {
     const char *regex; // 正则表达式
     int token_type;    // token类型
 } rules[] = {
-    {" +", TK_NOTYPE},          // 空格
-    {"\\+", '+'},               // 加号
-    {"-", '-'},                 // 减号
-    {"\\*", '*'},               // 乘号或指针解引用
-    {"/", '/'},                 // 除号
-    {"\\(", '('},               // 左括号
-    {"\\)", ')'},               // 右括号
-    {"0[xX][0-9a-fA-F]+", TK_HEX}, // 十六进制数字
-    {"[0-9]+u?", TK_NUM},       // 支持数字后面带有可选的 'u'
+    {" +", TK_NOTYPE},                   // 空格
+    {"\\+", '+'},                        // 加号
+    {"-", '-'},                          // 减号
+    {"\\*", '*'},                        // 乘号或指针解引用
+    {"/", '/'},                          // 除号
+    {"\\(", '('},                        // 左括号
+    {"\\)", ')'},                        // 右括号
+    {"0[xX][0-9a-fA-F]+", TK_HEX},       // 十六进制数字
+    {"[0-9]+u?", TK_NUM},                // 支持数字后面带有可选的 'u'
     {"\\$[a-zA-Z][a-zA-Z0-9]*", TK_REG}, // 寄存器
-    {"==", TK_EQ},              // 等于
-    {"!=", TK_NEQ},             // 不等于
-    {"&&", TK_AND},             // 逻辑与
+    {"==", TK_EQ},                       // 等于
+    {"!=", TK_NEQ},                      // 不等于
+    {"&&", TK_AND},                      // 逻辑与
 };
 
 #define NR_REGEX ARRLEN(rules)
 
 static regex_t re[NR_REGEX] = {};
+
+// // Token 类型到优先级的映射表
+// static std::unordered_map<int, int> priorities = {
+//     {TK_NOTYPE, 0}, // 0. 空格 数字 寄存器等等
+//     {TK_HEX, 0},    {TK_NUM, 0},  {TK_REG, 0}, {'(', 1}, // 1. 后缀运算符
+//     {TK_NEG, 2},                                         // 2. 一元运算符
+//     {TK_DEREF, 2},  {'*', 2},                            // 3. 乘除运算符
+//     {'/', 2},       {'+', 3},                            // 4. 加减运算符
+//     {'-', 3},       {TK_EQ, 7},                          // 7. 相等运算符
+//     {TK_NEQ, 7},    {TK_AND, 11},                        // 11. 逻辑与 AND
+// };
+
+// int get_priority(int token_type) {
+//     auto it = priorities.find(token_type);
+//     if (it != priorities.end()) {
+//         return it->second;
+//     }
+//     return -1; // 如果找不到对应的token_type，返回-1表示未知
+// }
+
+// Token 类型到优先级的映射表
+static struct priority_map {
+    int token_type;
+    int pri;
+} priorities[] = {
+    {TK_NOTYPE, 0}, // 0. 空格 数字 寄存器等等
+    {TK_HEX, 0},    {TK_NUM, 0},  {TK_REG, 0}, {'(', 1}, // 1. 后缀运算符
+    {TK_NEG, 2},                                         // 2. 一元运算符
+    {TK_DEREF, 2},  {'*', 2},                            // 3. 乘除运算符
+    {'/', 2},       {'+', 3},                            // 4. 加减运算符
+    {'-', 3},       {TK_EQ, 7},                          // 7. 相等运算符
+    {TK_NEQ, 7},    {TK_AND, 11},                        // 11. 逻辑与 AND
+};
+
+int get_priority(int token_type) {
+    for (size_t i = 0; i < sizeof(priorities) / sizeof(priorities[0]); ++i) {
+        if (priorities[i].token_type == token_type) {
+            return priorities[i].pri;
+        }
+    }
+    return -1; // 如果找不到对应的token_type，返回-1表示未知
+}
 
 /* 规则会被多次使用。
  * 因此我们在第一次使用前只编译一次。
@@ -188,7 +248,7 @@ static bool check_parentheses(int p, int q) {
 /* 在表达式中寻找主运算符 */
 static int find_main_operator(int p, int q) {
     int op = -1;
-    int min_priority = 100; // 假设优先级最大为100
+    int max_priority = 0; // 初始化优先级
     int balance = 0;
 
     for (int i = p; i <= q; i++) {
@@ -197,38 +257,14 @@ static int find_main_operator(int p, int q) {
         else if (tokens[i].type == ')')
             balance--;
         else if (balance == 0) { // 不在括号内
-            int priority;
-            switch (tokens[i].type) {
-            case '+':
-            case '-':
-                priority = 1;
-                break;
-            case '*':
-            case '/':
-                priority = 2;
-                break;
-            case TK_EQ:
-            case TK_NEQ:
-                priority = 3; // 等于和不等于优先级
-                break;
-            case TK_AND:
-                priority = 4; // 逻辑与优先级
-                break;
-            case TK_NEG:
-            case TK_DEREF:
-                priority = 5; // 负号和解引用优先级
-                break;
-            default:
-                continue;
-            }
+            int priority = get_priority(tokens[i].type);
             // 如果是负号或解引用，且前一个主运算符也是负号或解引用，则优先选择前一个
-            if ((tokens[i].type == TK_NEG || tokens[i].type == TK_DEREF) && op != -1 &&
-                (tokens[op].type == TK_NEG || tokens[op].type == TK_DEREF)) {
+            if(priority == 1 && max_priority == 1) {
                 continue;
             }
             // 如果当前运算符优先级更低，则更新主运算符
-            if (priority <= min_priority) {
-                min_priority = priority;
+            if (priority >= max_priority) {
+                max_priority = priority;
                 op = i;
             }
         }
