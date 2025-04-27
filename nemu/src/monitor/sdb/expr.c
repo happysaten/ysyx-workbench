@@ -207,15 +207,23 @@ static int find_main_operator(int p, int q) {
             case '/':
                 priority = 2;
                 break;
+            case TK_EQ:
+            case TK_NEQ:
+                priority = 3; // 等于和不等于优先级
+                break;
+            case TK_AND:
+                priority = 4; // 逻辑与优先级
+                break;
             case TK_NEG:
-                priority = 3; // 负号优先级高于加减乘除
+            case TK_DEREF:
+                priority = 5; // 负号和解引用优先级
                 break;
             default:
                 continue;
             }
-            // 如果是负号，且前一个主运算符也是负号，则优先选择前一个负号
-            if (tokens[i].type == TK_NEG && op != -1 &&
-                tokens[op].type == TK_NEG) {
+            // 如果是负号或解引用，且前一个主运算符也是负号或解引用，则优先选择前一个
+            if ((tokens[i].type == TK_NEG || tokens[i].type == TK_DEREF) && op != -1 &&
+                (tokens[op].type == TK_NEG || tokens[op].type == TK_DEREF)) {
                 continue;
             }
             // 如果当前运算符优先级更低，则更新主运算符
@@ -298,11 +306,11 @@ static word_t eval(int p, int q, bool *success) {
             }
             return val1 / val2;
         case TK_EQ:
-            return val1 == val2;
+            return val1 == val2; // 等于
         case TK_NEQ:
-            return val1 != val2;
+            return val1 != val2; // 不等于
         case TK_AND:
-            return val1 && val2;
+            return val1 && val2; // 逻辑与
         default:
             *success = false;
             printf("Error: Unsupported operator '%c'.\n", tokens[op].type);
