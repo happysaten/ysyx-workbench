@@ -23,7 +23,6 @@ typedef struct watchpoint {
 
     char expr[256]; // 存储监视的表达式
     word_t val;     // 上一次表达式的值
-    bool is_valid;  // 标记该监视点是否有效
 
 } WP;
 
@@ -59,7 +58,6 @@ WP *new_wp() {
     // 将节点添加到使用中的链表头部
     wp->next = head;
     head = wp;
-    wp->is_valid = true;
 
     return wp;
 }
@@ -90,7 +88,6 @@ void free_wp(WP *wp) {
     // 清空监视点信息
     memset(wp->expr, 0, sizeof(wp->expr));
     wp->val = 0;
-    wp->is_valid = false;
 
     // 添加到空闲链表头部
     wp->next = free_;
@@ -133,6 +130,7 @@ bool delete_watchpoint(int num) {
 void print_watchpoints() {
     if (head == NULL) {
         printf("No watchpoints.\n");
+        Log("No watchpoints.\n");
         return;
     }
     printf("Num\tWhat\tValue\n");
