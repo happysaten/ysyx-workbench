@@ -338,10 +338,7 @@ static word_t eval(int p, int q, bool *success) {
             if (val2 == 0) {
                 // *success = false;
                 printf("Error: Division by zero.\n");
-                for(int i = p; i <= q; i++) {
-                    printf("tokens[%d]: type=%d, str=%s\n", i, tokens[i].type, tokens[i].str);
-                }
-                return 0;
+                // return 0;
             }
             return val1 / val2;
         case TK_EQ:
