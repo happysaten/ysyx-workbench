@@ -20,4 +20,13 @@
 
 word_t expr(char *e, bool *success);
 
+// // 监视点相关函数声明
+typedef struct watchpoint WP;
+WP* new_wp();
+void free_wp(WP *wp);
+WP* set_watchpoint(char *expr);
+bool delete_watchpoint(int num);
+void print_watchpoints();
+bool check_watchpoints();
+
 #endif

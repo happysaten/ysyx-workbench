@@ -78,17 +78,46 @@ static int cmd_si(char *args) {
 /* 命令：显示所有支持的命令 */
 static int cmd_help(char *args);
 
-/* 命令：信息查询 */
-static int cmd_info(char *args) {
+/* 命令：处理设置监视点的命令 */
+static int cmd_w(char *args) {
     if (args == NULL) {
-        printf("Usage: info r\n");
+        printf("Usage: w EXPR - set watchpoint for expression EXPR\n");
+        return 0;
+    }
+    set_watchpoint(args);
+    return 0;
+}
+
+/* 命令：处理删除监视点的命令 */
+static int cmd_d(char *args) {
+    if (args == NULL) {
+        printf("Usage: d NUM - delete watchpoint with number NUM\n");
         return 0;
     }
 
-    if (strcmp(args, "r") == 0) {
-        isa_reg_display(); // 调用API打印寄存器值
+    int num = atoi(args);
+    if (delete_watchpoint(num)) {
+        printf("Deleted watchpoint %d\n", num);
     } else {
-        printf("Unknown argument '%s' for info\n", args);
+        printf("No watchpoint with number %d\n", num);
+    }
+    return 0;
+}
+
+/* 命令：信息查询 */
+static int cmd_info(char *args) {
+    if (args == NULL) {
+        printf("Usage: info r - print register values\n");
+        printf("       info w - print watchpoint information\n");
+        return 0;
+    }
+
+    if (args[0] == 'r') {
+        isa_reg_display(); // 调用API打印寄存器值
+    } else if (args[0] == 'w') {
+        print_watchpoints();
+    } else {
+        printf("Unknown info command: '%s'\n", args);
     }
     return 0;
 }
@@ -140,7 +169,8 @@ static int cmd_x(char *args) {
 
 /* 命令：测试表达式求值 */
 static int cmd_test(char *args) {
-    char *test_file = "/home/saten/Code/Other/ysyx-workbench/nemu/tools/gen-expr/build/input";
+    char *test_file =
+        "/home/saten/Code/Other/ysyx-workbench/nemu/tools/gen-expr/build/input";
     FILE *fp = fopen(test_file, "r");
     if (fp == NULL) {
         printf("Failed to open test file: %s\n", test_file);
@@ -167,9 +197,11 @@ static int cmd_test(char *args) {
         total_tests++;
         word_t result = expr(buf, &success);
         if (!success) {
-            Log("Test failed: %s = %u (failed to evaluate expression)\n", buf, result);
+            Log("Test failed: %s = %u (failed to evaluate expression)\n", buf,
+                result);
         } else if (result != expected_result) {
-            Log("Test failed: %s = %u (expected %u)\n", buf, result, expected_result);
+            Log("Test failed: %s = %u (expected %u)\n", buf, result,
+                expected_result);
         } else {
             Log("Test passed: %s = %u\n", buf, result);
             passed_tests++;
@@ -215,6 +247,8 @@ static struct {
     {"x", "Examine memory: x N EXPR", cmd_x},
     {"test", "Test expression evaluation", cmd_test}, // 添加 test 命令
     {"p", "Evaluate the value of an expression", cmd_p},
+    {"w", "Set a watchpoint", cmd_w},
+    {"d", "Delete a watchpoint", cmd_d},
 
     /* TODO: Add more commands */
 };
