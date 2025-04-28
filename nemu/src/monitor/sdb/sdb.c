@@ -155,19 +155,19 @@ static int cmd_test(char *args) {
     int passed_tests = 0;
 
     while (fgets(buf, sizeof(buf), fp) != NULL) {
-        char *equals_sign = strchr(buf, '=');
+        char *equals_sign = strrchr(buf, '='); // 查找最后一个 '='
         if (equals_sign == NULL) {
             printf("Invalid test case format: %s\n", buf);
             continue;
         }
 
-        *equals_sign = '\0'; // 将 '=' 替换为字符串结束符
+        *equals_sign = '\0'; // 将最后一个 '=' 替换为字符串结束符
         expected_result = atoi(equals_sign + 1); // 提取期望结果
 
         total_tests++;
         word_t result = expr(buf, &success);
         if (!success) {
-            Log("Expression evaluation failed for: %s\n", buf);
+            Log("Test failed: %s = %u (failed to evaluate expression)\n", buf, result);
         } else if (result != expected_result) {
             Log("Test failed: %s = %u (expected %u)\n", buf, result, expected_result);
         } else {

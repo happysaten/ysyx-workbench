@@ -22,6 +22,7 @@
 
 // this should be enough
 static char buf[65536] = {};
+static unsigned int len_buf = 0;
 static char code_buf[65536 + 128] = {}; // a little larger than `buf`
 static char *code_format = "#include <stdio.h>\n"
                            "int main() { "
@@ -38,10 +39,9 @@ uint32_t choose(uint32_t n) {
 
 // 将字符追加到 buf 中
 static void gen(char c) {
-    int len = strlen(buf);
-    if (len < sizeof(buf) - 1) { // 确保不会溢出
-        buf[len] = c;
-        buf[len + 1] = '\0';
+    if (len_buf < sizeof(buf) - 1) { // 确保不会溢出
+        buf[len_buf] = c;
+        len_buf++;
     }
 }
 
@@ -55,22 +55,40 @@ static void gen_space() {
 
 // 生成一个随机数字
 static void gen_num() {
-    int len = choose(8) + 1; // 随机生成1到8位的数字长度
-    for (int i = 0; i < len; i++) {
-        char digit;
-        if (i == 0) {
-            digit = '1' + choose(9); // 确保首位数字为 '1' 到 '9'
-        } else {
-            digit = '0' + choose(10); // 随机生成字符 '0' 到 '9'
+    if (choose(2) == 0) { // 随机选择十进制或16进制
+        // 生成十进制数字
+        int len = choose(8) + 1; // 随机生成1到8位的数字长度
+        for (int i = 0; i < len; i++) {
+            char digit;
+            if (i == 0) {
+                digit = '1' + choose(9); // 确保首位数字为 '1' 到 '9'
+            } else {
+                digit = '0' + choose(10); // 随机生成字符 '0' 到 '9'
+            }
+            gen(digit); // 追加到 buf 中
         }
-        gen(digit); // 追加到 buf 中
+        gen('u'); // 确保 buf 中的数字是无符号的
+    } else {
+        // 生成16进制数字
+        gen('0');
+        gen('x'); // 添加16进制前缀
+        int len = choose(8) + 1; // 随机生成1到8位的数字长度
+        for (int i = 0; i < len; i++) {
+            char digit;
+            int hex_digit = choose(16); // 随机生成0到15
+            if (hex_digit < 10) {
+                digit = '0' + hex_digit; // 生成字符 '0' 到 '9'
+            } else {
+                digit = 'a' + (hex_digit - 10); // 生成字符 'a' 到 'f'
+            }
+            gen(digit); // 追加到 buf 中
+        }
     }
-    gen('u'); // 确保 buf 中的数字是无符号的
 }
 
 // 生成一个随机运算符
 static void gen_rand_op() {
-    switch (choose(4)) {
+    switch (choose(7)) { // 支持7种操作符
     case 0:
         gen('+');
         break; // 加法
@@ -83,6 +101,18 @@ static void gen_rand_op() {
     case 3:
         gen('/');
         break; // 除法
+    case 4:
+        gen('=');
+        gen('=');
+        break; // 等于
+    case 5:
+        gen('!');
+        gen('=');
+        break; // 不等于
+    case 6:
+        gen('&');
+        gen('&');
+        break; // 逻辑与
     }
 }
 
@@ -119,8 +149,9 @@ int main(int argc, char *argv[]) {
     }
     int i;
     for (i = 0; i < loop; i++) {
-        buf[0] = '\0';   // 清空buf
+        len_buf = 0; // 重置 buf 的长度
         gen_rand_expr(); // 生成随机表达式
+        gen('\0');       // 结束字符串
 
         sprintf(code_buf, code_format, buf); // 将表达式嵌入到代码中
 
@@ -139,7 +170,7 @@ int main(int argc, char *argv[]) {
         int result;
         int status;
         ret = fscanf(fp, "%d", &result); // 获取程序输出的结果
-        status = pclose(fp); // 关闭程序并获取其退出状态
+        status = pclose(fp);             // 关闭程序并获取其退出状态
 
         // 检查程序是否正常退出
         if (WIFEXITED(status)) {
