@@ -135,12 +135,11 @@ void print_watchpoints() {
         printf("No watchpoints.\n");
         return;
     }
-
-    printf("Num     Type           What\n");
+    printf("Num\tWhat\n");
     WP *wp = head;
     while (wp) {
-        printf("%-8d watchpoint     %s\n", wp->NO, wp->expr);
-        printf("        value: %u\n", wp->val);
+        printf("%d\t%s\n", wp->NO, wp->expr);
+        printf("\tvalue: %u\n", wp->val);
         wp = wp->next;
     }
 }
