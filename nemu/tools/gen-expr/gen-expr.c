@@ -32,7 +32,7 @@ static char *code_format = "#include <stdio.h>\n"
                            "}";
 
 // 生成一个小于n的随机数
-uint32_t choose(uint32_t n) {
+static uint32_t choose(uint32_t n) {
     uint32_t num = rand() % n;
     return num;
 }

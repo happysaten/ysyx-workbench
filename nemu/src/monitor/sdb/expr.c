@@ -108,7 +108,7 @@ static struct priority_map {
     {TK_NEQ, 7},    {TK_AND, 11},                        // 11. 逻辑与 AND
 };
 
-int get_priority(int token_type) {
+static int get_priority(int token_type) {
     for (size_t i = 0; i < sizeof(priorities) / sizeof(priorities[0]); ++i) {
         if (priorities[i].token_type == token_type) {
             return priorities[i].pri;
