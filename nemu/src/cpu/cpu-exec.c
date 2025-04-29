@@ -17,6 +17,7 @@
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
 #include <locale.h>
+#include <stdio.h>
 
 /* The assembly code of instructions executed is only output to the screen
  * when the number of instructions executed is less than this value.
@@ -47,7 +48,7 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
     if (check_watchpoints()) {
         // 如果监视点触发，设置NEMU状态为停止
         nemu_state.state = NEMU_STOP;
-        printf("Program paused due to watchpoint trigger\n");
+        Log("Program paused due to watchpoint trigger\n");
     }
 #endif
 }

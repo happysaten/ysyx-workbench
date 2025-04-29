@@ -22,10 +22,7 @@
 #include <readline/readline.h>
 #include <stdio.h>
 
-static int is_batch_mode = false; // 是否为批处理模式
-
-void init_regex();   // 初始化正则表达式
-void init_wp_pool(); // 初始化监视点池
+static bool is_batch_mode = false; // 是否为批处理模式
 
 /* 使用 `readline` 库从标准输入读取命令 */
 static char *rl_gets() {

@@ -43,12 +43,12 @@ void init_wp_pool() {
 }
 
 // 从空闲链表获取一个监视点结构
-WP *new_wp() {
+static void new_wp() {
     if (free_ == NULL) {
         // 没有空闲监视点可用
         printf("Error: No free watchpoint available!\n");
         assert(0);
-        return NULL;
+        return;
     }
 
     // 从空闲链表中取出一个节点
@@ -59,11 +59,11 @@ WP *new_wp() {
     wp->next = head;
     head = wp;
 
-    return wp;
+    return;
 }
 
 // 释放监视点结构回到空闲链表
-void free_wp(WP *wp) {
+static void free_wp(WP *wp) {
     if (wp == NULL)
         return;
 
@@ -95,22 +95,23 @@ void free_wp(WP *wp) {
 }
 
 // 设置监视点
-WP *set_watchpoint(char *e) {
+void set_watchpoint(char *e) {
     bool success = true;
     word_t val = expr(e, &success);
     if (!success) {
         printf("Invalid expression for watchpoint\n");
-        return NULL;
+        return;
     }
 
-    WP *wp = new_wp();
+    new_wp();
+    WP *wp = head;
     if (wp) {
         strncpy(wp->expr, e, sizeof(wp->expr) - 1);
         wp->expr[sizeof(wp->expr) - 1] = '\0'; // 确保字符串终止
         wp->val = val;
         printf("Watchpoint %d: %s\n", wp->NO, wp->expr);
     }
-    return wp;
+    return;
 }
 
 // 删除监视点
@@ -130,7 +131,6 @@ bool delete_watchpoint(int num) {
 void print_watchpoints() {
     if (head == NULL) {
         printf("No watchpoints.\n");
-        Log("No watchpoints.\n");
         return;
     }
     printf("Num\tWhat\tValue\n");
