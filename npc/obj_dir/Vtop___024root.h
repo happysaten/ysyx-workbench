@@ -7,9 +7,10 @@
 
 #include "verilated.h"
 
+
 class Vtop__Syms;
 
-class Vtop___024root final : public VerilatedModule {
+class alignas(VL_CACHE_LINE_BYTES) Vtop___024root final : public VerilatedModule {
   public:
 
     // DESIGN SPECIFIC STATE
@@ -26,15 +27,15 @@ class Vtop___024root final : public VerilatedModule {
     CData/*2:0*/ top__DOT__ps2_keyboard0__DOT__r_ptr;
     CData/*3:0*/ top__DOT__ps2_keyboard0__DOT__count;
     CData/*2:0*/ top__DOT__ps2_keyboard0__DOT__ps2_clk_sync;
-    CData/*0:0*/ top__DOT__ps2_keyboard0__DOT____Vlvbound_h1a91ade8__0;
+    CData/*0:0*/ top__DOT__ps2_keyboard0__DOT____Vlvbound_h4ebbf8f4__0;
     CData/*7:0*/ top__DOT__key_process0__DOT__cur_data;
     CData/*7:0*/ top__DOT__key_process0__DOT__cnt;
     CData/*1:0*/ top__DOT__key_process0__DOT__state;
     CData/*1:0*/ top__DOT__key_process0__DOT__next_state;
-    CData/*0:0*/ __Vtrigrprev__TOP__clk;
+    CData/*0:0*/ __VstlFirstIteration;
+    CData/*0:0*/ __Vtrigprevexpr___TOP__clk__0;
     CData/*0:0*/ __VactContinue;
     SData/*9:0*/ top__DOT__ps2_keyboard0__DOT__buffer;
-    IData/*31:0*/ __VstlIterCount;
     IData/*31:0*/ __VactIterCount;
     VlUnpacked<CData/*7:0*/, 8> top__DOT__ps2_keyboard0__DOT__fifo;
     VlUnpacked<CData/*7:0*/, 256> top__DOT__key_process0__DOT__ps2_to_ascii0__DOT__lut;
@@ -52,7 +53,7 @@ class Vtop___024root final : public VerilatedModule {
 
     // INTERNAL METHODS
     void __Vconfigure(bool first);
-} VL_ATTR_ALIGNED(VL_CACHE_LINE_BYTES);
+};
 
 
 #endif  // guard
