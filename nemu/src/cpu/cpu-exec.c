@@ -47,7 +47,8 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
     // 检查监视点
     if (check_watchpoints()) {
         // 如果监视点触发，设置NEMU状态为停止
-        nemu_state.state = NEMU_STOP;
+        if(nemu_state.state == NEMU_RUNNING)
+            nemu_state.state = NEMU_STOP;
         Log("Program paused due to watchpoint trigger\n");
     }
 #endif
