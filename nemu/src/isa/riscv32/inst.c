@@ -212,6 +212,9 @@ static int decode_exec(Decode *s) {
     // div: rd = src1 / src2，除法（有符号）
     INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div, R,
             R(rd) = (sword_t)src2 == 0 ? (word_t)-1 : (sword_t)src1 / (sword_t)src2);
+    // divu: rd = src1 / src2，除法（无符号）
+    INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu, R,
+            R(rd) = src2 == 0 ? (word_t)-1 : src1 / src2);
     // rem: rd = src1 % src2，取余（有符号）
     INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem, R,
             R(rd) = (sword_t)src2 == 0 ? src1 : (sword_t)src1 % (sword_t)src2);
