@@ -141,6 +141,9 @@ static int decode_exec(Decode *s) {
     // add: rd = src1 + src2，寄存器加法
     INSTPAT("0000000 ????? ????? 000 ????? 01100 11", add, R,
             R(rd) = src1 + src2);
+    // sub: rd = src1 - src2，寄存器减法
+    INSTPAT("0100000 ????? ????? 000 ????? 01100 11", sub, R,
+            R(rd) = src1 - src2);
     // sltu: rd = (src1 < src2) ? 1 : 0，无符号小于置位
     INSTPAT("0000000 ????? ????? 011 ????? 01100 11", sltu, R,
             R(rd) = (src1 < src2) ? 1 : 0);
