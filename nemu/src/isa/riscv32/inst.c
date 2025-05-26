@@ -192,6 +192,12 @@ static int decode_exec(Decode *s) {
     // xor: rd = src1 ^ src2，按位异或
     INSTPAT("0000000 ????? ????? 100 ????? 01100 11", xor, R,
             R(rd) = src1 ^ src2);
+    // srl: rd = src1逻辑右移(src2 & 0x1f)位
+    INSTPAT("0000000 ????? ????? 101 ????? 01100 11", srl, R,
+            R(rd) = src1 >> (src2 & 0x1f));
+    // sra: rd = src1算术右移(src2 & 0x1f)位
+    INSTPAT("0100000 ????? ????? 101 ????? 01100 11", sra, R,
+            R(rd) = (sword_t)src1 >> (src2 & 0x1f));
     // or: rd = src1 | src2，按位或
     INSTPAT("0000000 ????? ????? 110 ????? 01100 11", or, R,
             R(rd) = src1 | src2);
