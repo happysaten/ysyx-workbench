@@ -204,6 +204,11 @@ static int decode_exec(Decode *s) {
     // mul: rd = src1 * src2，乘法
     INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul, R,
             R(rd) = src1 * src2);
+    // mulh: rd = 高32位(src1 * src2)，有符号乘法高位
+    INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh, R, {
+        int64_t res = (int64_t)(sword_t)src1 * (int64_t)(sword_t)src2;
+        R(rd) = (word_t)(res >> 32);
+    });
     // div: rd = src1 / src2，除法（有符号）
     INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div, R,
             R(rd) = (sword_t)src2 == 0 ? (word_t)-1 : (sword_t)src1 / (sword_t)src2);
