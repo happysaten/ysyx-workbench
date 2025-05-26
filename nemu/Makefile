@@ -62,7 +62,6 @@ else
 include $(NEMU_HOME)/scripts/native.mk
 endif
 
-# ...existing code...
 
 .PHONY: count
 count:
