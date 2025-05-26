@@ -159,6 +159,9 @@ static int decode_exec(Decode *s) {
     // or: rd = src1 | src2，按位或
     INSTPAT("0000000 ????? ????? 110 ????? 01100 11", or, R,
             R(rd) = src1 | src2);
+    // and: rd = src1 & src2，按位与
+    INSTPAT("0000000 ????? ????? 111 ????? 01100 11", and, R,
+            R(rd) = src1 & src2);
     // ebreak: 触发调试断点或系统调用
     INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak, N,
             NEMUTRAP(s->pc, R(10))); // R(10) is $a0
