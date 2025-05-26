@@ -62,17 +62,8 @@ else
 include $(NEMU_HOME)/scripts/native.mk
 endif
 
+
 .PHONY: count
 count:
 		@echo "统计所有.c和.h文件的非空代码行数："
 		@find . -name "*.c" -o -name "*.h" | xargs cat | grep -v '^[[:space:]]*$$' | wc -l
-
-.PHONY: preprocess
-preprocess:
-	@echo "输出所有源文件的预处理结果到 build/preprocessed/"
-	@mkdir -p build/preprocessed
-	@for f in $(SRCS); do \
-		out=build/preprocessed/$$(echo $$f | sed 's/\//_/g').i; \
-		echo "预处理: $$f -> $$out"; \
-		$(CC) $(CFLAGS) -E $$f -o $$out; \
-	done
