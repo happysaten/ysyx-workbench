@@ -17,23 +17,24 @@ include $(NVBOARD_HOME)/scripts/nvboard.mk
 sim: csrc/main.cpp $(VSRCS)
 	# 提交git
 	# $(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	# 生成约束函数
 	mkdir -p build
+	verilator --cc --exe --build -j 0 $^ $(LINTSRC) -Wall --top-module top --Mdir build/obj_dir --trace-fst
+	build/obj_dir/Vtop
+
+nvboard: csrc/main.cpp $(VSRCS)
+	# 提交git
+	# $(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	mkdir -p build
+	# 生成约束函数
 	python $(NVBOARD_HOME)/scripts/auto_pin_bind.py constr/top.nxdc constr/auto_bind.cpp
-
-	# 生成nvboard库
+	# 执行nvboard脚本
 	make nvboard-archive
-
-	# 执行verilator
 	verilator --cc --exe --build -j 0 $^ $(LINTSRC) constr/auto_bind.cpp -Wall --top-module top $(NVBOARD_ARCHIVE) $(addprefix -LDFLAGS , $(LDFLAGS)) -CFLAGS -I$(NVBOARD_HOME)/include --Mdir build/obj_dir
-	
-
-	# 执行可执行文件
 	build/obj_dir/Vtop
 
 clean:
 	rm -rf build
-	-rm -rf result
+	rm -rf result
 
 .PHONY: all clean sim
 
