@@ -66,7 +66,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
     char *p = s->logbuf;
     // 1. 先写入pc
     int n = snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
-
+    
     p += n;
     int ilen = s->snpc - s->pc;
     int i;
