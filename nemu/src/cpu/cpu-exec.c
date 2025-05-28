@@ -37,6 +37,8 @@ bool check_watchpoints();
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE
     log_write("%s\n", _this->logbuf);
+    void iringbuf_push(const char *itrace_str);
+    iringbuf_push(_this->logbuf);
 #endif
     if (g_print_step) {
         IFDEF(CONFIG_ITRACE, puts(_this->logbuf));
@@ -47,7 +49,7 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
     // 检查监视点
     if (check_watchpoints()) {
         // 如果监视点触发，设置NEMU状态为停止
-        if(nemu_state.state == NEMU_RUNNING)
+        if (nemu_state.state == NEMU_RUNNING)
             nemu_state.state = NEMU_STOP;
         Log("Program paused due to watchpoint trigger\n");
     }
@@ -115,6 +117,10 @@ static void statistic() {
 
 void assert_fail_msg() {
     isa_reg_display();
+#ifdef CONFIG_ITRACE
+    void iringbuf_dump();
+    iringbuf_dump();
+#endif
     statistic();
 }
 
