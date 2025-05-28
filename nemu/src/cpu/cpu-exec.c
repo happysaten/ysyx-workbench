@@ -63,28 +63,20 @@ static void exec_once(Decode *s, vaddr_t pc) {
     isa_exec_once(s);
     cpu.pc = s->dnpc;
 #ifdef CONFIG_ITRACE
-    char *buf = s->logbuf;
-
-    // 1. 输出pc，12字节对齐
-    int pc_len = snprintf(buf, 13, FMT_WORD, s->pc);
-    int pc_pad = 12 - pc_len;
-    if (pc_pad < 0) pc_pad = 0;
-    memset(buf + pc_len, ' ', pc_pad);
-
-    // 2. 反汇编指令，32字节对齐，从buf+12开始
-    char asm_buf[128] = {0};
+    char *p = s->logbuf;
     int ilen = s->snpc - s->pc;
-    void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
-    disassemble(asm_buf, sizeof(asm_buf), MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst, ilen);
-    int asm_len = snprintf(buf + 12, 33, "%s", asm_buf);
-    int asm_pad = 32 - asm_len;
-    if (asm_pad < 0) asm_pad = 0;
-    memset(buf + 12 + asm_len, ' ', asm_pad);
-
-    // 3. 二进制指令，从buf+44开始
     int i;
-    char *p = buf + 44;
     uint8_t *inst = (uint8_t *)&s->isa.inst;
+
+    // Write PC to the first 12 bytes (left-aligned)
+    p += snprintf(s->logbuf, 13, FMT_WORD ":", s->pc);
+
+    // Write disassembled instruction starting at byte 12, max 32 bytes
+    void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
+    disassemble(s->logbuf + 12, 33, MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), inst, ilen);
+
+    // Write binary instruction bytes starting at byte 44 (12 + 32)
+    p = s->logbuf + 44;
 #ifdef CONFIG_ISA_x86
     for (i = 0; i < ilen; i++) {
 #else
