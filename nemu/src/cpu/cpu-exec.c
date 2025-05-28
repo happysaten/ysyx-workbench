@@ -66,32 +66,20 @@ static void exec_once(Decode *s, vaddr_t pc) {
     char *p = s->logbuf;
     // 1. 先写入pc
     int n = snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
-    p += n;
 
+    p += n;
     int ilen = s->snpc - s->pc;
     int i;
     uint8_t *inst = (uint8_t *)&s->isa.inst;
 
     // 2. 反汇编写到logbuf中间
     void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
-    // 预留二进制指令空间（每字节3字符，最多8字节，外加空格和结尾）
-    int bin_max = 8 * 3 + 2;
-    int disasm_len = sizeof(s->logbuf) - (p - s->logbuf) - bin_max;
-    if (disasm_len < 32) disasm_len = 32;
+    int disasm_len = sizeof(s->logbuf) - (p - s->logbuf) - (ilen * 3 + 8); // 预留足够空间给二进制
+    if (disasm_len < 32) disasm_len = 32; // 最小预留
     disassemble(p, disasm_len, MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst, ilen);
 
     // 跳到反汇编字符串末尾
-    int asm_len = strlen(p);
-    p += asm_len;
-
-    // 对齐反汇编和二进制指令（假设反汇编部分宽度32）
-    int asm_align = 32;
-    if (asm_len < asm_align) {
-        int pad = asm_align - asm_len;
-        memset(p, ' ', pad);
-        p += pad;
-    }
-
+    p += strlen(p);
     // 3. 二进制指令写到最后
     *p++ = ' ';
 #ifdef CONFIG_ISA_x86
