@@ -64,10 +64,24 @@ static void exec_once(Decode *s, vaddr_t pc) {
     cpu.pc = s->dnpc;
 #ifdef CONFIG_ITRACE
     char *p = s->logbuf;
-    p += snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
+    // 1. 先写入pc
+    int n = snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
+
+    p += n;
     int ilen = s->snpc - s->pc;
     int i;
     uint8_t *inst = (uint8_t *)&s->isa.inst;
+
+    // 2. 反汇编写到logbuf中间
+    void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
+    int disasm_len = sizeof(s->logbuf) - (p - s->logbuf) - (ilen * 3 + 8); // 预留足够空间给二进制
+    if (disasm_len < 32) disasm_len = 32; // 最小预留
+    disassemble(p, disasm_len, MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst, ilen);
+
+    // 跳到反汇编字符串末尾
+    p += strlen(p);
+    // 3. 二进制指令写到最后
+    *p++ = ' ';
 #ifdef CONFIG_ISA_x86
     for (i = 0; i < ilen; i++) {
 #else
@@ -75,19 +89,6 @@ static void exec_once(Decode *s, vaddr_t pc) {
 #endif
         p += snprintf(p, 4, " %02x", inst[i]);
     }
-    int ilen_max = MUXDEF(CONFIG_ISA_x86, 8, 4);
-    int space_len = ilen_max - ilen;
-    if (space_len < 0)
-        space_len = 0;
-    space_len = space_len * 3 + 1;
-    memset(p, ' ', space_len);
-    p += space_len;
-
-    void disassemble(char *str, int size, uint64_t pc, uint8_t *code,
-                     int nbyte);
-    disassemble(p, s->logbuf + sizeof(s->logbuf) - p,
-                MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst,
-                ilen);
 #endif
 }
 
