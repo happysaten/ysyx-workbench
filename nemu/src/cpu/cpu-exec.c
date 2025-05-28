@@ -74,12 +74,9 @@ static void exec_once(Decode *s, vaddr_t pc) {
 
     // 2. 反汇编写到logbuf中间
     void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
-    // 反汇编和二进制指令对齐宽度
-    int asm_align = 32;
-    int bin_align = 32;
-
-    // 预留二进制指令空间
-    int disasm_len = sizeof(s->logbuf) - (p - s->logbuf) - bin_align;
+    // 预留二进制指令空间（每字节3字符，最多8字节，外加空格和结尾）
+    int bin_max = 8 * 3 + 2;
+    int disasm_len = sizeof(s->logbuf) - (p - s->logbuf) - bin_max;
     if (disasm_len < 32) disasm_len = 32;
     disassemble(p, disasm_len, MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst, ilen);
 
@@ -87,15 +84,15 @@ static void exec_once(Decode *s, vaddr_t pc) {
     int asm_len = strlen(p);
     p += asm_len;
 
-    // 对齐反汇编和二进制指令（反汇编部分宽度 asm_align）
+    // 对齐反汇编和二进制指令（假设反汇编部分宽度32）
+    int asm_align = 32;
     if (asm_len < asm_align) {
         int pad = asm_align - asm_len;
         memset(p, ' ', pad);
         p += pad;
     }
 
-    // 3. 二进制指令写到最后，保证二进制指令左对齐
-    char *bin_start = p;
+    // 3. 二进制指令写到最后
     *p++ = ' ';
 #ifdef CONFIG_ISA_x86
     for (i = 0; i < ilen; i++) {
@@ -103,13 +100,6 @@ static void exec_once(Decode *s, vaddr_t pc) {
     for (i = ilen - 1; i >= 0; i--) {
 #endif
         p += snprintf(p, 4, " %02x", inst[i]);
-    }
-    // 填充空格保证二进制指令区域宽度一致
-    int bin_len = p - bin_start;
-    if (bin_len < bin_align) {
-        int pad = bin_align - bin_len;
-        memset(p, ' ', pad);
-        p += pad;
     }
 #endif
 }
