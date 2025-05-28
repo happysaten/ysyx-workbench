@@ -13,6 +13,7 @@
  * See the Mulan PSL v2 for more details.
  ***************************************************************************************/
 
+#include "debug.h"
 #include <cpu/cpu.h>
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
@@ -151,6 +152,7 @@ void cpu_exec(uint64_t n) {
         break;
 
     case NEMU_END:
+        Assert(0, "just for debugging iringbuf");
     case NEMU_ABORT:
         Log("nemu: %s at pc = " FMT_WORD,
             (nemu_state.state == NEMU_ABORT
