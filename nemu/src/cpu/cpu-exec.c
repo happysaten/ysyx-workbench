@@ -64,8 +64,23 @@ static void exec_once(Decode *s, vaddr_t pc) {
     cpu.pc = s->dnpc;
 #ifdef CONFIG_ITRACE
     char *p = s->logbuf;
-    p += snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
+    // 1. 输出pc，12字节对齐
+    int pc_len = snprintf(p, 13, FMT_WORD, s->pc);
+    int pc_pad = 12 - pc_len;
+    if (pc_pad < 0) pc_pad = 0;
+    memset(p + pc_len, ' ', pc_pad);
+    p += 12;
+    // 2. 反汇编指令，32字节对齐
+    char asm_buf[128] = {0};
     int ilen = s->snpc - s->pc;
+    void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
+    disassemble(asm_buf, sizeof(asm_buf), MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst, ilen);
+    int asm_len = snprintf(p, 33, "%s", asm_buf);
+    int asm_pad = 32 - asm_len;
+    if (asm_pad < 0) asm_pad = 0;
+    memset(p + asm_len, ' ', asm_pad);
+    p += 32;
+    // 3. 二进制指令，剩下的空间
     int i;
     uint8_t *inst = (uint8_t *)&s->isa.inst;
 #ifdef CONFIG_ISA_x86
@@ -75,19 +90,6 @@ static void exec_once(Decode *s, vaddr_t pc) {
 #endif
         p += snprintf(p, 4, " %02x", inst[i]);
     }
-    int ilen_max = MUXDEF(CONFIG_ISA_x86, 8, 4);
-    int space_len = ilen_max - ilen;
-    if (space_len < 0)
-        space_len = 0;
-    space_len = space_len * 3 + 1;
-    memset(p, ' ', space_len);
-    p += space_len;
-
-    void disassemble(char *str, int size, uint64_t pc, uint8_t *code,
-                     int nbyte);
-    disassemble(p, s->logbuf + sizeof(s->logbuf) - p,
-                MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst,
-                ilen);
 #endif
 }
 
