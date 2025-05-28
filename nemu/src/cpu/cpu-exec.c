@@ -67,7 +67,6 @@ static void exec_once(Decode *s, vaddr_t pc) {
 
     // 写入 PC：固定 12 字符宽度（含冒号）
     snprintf(p, 12, FMT_WORD ":", s->pc);
-    p[11] = '\0';  // 确保末尾截断
     p += 12;
 
     // 写入反汇编（放在第 12 字节处，最大32字符）
