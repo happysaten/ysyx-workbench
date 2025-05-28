@@ -152,7 +152,7 @@ void cpu_exec(uint64_t n) {
         break;
 
     case NEMU_END:
-        Assert(0, "just for debugging iringbuf");
+        // Assert(0, "just for debugging iringbuf");
     case NEMU_ABORT:
         Log("nemu: %s at pc = " FMT_WORD,
             (nemu_state.state == NEMU_ABORT
