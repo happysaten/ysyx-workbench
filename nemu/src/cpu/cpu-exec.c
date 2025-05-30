@@ -92,7 +92,12 @@ static void exec_once(Decode *s, vaddr_t pc) {
 }
 
 static void execute(uint64_t n) {
-    Decode s;
+    // Decode s;
+    Decode s = {
+#ifdef CONFIG_ITRACE
+        .logbuf = {' '} // 初始化日志缓冲区
+#endif
+    };
     for (; n > 0; n--) {
         exec_once(&s, cpu.pc);
         g_nr_guest_inst++;
@@ -152,7 +157,7 @@ void cpu_exec(uint64_t n) {
         break;
 
     case NEMU_END:
-        // Assert(0, "just for debugging iringbuf");
+        Assert(0, "just for debugging iringbuf");
     case NEMU_ABORT:
         Log("nemu: %s at pc = " FMT_WORD,
             (nemu_state.state == NEMU_ABORT
