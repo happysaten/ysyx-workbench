@@ -60,20 +60,27 @@ void init_mem() {
         PMEM_RIGHT);
 }
 
-// 物理地址读取接口
 word_t paddr_read(paddr_t addr, int len) {
-    word_t ret = 0;
-    if (likely(in_pmem(addr)))
-        ret = pmem_read(addr, len);
-#ifdef CONFIG_DEVICE
-    ret = mmio_read(addr, len);
-#else
-    out_of_bound(addr);
-#endif
-    log_write("paddr_read: addr = " FMT_PADDR ", len = %d, data = " FMT_WORD,
-              addr, len, ret);
-    return ret;
+  if (likely(in_pmem(addr))) return pmem_read(addr, len);
+  IFDEF(CONFIG_DEVICE, return mmio_read(addr, len));
+  out_of_bound(addr);
+  return 0;
 }
+
+// // 物理地址读取接口
+// word_t paddr_read(paddr_t addr, int len) {
+//     word_t ret = 0;
+//     if (likely(in_pmem(addr)))
+//         ret = pmem_read(addr, len);
+// #ifdef CONFIG_DEVICE
+//     ret = mmio_read(addr, len);
+// #else
+//     out_of_bound(addr);
+// #endif
+//     log_write("paddr_read: addr = " FMT_PADDR ", len = %d, data = " FMT_WORD,
+//               addr, len, ret);
+//     return ret;
+// }
 
 // 物理地址写入接口
 void paddr_write(paddr_t addr, int len, word_t data) {
