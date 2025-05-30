@@ -86,7 +86,7 @@ word_t paddr_read(paddr_t addr, int len) {
 
 // 物理地址写入接口
 void paddr_write(paddr_t addr, int len, word_t data) {
-    log_write("paddr_write: addr = " FMT_PADDR ", len = %d, data = " FMT_WORD,
+    log_write("pwrite at " FMT_PADDR ", len = %d, data = " FMT_WORD "\n",
               addr, len, data);
     if (likely(in_pmem(addr))) {
         pmem_write(addr, len, data);
