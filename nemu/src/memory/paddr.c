@@ -79,7 +79,7 @@ word_t paddr_read(paddr_t addr, int len) {
         out_of_bound(addr);
 #endif
     }
-    log_write("pread at " FMT_PADDR ", len = %d, data = " FMT_WORD,
+    log_write("pread at " FMT_PADDR ", len = %d, data = " FMT_WORD "\n",
               addr, len, ret);
     return ret;
 }
