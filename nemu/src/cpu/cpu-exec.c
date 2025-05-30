@@ -81,7 +81,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
     if (space_len < 0)
         space_len = 0;
     space_len = space_len * 3 + 8;
-    memset(p, ' ', space_len*10);
+    memset(p, 'a', space_len*10);
     p += space_len;
 
     void disassemble(char *str, int size, uint64_t pc, uint8_t *code,
