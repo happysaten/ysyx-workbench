@@ -18,6 +18,7 @@
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
 #include <locale.h>
+#include <stddef.h>
 #include <stdio.h>
 
 /* The assembly code of instructions executed is only output to the screen
@@ -65,7 +66,8 @@ static void exec_once(Decode *s, vaddr_t pc) {
 #ifdef CONFIG_ITRACE
     char *p = s->logbuf;
     p += snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
-    int ilen = s->snpc - s->pc;
+    // int ilen = s->snpc - s->pc;
+    int ilen = sizeof(s->isa.inst);
     int i;
     uint8_t *inst = (uint8_t *)&s->isa.inst;
 #ifdef CONFIG_ISA_x86
@@ -92,12 +94,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
 }
 
 static void execute(uint64_t n) {
-    // Decode s;
-    Decode s = {
-#ifdef CONFIG_ITRACE
-        .logbuf = {[0 ... 127] = 'a'} // 初始化日志缓冲区
-#endif
-    };
+    Decode s;
     for (; n > 0; n--) {
         exec_once(&s, cpu.pc);
         g_nr_guest_inst++;
