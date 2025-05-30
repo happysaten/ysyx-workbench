@@ -95,7 +95,7 @@ static void execute(uint64_t n) {
     // Decode s;
     Decode s = {
 #ifdef CONFIG_ITRACE
-        .logbuf = {' '} // 初始化日志缓冲区
+        .logbuf = {[0 ... 127]=' '} // 初始化日志缓冲区
 #endif
     };
     for (; n > 0; n--) {
