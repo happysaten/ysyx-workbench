@@ -109,6 +109,8 @@ void init_monitor(int argc, char *argv[]) {
   /* Parse arguments. */
   parse_args(argc, argv);
 
+  printf("Initializing ftrace with ELF file: %s\n", elf_file);
+
   /* Initialize function tracing with ELF file */
   init_ftrace(elf_file);
 
