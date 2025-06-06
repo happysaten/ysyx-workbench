@@ -18,6 +18,7 @@
 #include <cpu/cpu.h>
 #include <cpu/decode.h>
 #include <cpu/ifetch.h>
+#include <stdio.h>
 
 #define R(i) gpr(i)           // 访问通用寄存器
 #define Mr vaddr_read         // 读取虚拟地址
@@ -119,6 +120,7 @@ static int decode_exec(Decode *s) {
         R(rd) = s->snpc;
         s->dnpc = s->pc + imm;
         // rd==1 (ra) 视为call
+        printf("jal rd = %d, ra = 1\n", rd);
         if (rd == 1)
             ftrace_call(s->pc, s->dnpc);
     });
