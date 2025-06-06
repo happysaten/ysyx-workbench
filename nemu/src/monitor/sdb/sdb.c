@@ -277,7 +277,9 @@ static int cmd_help(char *args) {
 }
 
 /* 设置批处理模式 */
-void sdb_set_batch_mode() { is_batch_mode = true; }
+// void sdb_set_batch_mode() { is_batch_mode = true; }
+void sdb_set_batch_mode() { printf("Just for debugging, batch mode is not supported yet.\n"); 
+    is_batch_mode = false; }
 
 /* 主循环：处理用户输入的命令 */
 void sdb_mainloop() {
