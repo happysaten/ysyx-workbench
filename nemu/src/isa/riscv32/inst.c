@@ -116,7 +116,8 @@ static int decode_exec(Decode *s) {
     INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {
         R(rd) = s->snpc;
         s->dnpc = s->pc + imm;
-        IFONE(FTRACE_COND, {
+        IFDEF(CONFIG_FTRACE, {
+            void ftrace_call(vaddr_t pc, vaddr_t target);
             // rd==1 (ra) 视为call
             if (rd == 1) {
                 void ftrace_call(vaddr_t pc, vaddr_t target);
@@ -131,7 +132,9 @@ static int decode_exec(Decode *s) {
     INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {
         s->dnpc = (src1 + imm) & ~1;
         R(rd) = s->snpc;
-        IFONE(FTRACE_COND, {
+        IFDEF(CONFIG_FTRACE, {
+            void ftrace_call(vaddr_t pc, vaddr_t target);
+            void ftrace_ret(vaddr_t pc, vaddr_t target);
             // rd==1 (ra) 视为call
             if (rd == 1)
                 ftrace_call(s->pc, s->dnpc);
