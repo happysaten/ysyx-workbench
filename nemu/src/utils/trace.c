@@ -1,3 +1,4 @@
+#include "common.h"
 #include "utils.h"
 #include <memory/vaddr.h>
 #include <stdint.h>
@@ -263,13 +264,13 @@ void ftrace_call(paddr_t pc, paddr_t target) {
         }
         // pc在最前，后跟缩进和内容
         log_write(FMT_PADDR ":%s call [%s@" FMT_PADDR "]\n", pc, indent, func_name, target);
-        printf("ftrace call: %s at " FMT_PADDR "\n", func_name, target);
 
         // 增加调用深度
         if (call_depth < FTRACE_MAX_DEPTH - 1) {
             call_depth++;
         }
     }
+    else log_write(FMT_PADDR ":call [unknown@" FMT_PADDR "]\n", pc, target);
 }
 
 // 追踪函数返回
