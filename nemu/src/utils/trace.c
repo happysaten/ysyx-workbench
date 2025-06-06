@@ -1,11 +1,11 @@
 #include "common.h"
 #include "utils.h"
+#include <elf.h>
 #include <memory/vaddr.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <elf.h>
+#include <string.h>
 
 #define IRINGBUF_SIZE 16
 
@@ -33,7 +33,8 @@ void iringbuf_push(const char itrace_str[128]) {
 // 打印环形缓冲区内容，出错指令用'-->'标记
 void iringbuf_dump() {
     printf("Recent instruction trace (iringbuf):\n");
-    int start = (iringbuf.head + IRINGBUF_SIZE - iringbuf.count) % IRINGBUF_SIZE;
+    int start =
+        (iringbuf.head + IRINGBUF_SIZE - iringbuf.count) % IRINGBUF_SIZE;
     int bad_idx = iringbuf.count - 1; // 最新指令
     for (int i = 0; i < iringbuf.count; i++) {
         int idx = (start + i) % IRINGBUF_SIZE;
@@ -48,15 +49,15 @@ void iringbuf_dump() {
 
 // ELF符号表相关结构
 typedef struct {
-    char *name;        // 函数名
-    paddr_t addr;      // 函数地址
-    paddr_t size;      // 函数大小
+    char *name;   // 函数名
+    vaddr_t addr; // 函数地址
+    vaddr_t size; // 函数大小
 } func_symbol_t;
 
 typedef struct {
-    func_symbol_t *symbols;  // 符号数组
-    int count;               // 符号数量
-    int capacity;            // 数组容量
+    func_symbol_t *symbols; // 符号数组
+    int count;              // 符号数量
+    int capacity;           // 数组容量
 } symbol_table_t;
 
 static symbol_table_t sym_table = {.symbols = NULL, .count = 0, .capacity = 0};
@@ -67,7 +68,7 @@ int init_ftrace(const char *elf_file) {
         printf("No ELF file specified for ftrace\n");
         return -1;
     }
-    
+
     FILE *fp = fopen(elf_file, "rb");
     if (fp == NULL) {
         printf("Failed to open ELF file: %s\n", elf_file);
@@ -90,7 +91,8 @@ int init_ftrace(const char *elf_file) {
     }
 
     // 读取节头表
-    Elf64_Shdr *section_headers = malloc(sizeof(Elf64_Shdr) * elf_header.e_shnum);
+    Elf64_Shdr *section_headers =
+        malloc(sizeof(Elf64_Shdr) * elf_header.e_shnum);
     if (!section_headers) {
         printf("Failed to allocate memory for section headers\n");
         fclose(fp);
@@ -98,7 +100,8 @@ int init_ftrace(const char *elf_file) {
     }
 
     fseek(fp, elf_header.e_shoff, SEEK_SET);
-    if (fread(section_headers, sizeof(Elf64_Shdr), elf_header.e_shnum, fp) != elf_header.e_shnum) {
+    if (fread(section_headers, sizeof(Elf64_Shdr), elf_header.e_shnum, fp) !=
+        elf_header.e_shnum) {
         printf("Failed to read section headers\n");
         free(section_headers);
         fclose(fp);
@@ -203,7 +206,8 @@ int init_ftrace(const char *elf_file) {
     // 提取函数符号（类型为FUNC且大小大于0）
     for (int i = 0; i < sym_count; i++) {
         if (ELF64_ST_TYPE(syms[i].st_info) == STT_FUNC && syms[i].st_size > 0) {
-            sym_table.symbols[sym_table.count].name = strdup(sym_str_table + syms[i].st_name);
+            sym_table.symbols[sym_table.count].name =
+                strdup(sym_str_table + syms[i].st_name);
             sym_table.symbols[sym_table.count].addr = syms[i].st_value;
             sym_table.symbols[sym_table.count].size = syms[i].st_size;
             sym_table.count++;
@@ -222,9 +226,9 @@ int init_ftrace(const char *elf_file) {
 }
 
 // 根据地址查找函数名
-const char* find_func_name(paddr_t addr) {
+const char *find_func_name(vaddr_t addr) {
     for (int i = 0; i < sym_table.count; i++) {
-        if (addr >= sym_table.symbols[i].addr && 
+        if (addr >= sym_table.symbols[i].addr &&
             addr < sym_table.symbols[i].addr + sym_table.symbols[i].size) {
             return sym_table.symbols[i].name;
         }
@@ -254,27 +258,29 @@ void cleanup_ftrace() {
 static int call_depth = 0;
 
 // 追踪函数调用
-void ftrace_call(paddr_t pc, paddr_t target) {
+void ftrace_call(vaddr_t pc, vaddr_t target) {
     const char *func_name = find_func_name(target);
     if (func_name != NULL) {
         // 生成缩进
-        char indent[FTRACE_MAX_DEPTH*2 + 1] = {0};
+        char indent[FTRACE_MAX_DEPTH * 2 + 1] = {0};
         for (int i = 0; i < call_depth; i++) {
             strcat(indent, "  ");
         }
-        // pc在最前，后跟缩进和内容
-        log_write(FMT_PADDR ":%s call [%s@" FMT_PADDR "]\n", pc, indent, func_name, target);
+        // 记录函数调用
+        log_write(FMT_WORD ": %scall [%s@" FMT_WORD "]\n", pc, indent,
+                  func_name, target);
 
         // 增加调用深度
         if (call_depth < FTRACE_MAX_DEPTH - 1) {
             call_depth++;
         }
-    }
-    else log_write(FMT_PADDR ":call [unknown@" FMT_PADDR "]\n", pc, target);
+    } else
+        log_write(FMT_WORD ": call [unknown function @ " FMT_WORD "]\n", pc,
+                  target);
 }
 
 // 追踪函数返回
-void ftrace_ret(paddr_t pc, vaddr_t target) {
+void ftrace_ret(vaddr_t pc, vaddr_t target) {
     const char *func_name = find_func_name(target);
     if (func_name != NULL) {
         // 减少调用深度
@@ -282,11 +288,12 @@ void ftrace_ret(paddr_t pc, vaddr_t target) {
             call_depth--;
         }
         // 生成缩进
-        char indent[FTRACE_MAX_DEPTH*2 + 1] = {0};
+        char indent[FTRACE_MAX_DEPTH * 2 + 1] = {0};
         for (int i = 0; i < call_depth; i++) {
             strcat(indent, "  ");
         }
-        // pc在最前，后跟缩进和内容
-        log_write(FMT_PADDR ":%s ret  [%s@" FMT_PADDR "]\n", pc, indent, func_name, target);
+        // 记录函数返回
+        log_write(FMT_WORD ": %sret [%s@" FMT_WORD "]\n", pc, indent, func_name,
+                  target);
     }
 }
