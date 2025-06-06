@@ -229,6 +229,9 @@ int init_ftrace(const char *elf_file) {
 const char *find_func_name(vaddr_t addr) {
     printf("Searching for function at address " FMT_WORD "\n", addr);
     for (int i = 0; i < sym_table.count; i++) {
+        printf("Checking symbol %s at " FMT_WORD " with size " FMT_WORD "\n",
+               sym_table.symbols[i].name, sym_table.symbols[i].addr,
+               sym_table.symbols[i].size);
         if (addr >= sym_table.symbols[i].addr &&
             addr < sym_table.symbols[i].addr + sym_table.symbols[i].size) {
             return sym_table.symbols[i].name;
