@@ -137,7 +137,7 @@ static int decode_exec(Decode *s) {
             if (rd == 1)
                 ftrace_call(s->pc, s->dnpc);
             // 标准RET: rd==0, rs1==1, imm==0
-            else if (rd == 0 && BITS(s->isa.inst, 19, 15) == 1 && imm == 0)
+            else if (s->isa.inst == 0x00008067)
                 ftrace_ret(s->pc);
         })
     });
