@@ -110,7 +110,7 @@ void init_monitor(int argc, char *argv[]) {
   /* Parse arguments. */
   parse_args(argc, argv);
 
-  printf("Welcome to %s-NEMU!\n", ANSI_FMT(str(__GUEST_ISA__), ANSI_FG_YELLOW ANSI_BG_RED));
+  printf("Hello, NEMU!\n");
   /* Initialize function tracing with ELF file */
   init_ftrace(elf_file);
 
