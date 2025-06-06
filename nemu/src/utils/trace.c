@@ -113,6 +113,12 @@ int init_ftrace(const char *elf_file) {
     Elf64_Shdr *symtab = NULL;
     Elf64_Shdr *strtab = NULL;
     for (int i = 0; i < elf_header.e_shnum; i++) {
+        printf("Section %d: type = %u, name = %s\n", i,
+               section_headers[i].sh_type,
+               section_headers[i].sh_name < elf_header.e_shstrndx
+                   ? "<unknown>"
+                   : (char *)(section_headers + elf_header.e_shstrndx) +
+                         section_headers[i].sh_name);
         if (section_headers[i].sh_type == SHT_SYMTAB) {
             symtab = &section_headers[i];
         } else if (i == elf_header.e_shstrndx) {
