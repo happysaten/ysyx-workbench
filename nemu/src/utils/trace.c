@@ -74,8 +74,8 @@ void ftrace_call(vaddr_t pc, vaddr_t target) {
 }
 
 // 追踪函数返回
-void ftrace_ret(vaddr_t pc, vaddr_t target) {
-    const char *func_name = find_func_name(target);
+void ftrace_ret(vaddr_t pc) {
+    const char *func_name = find_func_name(pc);
     if (func_name != NULL) {
         // 减少调用深度
         if (call_depth > 0) {
@@ -87,8 +87,7 @@ void ftrace_ret(vaddr_t pc, vaddr_t target) {
             strcat(indent, "  ");
         }
         // 记录函数返回
-        log_write(FMT_WORD ": %sret [%s@" FMT_WORD "]\n", pc, indent, func_name,
-                  target);
+        log_write(FMT_WORD ": %sret [%s]\n", pc, indent, func_name);
     }
 }
 #endif

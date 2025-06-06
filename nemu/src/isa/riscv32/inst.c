@@ -121,9 +121,7 @@ static int decode_exec(Decode *s) {
             // rd==1 (ra) 视为call
             if (rd == 1) {
                 void ftrace_call(vaddr_t pc, vaddr_t target);
-                void ftrace_ret(vaddr_t pc, vaddr_t target);
                 ftrace_call(s->pc, s->dnpc);
-                printf("jal rd = %d, ra = 1\n", rd);
             }
         });
     });
@@ -134,13 +132,13 @@ static int decode_exec(Decode *s) {
         R(rd) = s->snpc;
         IFDEF(CONFIG_FTRACE, {
             void ftrace_call(vaddr_t pc, vaddr_t target);
-            void ftrace_ret(vaddr_t pc, vaddr_t target);
+            void ftrace_ret(vaddr_t pc);
             // rd==1 (ra) 视为call
             if (rd == 1)
                 ftrace_call(s->pc, s->dnpc);
             // 标准RET: rd==0, rs1==1, imm==0
             else if (rd == 0 && BITS(s->isa.inst, 19, 15) == 1 && imm == 0)
-                ftrace_ret(s->pc, s->dnpc);
+                ftrace_ret(s->pc);
         })
     });
     // beq: 如果src1==src2则跳转
