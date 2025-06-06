@@ -1,12 +1,6 @@
 #include "common.h"
-#include "utils.h"
-#include <elf.h>
-#include <memory/vaddr.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
+#ifdef CONFIG_ITRACE
 #define IRINGBUF_SIZE 16
 
 typedef struct {
@@ -46,7 +40,9 @@ void iringbuf_dump() {
         printf("%s\n", iringbuf.buf[idx].itrace);
     }
 }
+#endif
 
+#ifdef CONFIG_FTRACE
 // 函数调用最大嵌套深度
 #define FTRACE_MAX_DEPTH 256
 
@@ -95,3 +91,4 @@ void ftrace_ret(vaddr_t pc, vaddr_t target) {
                   target);
     }
 }
+#endif

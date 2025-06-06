@@ -1,9 +1,7 @@
-#include <memory/vaddr.h>
 #include <elf.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "common.h"
 
+#ifdef CONFIG_FTRACE
 // ELF符号表相关结构
 typedef struct {
     char *name;   // 函数名
@@ -71,22 +69,24 @@ int init_ftrace(const char *elf_file) {
     for (int i = 0; i < ehdr.e_shnum; i++) {
         const char *name = shstrtab + sh_table[i].sh_name;
         printf("Section %d: %s (type: %d)\n", i, name, sh_table[i].sh_type);
-        if (strcmp(name, ".symtab") == 0) symtab_hdr = &sh_table[i];
-        if (strcmp(name, ".strtab") == 0) strtab_hdr = &sh_table[i];
+        if (strcmp(name, ".symtab") == 0)
+            symtab_hdr = &sh_table[i];
+        if (strcmp(name, ".strtab") == 0)
+            strtab_hdr = &sh_table[i];
     }
-    
+
     if (!symtab_hdr || !strtab_hdr) {
-        fprintf(stderr, "No .symtab or .strtab found. symtab: %p, strtab: %p\n", 
-                (void*)symtab_hdr, (void*)strtab_hdr);
-        free(sh_table); 
-        free(shstrtab); 
+        fprintf(stderr, "No .symtab or .strtab found. symtab: %p, strtab: %p\n",
+                (void *)symtab_hdr, (void *)strtab_hdr);
+        free(sh_table);
+        free(shstrtab);
         fclose(fp);
         return -1;
     }
 
-    printf("Found symtab at offset 0x%x, size: %d bytes\n", 
+    printf("Found symtab at offset 0x%x, size: %d bytes\n",
            symtab_hdr->sh_offset, symtab_hdr->sh_size);
-    printf("Found strtab at offset 0x%x, size: %d bytes\n", 
+    printf("Found strtab at offset 0x%x, size: %d bytes\n",
            strtab_hdr->sh_offset, strtab_hdr->sh_size);
 
     // 读取符号表和字符串表
@@ -115,7 +115,7 @@ int init_ftrace(const char *elf_file) {
 
     int sym_count = symtab_hdr->sh_size / sizeof(Elf32_Sym);
     printf("Found %d symbols in symbol table\n", sym_count);
-    
+
     // 初始化符号表
     sym_table.count = 0;
     sym_table.capacity = 32;
@@ -124,17 +124,19 @@ int init_ftrace(const char *elf_file) {
     // 遍历符号表，查找函数符号
     for (int i = 0; i < sym_count; i++) {
         unsigned char type = ELF32_ST_TYPE(symtab[i].st_info);
-        if (type == STT_FUNC && symtab[i].st_size > 0 && symtab[i].st_name != 0) {
+        if (type == STT_FUNC && symtab[i].st_size > 0 &&
+            symtab[i].st_name != 0) {
             if (sym_table.count >= sym_table.capacity) {
                 sym_table.capacity *= 2;
-                sym_table.symbols = realloc(sym_table.symbols, 
-                                           sym_table.capacity * sizeof(func_symbol_t));
+                sym_table.symbols =
+                    realloc(sym_table.symbols,
+                            sym_table.capacity * sizeof(func_symbol_t));
             }
-            
+
             const char *name = strtab + symtab[i].st_name;
-            printf("Found function: %s at 0x%x size %d\n", 
-                   name, symtab[i].st_value, symtab[i].st_size);
-                   
+            printf("Found function: %s at 0x%x size %d\n", name,
+                   symtab[i].st_value, symtab[i].st_size);
+
             func_symbol_t *fs = &sym_table.symbols[sym_table.count++];
             fs->name = strdup(name);
             fs->addr = symtab[i].st_value;
@@ -162,3 +164,4 @@ const char *find_func_name(vaddr_t addr) {
     }
     return NULL;
 }
+#endif

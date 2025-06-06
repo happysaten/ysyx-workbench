@@ -128,7 +128,7 @@ void init_monitor(int argc, char *argv[]) {
     parse_args(argc, argv);
 
     /* Initialize function tracing with ELF file */
-    init_ftrace(elf_file);
+    IFDEF(CONFIG_FTRACE, init_ftrace(elf_file));
 
     /* Set random seed. */
     init_rand();

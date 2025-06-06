@@ -24,9 +24,6 @@
 #define Mr vaddr_read         // 读取虚拟地址
 #define Mw vaddr_write        // 写虚拟地址
 
-void ftrace_call(vaddr_t pc, vaddr_t target);
-void ftrace_ret(vaddr_t pc, vaddr_t target);
-
 // 指令类型枚举
 enum {
     TYPE_R, // R型指令，寄存器间操作
@@ -119,23 +116,29 @@ static int decode_exec(Decode *s) {
     INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {
         R(rd) = s->snpc;
         s->dnpc = s->pc + imm;
-        // rd==1 (ra) 视为call
-        if (rd == 1){
-            ftrace_call(s->pc, s->dnpc);
-            printf("jal rd = %d, ra = 1\n", rd);
-        }
+        IFONE(FTRACE_COND, {
+            // rd==1 (ra) 视为call
+            if (rd == 1) {
+                void ftrace_call(vaddr_t pc, vaddr_t target);
+                void ftrace_ret(vaddr_t pc, vaddr_t target);
+                ftrace_call(s->pc, s->dnpc);
+                printf("jal rd = %d, ra = 1\n", rd);
+            }
+        });
     });
 
     // jalr: 跳转并链接寄存器，rd = 返回地址，pc跳转到(src1+imm)&~1
     INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {
         s->dnpc = (src1 + imm) & ~1;
         R(rd) = s->snpc;
-        // rd==1 (ra) 视为call
-        if (rd == 1)
-            ftrace_call(s->pc, s->dnpc);
-        // 标准RET: rd==0, rs1==1, imm==0
-        else if (rd == 0 && BITS(s->isa.inst, 19, 15) == 1 && imm == 0)
-            ftrace_ret(s->pc, s->dnpc);
+        IFONE(FTRACE_COND, {
+            // rd==1 (ra) 视为call
+            if (rd == 1)
+                ftrace_call(s->pc, s->dnpc);
+            // 标准RET: rd==0, rs1==1, imm==0
+            else if (rd == 0 && BITS(s->isa.inst, 19, 15) == 1 && imm == 0)
+                ftrace_ret(s->pc, s->dnpc);
+        })
     });
     // beq: 如果src1==src2则跳转
     INSTPAT("??????? ????? ????? 000 ????? 11000 11", beq, B,
