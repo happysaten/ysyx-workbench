@@ -227,6 +227,7 @@ int init_ftrace(const char *elf_file) {
 
 // 根据地址查找函数名
 const char *find_func_name(vaddr_t addr) {
+    printf("Searching for function at address " FMT_WORD "\n", addr);
     for (int i = 0; i < sym_table.count; i++) {
         if (addr >= sym_table.symbols[i].addr &&
             addr < sym_table.symbols[i].addr + sym_table.symbols[i].size) {
