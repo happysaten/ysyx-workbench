@@ -64,6 +64,7 @@ static symbol_table_t sym_table = {.symbols = NULL, .count = 0, .capacity = 0};
 
 // 初始化ftrace功能，从ELF文件读取符号表
 int init_ftrace(const char *elf_file) {
+    printf("Initializing ftrace with ELF file: %s\n", elf_file);
     if (elf_file == NULL) {
         printf("No ELF file specified for ftrace\n");
         return -1;
