@@ -120,9 +120,10 @@ static int decode_exec(Decode *s) {
         R(rd) = s->snpc;
         s->dnpc = s->pc + imm;
         // rd==1 (ra) 视为call
-        printf("jal rd = %d, ra = 1\n", rd);
-        if (rd == 1)
+        if (rd == 1){
             ftrace_call(s->pc, s->dnpc);
+            printf("jal rd = %d, ra = 1\n", rd);
+        }
     });
 
     // jalr: 跳转并链接寄存器，rd = 返回地址，pc跳转到(src1+imm)&~1
