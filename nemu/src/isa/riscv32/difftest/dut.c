@@ -23,11 +23,13 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   for (int i = 0; i < ARRLEN(cpu.gpr); i++) {
     if (ref_r->gpr[i] != cpu.gpr[i]) {
       // Log("reg[%d]: ref = 0x%016lx, dut = 0x%016lx", i, ref_r->gpr[i], cpu.gpr[i]);
+      printf("reg[%d]: ref = 0x%08x, dut = 0x%08x\n", i, ref_r->gpr[i], cpu.gpr[i]);
       return false;
     }
   }
   if (ref_r->pc != pc) {
     // Log("pc: ref = 0x%016lx, dut = 0x%016lx", ref_r->pc, pc);
+    printf("pc: ref = 0x%08x, dut = 0x%08x\n", ref_r->pc, pc);
     return false;
   }
   return true;
