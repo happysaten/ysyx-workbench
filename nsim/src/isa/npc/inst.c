@@ -13,7 +13,7 @@ void exec_one_cpu();
 void update_gprs(word_t *gprs) {
   for (int i = 0; i < ARRLEN(cpu.gpr); ++i) {
     gpr(i) = gprs[i]; // 设置每个寄存器的值
-    printf("%s: 0x%08x\n", reg_name(i),  gprs[i]); // 打印寄存器名称和值
+    // printf("%s: 0x%08x\n", reg_name(i),  gprs[i]); // 打印寄存器名称和值
   }
 }
 
