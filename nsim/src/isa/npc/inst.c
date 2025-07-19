@@ -11,7 +11,7 @@ void exec_one_cpu();
 // 更新通用寄存器组
 // gprs: 指向包含32个寄存器值的数组
 void update_gprs(word_t *gprs) {
-  for (int i = 0; i < 32; ++i) {
+  for (int i = 0; i < ARRLEN(cpu.gpr); ++i) {
     gpr(i) = gprs[i]; // 设置每个寄存器的值
   }
 }
