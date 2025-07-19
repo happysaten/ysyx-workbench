@@ -46,6 +46,8 @@ void init_disasm() {
                    MUXDEF(CONFIG_ISA_mips32, CS_MODE_MIPS32,
                    MUXDEF(CONFIG_ISA_riscv || CONFIG_ISA_npc,  MUXDEF(CONFIG_ISA64, CS_MODE_RISCV64, CS_MODE_RISCV32) | CS_MODE_RISCVC,
                    MUXDEF(CONFIG_ISA_loongarch32r,  CS_MODE_LOONGARCH32, -1))));
+  printf("CONFIG_ISA_npc: %d\n",
+         CONFIG_ISA_npc);
   printf("Disassembler initialized with arch: %d, mode: %d\n", arch, mode);
 	int ret = cs_open_dl(arch, mode, &handle);
   assert(ret == CS_ERR_OK);
