@@ -38,5 +38,6 @@ int isa_exec_once(Decode *s) {
 }
 
 void ebreak(){
+  printf("ebreak called at pc = " FMT_WORD "\n", ls->pc);
   NSIMTRAP(ls->dnpc, gpr(10));
 }

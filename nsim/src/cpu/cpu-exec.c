@@ -155,7 +155,6 @@ void cpu_exec(uint64_t n) {
         break;
 
     case NSIM_END:
-        printf("Program execution has ended.\n");
         // Assert(0, "just for debugging iringbuf");
     case NSIM_ABORT:
         Log("nsim: %s at pc = " FMT_WORD,
