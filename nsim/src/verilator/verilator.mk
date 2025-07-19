@@ -1,0 +1,16 @@
+CVSRCS = init.cpp \
+				 exec.cpp \
+				 dpi/gprs.cpp
+
+CVSRCS := $(addprefix $(NSIM_HOME)/src/verilator/, $(CVSRCS))
+
+ifdef CONFIG_WTRACE
+CVCFLAGS = -DCONFIG_WTRACE
+else
+CVCFLAGS =
+endif
+
+wv:
+	gtkwave $(NSIM_HOME)/build/trace.fst &
+
+.PHONY: wv

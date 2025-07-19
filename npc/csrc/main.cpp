@@ -1,5 +1,7 @@
 #include "Vtop.h"
 #include "Vtop__Dpi.h"
+#include <cassert>
+#include <cstdio>
 #include <stdint.h>
 #include <unistd.h>
 #include <verilated.h>
@@ -41,14 +43,16 @@ typedef struct {
 } NPCState;
 NPCState npc_state;
 
-void set_npc_state(int state) {
+void set_npc_state(int state, vaddr_t pc, int halt_ret) {
     npc_state.state = state;
-    // npc_state.halt_pc = pc;
-    // npc_state.halt_ret = halt_ret;
+    npc_state.halt_pc = pc;
+    npc_state.halt_ret = halt_ret;
 }
 
 // #define NPCTRAP() set_npc_state(NPC_END)
-void NPCTRAP() { set_npc_state(NPC_END); }
+void NPCTRAP(int this_pc, int code) {
+    set_npc_state(NPC_END, this_pc, code);
+}
 
 // 简单仿真内存，大小可根据需要调整
 static uint32_t pmem[1024] = {
@@ -63,6 +67,28 @@ static uint32_t pmem[1024] = {
     // ...
 };
 
+static long load_img(char *img_file) {
+    if (img_file == NULL) {
+        printf("No image is given. Use the default build-in image.\n");
+        return 4096; // built-in image size
+    }
+    FILE *fp = fopen(img_file, "rb");
+    if (fp == NULL) {
+        printf("Cannot open image file %s.\n", img_file);
+        assert(0);
+    }
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+
+    printf("The image is %s, size = %ld\n", img_file, size);
+    fseek(fp, 0, SEEK_SET);
+    int ret = fread(pmem, size, 1, fp);
+    assert(ret == 1);
+
+    fclose(fp);
+    return size;
+}
+
 // 仿真内存读取函数
 uint32_t pmem_read(uint32_t pc) {
     // 假设pc按字对齐，且小于pmem大小
@@ -72,10 +98,22 @@ uint32_t pmem_read(uint32_t pc) {
 #define MAX_SIM_TIME 30
 vluint64_t sim_time = 0;
 int main(int argc, char **argv) {
+    char *img_file = NULL;
+    // 解析命令行参数，查找 --img 选项
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--img") == 0 && i + 1 < argc) {
+            img_file = argv[i + 1];
+            i++; // 跳过文件名参数
+        }
+    }
+
     contextp->commandArgs(argc, argv);
     contextp->traceEverOn(true);
     top->trace(tfp, 99);                      // Trace 99 levels of hierarchy
     tfp->open("build/obj_dir/Vtop_wave.fst"); // 打开波形文件
+
+    load_img(img_file); // 加载镜像
+
     reset(10);
 
     while (1) {
@@ -86,8 +124,12 @@ int main(int argc, char **argv) {
         if (sim_time >= MAX_SIM_TIME)
             break; // 达到最大仿真时间，退出循环
         if (npc_state.state == NPC_END) {
-            printf("Simulation ended at PC: 0x%08x", top->pc);
-            break; // 如果遇到结束状态，退出循环
+            if (npc_state.halt_ret == 0) {
+                printf("HIT GOOD TRAP\n");
+            } else {
+                printf("HIT BAD TRAP, code = %d\n", npc_state.halt_ret);
+            }
+            break;
         }
     }
     tfp->close();
