@@ -15,6 +15,7 @@
 
 #include <isa.h>
 #include <memory/paddr.h>
+#include <stdio.h>
 
 // img数组为内置指令镜像，直接以uint32_t存储指令数据
 // 注意：与uint8_t不一致，但不会直接访问数组内容，因此无影响
@@ -34,6 +35,7 @@ static void restart() {
   reset_cpu(); // 复位CPU所有寄存器和状态
   /* 设置初始程序计数器（PC） */
   cpu.pc = RESET_VECTOR;
+  printf("CPU restarted, PC set to " FMT_WORD "\n", cpu.pc);
 
   /* 零号寄存器始终为0 */
   cpu.gpr[0] = 0;
