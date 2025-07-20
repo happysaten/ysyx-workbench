@@ -16,6 +16,7 @@
 #include <capstone/capstone.h>
 #include <common.h>
 #include <dlfcn.h>
+#include <stdio.h>
 
 static size_t (*cs_disasm_dl)(csh handle, const uint8_t *code, size_t code_size,
                               uint64_t address, size_t count, cs_insn **insn);
