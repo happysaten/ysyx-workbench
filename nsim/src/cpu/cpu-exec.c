@@ -88,7 +88,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
 
     void disassemble(char *str, int size, uint64_t pc, uint8_t *code,
                      int nbyte);
-    printf("PC = " FMT_WORD " DNPC = " FMT_WORD , s->pc, s->snpc);
+    printf("%s\n", s->logbuf);
     disassemble(p, s->logbuf + sizeof(s->logbuf) - p,
                 MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst,
                 ilen);
