@@ -1,7 +1,8 @@
 CVSRCS = init.cpp \
 				 exec.cpp \
 				 dpi/mem.cpp \
-				 dpi/gprs.cpp
+				 dpi/gprs.cpp \
+				 dpi/inst.cpp \
 
 CVSRCS := $(addprefix $(NSIM_HOME)/src/verilator/, $(CVSRCS))
 
