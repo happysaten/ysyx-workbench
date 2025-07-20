@@ -46,9 +46,9 @@ static void pmem_write(paddr_t addr, int len, word_t data) {
 
 // 物理地址越界处理
 static void out_of_bound(paddr_t addr) {
-    // panic("address = " FMT_PADDR " is out of bound of pmem [" FMT_PADDR
-    //       ", " FMT_PADDR "] at pc = " FMT_WORD,
-    //       addr, PMEM_LEFT, PMEM_RIGHT, cpu.pc);
+    panic("address = " FMT_PADDR " is out of bound of pmem [" FMT_PADDR
+          ", " FMT_PADDR "] at pc = " FMT_WORD,
+          addr, PMEM_LEFT, PMEM_RIGHT, cpu.pc);
 }
 
 // 初始化物理内存
@@ -78,7 +78,7 @@ word_t paddr_read(paddr_t addr, int len) {
 #ifdef CONFIG_DEVICE
         ret = mmio_read(addr, len);
 #else
-        out_of_bound(addr);
+        // out_of_bound(addr);
 #endif
     }
     IFDEF(CONFIG_MTRACE,
