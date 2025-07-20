@@ -78,7 +78,7 @@ word_t paddr_read(paddr_t addr, int len) {
 #ifdef CONFIG_DEVICE
         ret = mmio_read(addr, len);
 #else
-        // out_of_bound(addr);
+        out_of_bound(addr);
 #endif
     }
     IFDEF(CONFIG_MTRACE,
