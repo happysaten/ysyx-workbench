@@ -46,8 +46,6 @@ static void pmem_write(paddr_t addr, int len, word_t data) {
 
 // 物理地址越界处理
 static void out_of_bound(paddr_t addr) {
-    printf("RESET_VECTOR = " FMT_PADDR "\n", RESET_VECTOR);
-    printf("PC = " FMT_WORD "\n", cpu.pc);
     panic("address = " FMT_PADDR " is out of bound of pmem [" FMT_PADDR
           ", " FMT_PADDR "] at pc = " FMT_WORD,
           addr, PMEM_LEFT, PMEM_RIGHT, cpu.pc);
