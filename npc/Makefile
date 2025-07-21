@@ -19,7 +19,7 @@ verilator:
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
 
 clean:
-	rm -rf build
+	rm -rf $(NSIM_HOME)/src/verilator/obj_dir
 
 include ../Makefile
 .PHONY: all clean verilator
