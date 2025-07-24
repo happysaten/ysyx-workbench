@@ -17,6 +17,14 @@ void update_gprs(word_t *gprs) {
   }
 }
 
+// 写入通用寄存器
+void write_gpr(int idx, word_t data) {
+  if (idx < 0 || idx >= ARRLEN(cpu.gpr)) {
+    panic("Invalid GPR index: %d", idx);
+  }
+  gpr(idx) = data; // 设置指定寄存器的值
+}
+
 // 静态指令解码结构体指针
 static Decode *ls;
 
