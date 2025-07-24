@@ -32,7 +32,15 @@ static inline bool in_pmem(paddr_t addr) {
   return addr - CONFIG_MBASE < CONFIG_MSIZE;
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 word_t paddr_read(paddr_t addr, int len);
 void paddr_write(paddr_t addr, int len, word_t data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
