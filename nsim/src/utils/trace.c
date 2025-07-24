@@ -1,4 +1,4 @@
-#include "common.h"
+#include <common.h>
 
 #ifdef CONFIG_ITRACE
 #define IRINGBUF_SIZE 16

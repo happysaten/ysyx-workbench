@@ -10,3 +10,4 @@
 !Kconfig
 include/config
 include/generated
+src/verilator/obj_dir

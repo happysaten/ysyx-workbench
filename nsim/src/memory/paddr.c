@@ -19,6 +19,7 @@
 #include <isa.h>
 #include <memory/host.h>
 #include <memory/paddr.h>
+#include <stdio.h>
 
 // 物理内存的分配方式：使用malloc或静态数组
 #if defined(CONFIG_PMEM_MALLOC)

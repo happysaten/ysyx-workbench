@@ -1,5 +1,5 @@
 #include <elf.h>
-#include "common.h"
+#include <common.h>
 
 #ifdef CONFIG_FTRACE
 // ELF符号表相关结构

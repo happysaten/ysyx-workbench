@@ -17,6 +17,9 @@
 #include <memory/paddr.h>
 #include <stdio.h>
 
+#ifdef CONFIG_ISA_npc
+void init_verilator(const char *trace_file);
+#endif
 void init_rand();
 void init_log(const char *log_file);
 void init_mem();
@@ -50,6 +53,7 @@ static char *log_file = NULL;
 static char *diff_so_file = NULL;
 static char *img_file = NULL;
 static char *elf_file = NULL;
+static char *trace_file = NULL;
 static int difftest_port = 1234;
 
 static long load_img() {
@@ -81,6 +85,7 @@ static int parse_args(int argc, char *argv[]) {
         {"diff", required_argument, NULL, 'd'},
         {"port", required_argument, NULL, 'p'},
         {"elf", required_argument, NULL, 'e'},
+        {"trace", required_argument, NULL, 't'},
         {"help", no_argument, NULL, 'h'},
         {0, 0, NULL, 0},
     };
@@ -101,6 +106,9 @@ static int parse_args(int argc, char *argv[]) {
             break;
         case 'e':
             elf_file = optarg;
+            break;
+        case 't':
+            trace_file = optarg;
             break;
         case 1:
             img_file = optarg;
@@ -130,6 +138,10 @@ void init_monitor(int argc, char *argv[]) {
     /* Initialize function tracing with ELF file */
     IFDEF(CONFIG_FTRACE, init_ftrace(elf_file));
 
+    /* Initialize the Verilator interface. */
+#ifdef CONFIG_ISA_npc
+    init_verilator(trace_file);
+#endif
     /* Set random seed. */
     init_rand();
 
