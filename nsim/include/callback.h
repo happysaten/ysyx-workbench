@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 #include <common.h>
-#include <cpu/decode.h>
 
 void update_gprs(word_t *gprs);
 void write_gpr(int idx, word_t data);
