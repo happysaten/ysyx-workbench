@@ -37,15 +37,16 @@ void update_inst(word_t inst, vaddr_t dnpc) {
   ls->dnpc = dnpc;         // 设置下一条指令的PC
 }
 
+
+void ebreak(){
+  printf("ebreak called at pc = " FMT_WORD " code = %d\n", ls->dnpc, gpr(10));
+  NSIMTRAP(ls->dnpc, gpr(10));
+}
+
 // 执行一次指令
 // s: 指令解码结构体指针
 int isa_exec_once(Decode *s) {
   ls = s;           // 保存当前解码结构体指针
   exec_one_cpu();   // 执行单条指令
   return 0;         // 返回0表示成功
-}
-
-void ebreak(){
-  printf("ebreak called at pc = " FMT_WORD " code = %d\n", ls->dnpc, gpr(10));
-  NSIMTRAP(ls->dnpc, gpr(10));
 }
