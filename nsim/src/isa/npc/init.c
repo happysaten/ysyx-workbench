@@ -25,6 +25,10 @@ static const uint32_t img [] = {
   0x0102c503,  // lbu a0,16(t0)  // 从t0+16地址读入a0
   0x00100073,  // ebreak (used as nsim_trap) // 触发断点（模拟trap）
   0xdeadbeef,  // some data // 测试数据
+  // t0 = PC + (0 << 12) = 0x80000000
+  // 将0写入地址 t0+0x10 = 0x80000010
+  // 从地址 t0+0x10 = 0x80000010 读取字节到a0
+  // 触发断点异常
 };
 
 // 声明复位CPU的函数

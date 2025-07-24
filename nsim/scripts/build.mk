@@ -63,4 +63,4 @@ endif
 
 clean:
 	-rm -rf $(BUILD_DIR)
-# 	-rm -rf $(NSIM_HOME)/src/verilator/obj_dir
+	-rm -rf $(NSIM_HOME)/src/verilator/obj_dir
