@@ -2,9 +2,9 @@ include $(AM_HOME)/scripts/isa/riscv.mk
 include $(AM_HOME)/scripts/platform/nsim.mk
 
 export PATH := $(PATH):$(abspath $(AM_HOME)/tools/rvmini)
-# CC = rvmini-gcc
-# AS = rvmini-gcc
-# CXX = rvmini-g++
+CC = rvmini-gcc
+AS = rvmini-gcc
+CXX = rvmini-g++
 
 CFLAGS  += -DISA_H=\"riscv/riscv.h\"
 COMMON_CFLAGS += -march=rv32i_zicsr -mabi=ilp32  # overwrite
