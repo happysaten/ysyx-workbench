@@ -10,7 +10,7 @@ WORK_DIR = $(abspath .)
 CVCFLAGS ?=
 
 verilator:
-	@verilator --cc --build \
+	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
