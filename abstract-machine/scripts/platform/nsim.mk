@@ -15,7 +15,6 @@ LDFLAGS   += --gc-sections -e _start
 NEMUFLAGS += -l $(shell dirname $(IMAGE).elf)/nsim-log.txt
 # NEMUFLAGS += -b
 NEMUFLAGS += -e $(IMAGE).elf
-# $(info NEMUFLAGS = $(NEMUFLAGS))
 
 MAINARGS_MAX_LEN = 64
 MAINARGS_PLACEHOLDER = the_insert-arg_rule_in_Makefile_will_insert_mainargs_here
