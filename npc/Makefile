@@ -1,6 +1,6 @@
 VSRCS = $(shell find $(abspath ./vsrc) -name "*.sv" -o -name "*.vlt")
 IMG ?=
-all: verilator
+all:
 	# 提交git
 	# $(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 # 	mkdir -p build
@@ -9,7 +9,7 @@ all: verilator
 WORK_DIR = $(abspath .)
 CVCFLAGS ?=
 
-verilator: $(VSRCS)
+verilator:
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
