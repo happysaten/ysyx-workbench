@@ -27,6 +27,20 @@ LDFLAGS := -O2 $(LDFLAGS)
 
 OBJS = $(SRCS:%.c=$(OBJ_DIR)/%.o) $(CXXSRC:%.cc=$(OBJ_DIR)/%.o)
 
+# Verilator sources and rules
+ifdef CONFIG_ISA_npc
+VSRCS = $(shell find $(abspath $(NPC_HOME)/vsrc) -name "*.sv" -o -name "*.vlt")
+
+verilator:
+	verilator --cc --build \
+		--top-module top \
+		--trace-fst \
+		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
+		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
+		$(VSRCS) \
+		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
+endif
+
 # Compilation patterns
 $(OBJ_DIR)/%.o: %.c
 	@echo + CC $<
@@ -47,22 +61,13 @@ $(OBJ_DIR)/%.o: %.cc
 
 # Some convenient rules
 
-.PHONY: app clean
+.PHONY: app clean verilator
 
 app: $(BINARY)
 ifdef CONFIG_ISA_npc
-# $(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS)
-# 	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
-# 	@echo + LD $@
-# 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
-VERILATOR_LIB := $(NSIM_HOME)/src/verilator/obj_dir/Vtop__ALL.a
-
-$(VERILATOR_LIB):
-	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
-
-$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) $(VERILATOR_LIB)
+$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) verilator
 	@echo + LD $@
-	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) $(VERILATOR_LIB) $(LIBS) -lz
+	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
 else
 $(BINARY):: $(OBJS) $(ARCHIVES)
 	@echo + LD $@
