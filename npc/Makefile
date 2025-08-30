@@ -9,7 +9,7 @@ all:
 WORK_DIR = $(abspath .)
 CVCFLAGS ?=
 
-verilator:
+verilator: $(VSRCS)
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
