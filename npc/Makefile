@@ -1,6 +1,6 @@
 VSRCS = $(shell find $(abspath ./vsrc) -name "*.sv" -o -name "*.vlt")
 IMG ?=
-all:
+all: verilator
 	# 提交git
 	# $(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 # 	mkdir -p build
