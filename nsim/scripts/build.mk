@@ -51,18 +51,18 @@ $(OBJ_DIR)/%.o: %.cc
 
 app: $(BINARY)
 ifdef CONFIG_ISA_npc
-$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS)
-	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
-	@echo + LD $@
-	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
-# VERILATOR_LIBS := $(wildcard $(NSIM_HOME)/src/verilator/obj_dir/*.a)
-
-# $(VERILATOR_LIBS):
+# $(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS)
 # 	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
-
-# $(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) $(VERILATOR_LIBS)
 # 	@echo + LD $@
-# 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) $(VERILATOR_LIBS) $(LIBS) -lz
+# 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
+VERILATOR_LIBS := $(wildcard $(NSIM_HOME)/src/verilator/obj_dir/*.a)
+
+$(VERILATOR_LIBS):
+	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
+
+$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) $(VERILATOR_LIBS)
+	@echo + LD $@
+	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) $(VERILATOR_LIBS) $(LIBS) -lz
 else
 $(BINARY):: $(OBJS) $(ARCHIVES)
 	@echo + LD $@
