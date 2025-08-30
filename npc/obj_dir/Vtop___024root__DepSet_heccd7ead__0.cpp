@@ -489,10 +489,7 @@ VL_INLINE_OPT void Vtop___024root___nba_sequent__TOP__0(Vtop___024root* vlSelf) 
                 vlSelfRef.top__DOT__wdata = 0U;
             }
         } else {
-            vlSelfRef.top__DOT__wdata = ((0x1000U & vlSelfRef.top__DOT__inst)
-                                          ? vlSelfRef.top__DOT__u_exe__DOT__alu_result
-                                          : (vlSelfRef.top__DOT__rdata1 
-                                             - vlSelfRef.top__DOT__imm));
+            vlSelfRef.top__DOT__wdata = vlSelfRef.top__DOT__u_exe__DOT__alu_result;
         }
     } else if ((0x4000U & vlSelfRef.top__DOT__inst)) {
         vlSelfRef.top__DOT__wdata = vlSelfRef.top__DOT__u_exe__DOT__alu_result;
