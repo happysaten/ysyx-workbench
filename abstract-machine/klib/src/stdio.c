@@ -6,20 +6,20 @@
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
 // 输出函数类型定义
-typedef void (*output_func_t)(char ch, void *ctx);
+typedef void (*output_callback_t)(char ch, void *ctx);
 
 // 输出到字符串的上下文
 typedef struct {
     char *str;
 } sprintf_ctx_t;
 
-// 输出到字符串的函数
+// 输出到字符串的回调函数
 static void sprintf_output(char ch, void *ctx) {
     sprintf_ctx_t *sctx = (sprintf_ctx_t *)ctx;
     *(sctx->str)++ = ch;
 }
 
-// 输出到标准输出的函数
+// 输出到标准输出的回调函数
 static void printf_output(char ch, void *ctx) {
     putch(ch);
 }
@@ -59,7 +59,7 @@ static char *itoa(int value, char *buf, int base, int is_unsigned) {
 }
 
 // 通用的格式化函数
-static int vprintf_helper(output_func_t output, void *ctx, const char *fmt, va_list ap) {
+static int vprintf_helper(output_callback_t output, void *ctx, const char *fmt, va_list ap) {
     const char *p = fmt;
     char numbuf[32];
     int count = 0;
@@ -131,6 +131,7 @@ static int vprintf_helper(output_func_t output, void *ctx, const char *fmt, va_l
 }
 
 // printf: 格式化输出到标准输出
+// 原理：使用va_list宏处理可变参数，调用vprintf_helper
 int printf(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -140,6 +141,7 @@ int printf(const char *fmt, ...) {
 }
 
 // vsprintf: 格式化输出到字符串，参数通过va_list传递
+// 原理：调用vprintf_helper，最后添加字符串结束符
 int vsprintf(char *out, const char *fmt, va_list ap) {
     sprintf_ctx_t ctx = { .str = out };
     int ret = vprintf_helper(sprintf_output, &ctx, fmt, ap);
