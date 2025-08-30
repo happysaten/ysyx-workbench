@@ -213,6 +213,9 @@ static int decode_exec(Decode *s) {
     // sll: rd = src1 << (src2 & 0x1f)，逻辑左移
     INSTPAT("0000000 ????? ????? 001 ????? 01100 11", sll, R,
             R(rd) = src1 << (src2 & 0x1f));
+    // slt: rd = (src1 < src2) ? 1 : 0，有符号小于置位
+    INSTPAT("0000000 ????? ????? 010 ????? 01100 11", slt, R,
+            R(rd) = ((sword_t)src1 < (sword_t)src2) ? 1 : 0);
     // sltu: rd = (src1 < src2) ? 1 : 0，无符号小于置位
     INSTPAT("0000000 ????? ????? 011 ????? 01100 11", sltu, R,
             R(rd) = (src1 < src2) ? 1 : 0);
