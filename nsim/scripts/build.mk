@@ -44,6 +44,7 @@ $(OBJ_DIR)/%.o: %.cc
 
 # Depencies
 -include $(OBJS:.o=.d)
+-include $(NSIM_HOME)/../Makefile
 
 # Verilator sources and rules
 ifdef CONFIG_ISA_npc
