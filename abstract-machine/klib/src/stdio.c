@@ -5,8 +5,24 @@
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
-// printf: 格式化输出到标准输出（未实现）
-int printf(const char *fmt, ...) { panic("Not implemented"); }
+// 输出函数类型定义
+typedef void (*output_func_t)(char ch, void *ctx);
+
+// 输出到字符串的上下文
+typedef struct {
+    char *str;
+} sprintf_ctx_t;
+
+// 输出到字符串的函数
+static void sprintf_output(char ch, void *ctx) {
+    sprintf_ctx_t *sctx = (sprintf_ctx_t *)ctx;
+    *(sctx->str)++ = ch;
+}
+
+// 输出到标准输出的函数
+static void printf_output(char ch, void *ctx) {
+    putch(ch);
+}
 
 // itoa: 整数转字符串，支持十进制和十六进制
 // 原理：将整数按指定进制转换为字符串，支持负数和无符号
@@ -42,16 +58,16 @@ static char *itoa(int value, char *buf, int base, int is_unsigned) {
     return buf;
 }
 
-// vsprintf: 格式化输出到字符串，参数通过va_list传递
-// 原理：遍历格式字符串，遇到%时处理对应类型，支持%d/%u/%x/%c/%s/%%
-int vsprintf(char *out, const char *fmt, va_list ap) {
-    char *str = out;
+// 通用的格式化函数
+static int vprintf_helper(output_func_t output, void *ctx, const char *fmt, va_list ap) {
     const char *p = fmt;
     char numbuf[32];
+    int count = 0;
 
     while (*p) {
         if (*p != '%') {
-            *str++ = *p++;
+            output(*p++, ctx);
+            count++;
             continue;
         }
         p++; // 跳过'%'
@@ -59,49 +75,76 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
         case 'd': { // 十进制整数
             int val = va_arg(ap, int);
             itoa(val, numbuf, 10, 0);
-            for (char *s = numbuf; *s; ++s)
-                *str++ = *s;
+            for (char *s = numbuf; *s; ++s) {
+                output(*s, ctx);
+                count++;
+            }
             break;
         }
         case 'u': { // 无符号十进制
             unsigned int val = va_arg(ap, unsigned int);
             itoa(val, numbuf, 10, 1);
-            for (char *s = numbuf; *s; ++s)
-                *str++ = *s;
+            for (char *s = numbuf; *s; ++s) {
+                output(*s, ctx);
+                count++;
+            }
             break;
         }
         case 'x': { // 十六进制
             unsigned int val = va_arg(ap, unsigned int);
             itoa(val, numbuf, 16, 1);
-            for (char *s = numbuf; *s; ++s)
-                *str++ = *s;
+            for (char *s = numbuf; *s; ++s) {
+                output(*s, ctx);
+                count++;
+            }
             break;
         }
         case 'c': { // 字符
             char ch = (char)va_arg(ap, int);
-            *str++ = ch;
+            output(ch, ctx);
+            count++;
             break;
         }
         case 's': { // 字符串
             const char *s = va_arg(ap, const char *);
-            while (*s)
-                *str++ = *s++;
+            while (*s) {
+                output(*s++, ctx);
+                count++;
+            }
             break;
         }
         case '%': { // 百分号
-            *str++ = '%';
+            output('%', ctx);
+            count++;
             break;
         }
         default:
             // 不支持的格式，原样输出
-            *str++ = '%';
-            *str++ = *p;
+            output('%', ctx);
+            output(*p, ctx);
+            count += 2;
             break;
         }
         p++;
     }
-    *str = '\0';
-    return str - out;
+    return count;
+}
+
+// printf: 格式化输出到标准输出
+int printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vprintf_helper(printf_output, NULL, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+// vsprintf: 格式化输出到字符串，参数通过va_list传递
+int vsprintf(char *out, const char *fmt, va_list ap) {
+    sprintf_ctx_t ctx = { .str = out };
+    int ret = vprintf_helper(sprintf_output, &ctx, fmt, ap);
+    *ctx.str = '\0';
+    return ret;
 }
 
 // sprintf: 格式化输出到字符串，参数可变
