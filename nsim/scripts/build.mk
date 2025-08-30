@@ -51,7 +51,8 @@ VSRCS = $(shell find $(abspath $(NPC_HOME)/vsrc) -name "*.sv" -o -name "*.vlt")
 
 verilator:
 	# 提交git
-	$(call git_coit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	@echo "Generating Verilator sources..."
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
