@@ -52,19 +52,33 @@ void init_map() {
   p_space = io_space;
 }
 
+/**
+ * 从IO映射区域读取数据
+ * @param addr 物理地址
+ * @param len 读取长度(1-8字节)
+ * @param map IO映射结构体指针
+ * @return 读取到的数据
+ */
 word_t map_read(paddr_t addr, int len, IOMap *map) {
-  assert(len >= 1 && len <= 8);
-  check_bound(map, addr);
-  paddr_t offset = addr - map->low;
-  invoke_callback(map->callback, offset, len, false); // prepare data to read
-  word_t ret = host_read(map->space + offset, len);
+  assert(len >= 1 && len <= 8);  // 确保读取长度有效
+  check_bound(map, addr);        // 检查地址是否在映射范围内
+  paddr_t offset = addr - map->low;  // 计算在映射区域内的偏移
+  invoke_callback(map->callback, offset, len, false); // 调用回调函数准备读取数据
+  word_t ret = host_read(map->space + offset, len);   // 从主机内存读取数据
   return ret;
 }
 
+/**
+ * 向IO映射区域写入数据
+ * @param addr 物理地址
+ * @param len 写入长度(1-8字节)  
+ * @param data 要写入的数据
+ * @param map IO映射结构体指针
+ */
 void map_write(paddr_t addr, int len, word_t data, IOMap *map) {
-  assert(len >= 1 && len <= 8);
-  check_bound(map, addr);
-  paddr_t offset = addr - map->low;
-  host_write(map->space + offset, len, data);
-  invoke_callback(map->callback, offset, len, true);
+  assert(len >= 1 && len <= 8);  // 确保写入长度有效
+  check_bound(map, addr);        // 检查地址是否在映射范围内
+  paddr_t offset = addr - map->low;  // 计算在映射区域内的偏移
+  host_write(map->space + offset, len, data);  // 向主机内存写入数据
+  invoke_callback(map->callback, offset, len, true);  // 调用回调函数处理写入操作
 }
