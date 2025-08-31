@@ -31,15 +31,12 @@ void __am_gpu_fbdraw(AM_GPU_FBDRAW_T *ctl) {
     uint32_t *pixels = ctl->pixels; // 获取像素数据指针
     uint32_t width = inl(VGACTL_ADDR) & 0xffff; // 屏幕宽度
 
-    // 遍历图像的每一行和每一列
+    // 修正：每次只写入一行的 ctl->w 个像素
     for (uint32_t row = 0; row < ctl->h; ++row) {
+        uint32_t fb_index = (ctl->y + row) * width + ctl->x;
+        uint32_t pixel_index = row * ctl->w;
         for (uint32_t col = 0; col < ctl->w; ++col) {
-            // 计算帧缓冲中的位置：(y + row) * width + (x + col)
-            uint32_t fb_index = (ctl->y + row) * width + (ctl->x + col);
-            // 像素数据索引：row * w + col
-            uint32_t pixel_index = row * ctl->w + col;
-            // 写入像素数据到帧缓冲
-            fb[fb_index] = pixels[pixel_index];
+            fb[fb_index + col] = pixels[pixel_index + col];
         }
     }
 
