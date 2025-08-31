@@ -58,17 +58,11 @@ void __am_audio_status(AM_AUDIO_STATUS_T *stat) {
 
 void __am_audio_play(AM_AUDIO_PLAY_T *ctl) {
   int len = ctl->buf.end - ctl->buf.start;
-  int bufsize = io_read(AM_AUDIO_CONFIG).bufsize;
-  int remainlen =  bufsize - io_read(AM_AUDIO_STATUS).count;
+  int count = inl(AUDIO_COUNT_ADDR);
  
-  while (remainlen < len){
-    remainlen = bufsize - io_read(AM_AUDIO_STATUS).count;
-  }
-  uintptr_t sbufAddr = (uintptr_t)AUDIO_SBUF_ADDR + io_read(AM_AUDIO_STATUS).count;
+  uintptr_t sbufAddr = (uintptr_t)AUDIO_SBUF_ADDR + count;
   for (int i = 0; i < len; i++){
     outb(sbufAddr + i, *(uint8_t *)(ctl->buf.start + i));
-    //outl(AUDIO_COUNT_ADDR, io_read(AM_AUDIO_STATUS).count + 1);
-    //sbufAddr = (uintptr_t)AUDIO_SBUF_ADDR + io_read(AM_AUDIO_STATUS).count;
   }
-  outl(AUDIO_COUNT_ADDR, io_read(AM_AUDIO_STATUS).count + len);
+  outl(AUDIO_COUNT_ADDR, count + len);
 }
