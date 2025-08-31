@@ -4,6 +4,8 @@
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 static unsigned long int next = 1;
+// 维护上次分配内存的位置，初始化为堆区起始位置
+static char *addr = NULL;
 
 int rand(void) {
   // RAND_MAX assumed to be 32767
@@ -34,7 +36,30 @@ void *malloc(size_t size) {
   // Therefore do not call panic() here, else it will yield a dead recursion:
   //   panic() -> putchar() -> (glibc) -> malloc() -> panic()
 #if !(defined(__ISA_NATIVE__) && defined(__NATIVE_USE_KLIB__))
-  panic("Not implemented");
+  // 如果是第一次调用malloc，初始化addr为堆区起始位置
+  if (addr == NULL) {
+    addr = (char *)heap.start;
+  }
+  
+  // 将size向上对齐到8字节边界，满足malloc对地址对齐的要求
+  size = (size_t)ROUNDUP(size, 8);
+  
+  // 保存当前分配位置
+  char *old = addr;
+  
+  // 更新下次分配位置
+  addr += size;
+  
+  // 检查是否超出堆区范围
+  assert((uintptr_t)heap.start <= (uintptr_t)addr && (uintptr_t)addr < (uintptr_t)heap.end);
+  
+  // 将分配的内存初始化为0
+  for (uint64_t *p = (uint64_t *)old; p != (uint64_t *)addr; p++) {
+    *p = 0;
+  }
+  
+  // 返回分配的内存起始地址
+  return old;
 #endif
   return NULL;
 }
