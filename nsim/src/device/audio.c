@@ -1,7 +1,7 @@
 /***************************************************************************************
-* Copyright (c) 2014-2022 Zihao Yu, Nanjing University
+* Copyright (c) 2014-2024 Zihao Yu, Nanjing University
 *
-* NEMU is licensed under Mulan PSL v2.
+* NSIM is licensed under Mulan PSL v2.
 * You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
 *          http://license.coscl.org.cn/MulanPSL2
@@ -12,109 +12,145 @@
 *
 * See the Mulan PSL v2 for more details.
 ***************************************************************************************/
- 
+
 #include <common.h>
 #include <device/map.h>
 #include <SDL2/SDL.h>
- 
-#define INIT_OFFSET 16
-/*
- * 声卡不能独立播放音频, 它需要接受来自客户程序的设置和音频数据. 程序要和设备交互
- * 我们需要定义一些寄存器和 MMIO空间来让程序访问
- * 
- * freq, channels和samples这三个寄存器可写入相应的初始化参数
- * init寄存器用于初始化, 写入后将根据设置好的freq, channels和samples来对SDL的音频子系统进行初始化
- * sbuf_size寄存器可读出流缓冲区的大小
- * count寄存器可以读出当前流缓冲区已经使用的大小
- */
+
+// 音频设备寄存器定义
 enum {
-  reg_freq,
-  reg_channels,
-  reg_samples,
-  reg_sbuf_size,
-  reg_init,
-  reg_count,
-  nr_reg
+  reg_freq,        // 音频频率寄存器
+  reg_channels,    // 声道数寄存器
+  reg_samples,     // 采样数寄存器
+  reg_sbuf_size,   // 流缓冲区大小寄存器（只读）
+  reg_init,        // 初始化寄存器（写入触发SDL初始化）
+  reg_count,       // 当前缓冲区使用大小寄存器（只读）
+  nr_reg           // 寄存器总数
 };
- 
-static uint8_t *sbuf = NULL;
-static uint32_t *audio_base = NULL;
- 
-/*
- * 通过SDL_OpenAudio()来初始化音频子系统, 需要提供频率, 格式等参数, 还需要注册一个用于将来填充音频数据的回调函数 
- * SDL库会定期调用初始化时注册的回调函数, 并提供一个缓冲区, 请求回调函数往缓冲区中写入音频数据
- * 回调函数返回后, SDL库就会按照初始化时提供的参数来播放缓冲区中的音频数据
- * 
- * 维护流缓冲区. 我们可以把流缓冲区可以看成是一个队列
- * 如果回调函数需要的数据量大于当前流缓冲区中的数据量, 你还需要把SDL提供的缓冲区剩余的部分清零, 
- */
-static void audio_callback(void *userdata, Uint8 *stream, int len){
-  SDL_memset(stream, 0, len);
-  if (audio_base[reg_count] > len){
-    SDL_memcpy(stream, sbuf, len);
-    audio_base[reg_count] = audio_base[reg_count] - len;
-    /*去除掉以及拷贝到SDL缓冲区的内容*/
-    for (uint32_t i = 0; i < audio_base[reg_count]; i++)
-      sbuf[i] = sbuf[len + i];
-  } else {
-    SDL_memcpy(stream, sbuf, audio_base[reg_count]);
-    SDL_memset(stream + audio_base[reg_count], 0, len - audio_base[reg_count]);
-    audio_base[reg_count] = 0;
-  }
-}
- 
-static void audio_init(){
-  SDL_AudioSpec s = {}; 
-  s.format = AUDIO_S16SYS;  // 假设系统中音频数据的格式总是使用16位有符号数来表示
-  s.userdata = NULL;        // 不使用
-  s.freq = audio_base[reg_freq]; // 采样频率
-  s.channels = audio_base[reg_channels]; // 声道数
-  s.samples = audio_base[reg_samples]; // 缓冲区大小
-  s.callback = audio_callback; // 回调函数
-  // if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
-  //   panic("Failed to initialize SDL audio: %s\n", SDL_GetError());
-  // if (SDL_OpenAudio(&s, NULL) < 0) 
-  //   panic("Failed to open audio device: %s\n", SDL_GetError());
-  SDL_InitSubSystem(SDL_INIT_AUDIO);
-  SDL_OpenAudio(&s, NULL);
-  SDL_PauseAudio(0);
-}
- 
- 
-static void audio_io_handler(uint32_t offset, int len, bool is_write) {
-  assert(offset == 0 || offset == 4 || offset == 8 || offset == 12 ||
-         offset == 16 || offset == 20 || offset == 24);
-  switch (offset)
-  {
-  case INIT_OFFSET:
-    if (is_write && audio_base[4]){
-      audio_init();
-      audio_base[reg_init] = 0;
+
+static uint8_t *sbuf = NULL;        // 流缓冲区指针
+static uint32_t *audio_base = NULL; // 音频寄存器基地址
+
+// 音频流缓冲区管理变量
+static int buf_front = 0;    // 队列头指针
+static int buf_rear = 0;     // 队列尾指针
+static int buf_count = 0;    // 当前缓冲区使用大小
+
+// SDL音频回调函数 - 从流缓冲区读取数据并填充到SDL缓冲区
+static void audio_callback(void *userdata, uint8_t *stream, int len) {
+    int nread = len;
+    
+    // 如果请求的数据量大于当前缓冲区数据量，只能提供现有数据
+    if (buf_count < len) {
+        nread = buf_count;
+        // 清零SDL缓冲区剩余部分，避免噪音
+        memset(stream + nread, 0, len - nread);
     }
-    break; 
-  default:
-    break;
-  }
+    
+    // 从环形缓冲区复制数据到SDL流
+    int first_copy = nread;
+    if (buf_front + nread > CONFIG_SB_SIZE) {
+        // 需要分两段复制（环形缓冲区回绕）
+        first_copy = CONFIG_SB_SIZE - buf_front;
+        memcpy(stream, sbuf + buf_front, first_copy);
+        memcpy(stream + first_copy, sbuf, nread - first_copy);
+    } else {
+        // 一次性复制
+        memcpy(stream, sbuf + buf_front, nread);
+    }
+    
+    // 更新队列状态
+    buf_front = (buf_front + nread) % CONFIG_SB_SIZE;
+    buf_count -= nread;
 }
- 
+
+static void audio_init_sdl() {
+    SDL_AudioSpec s = {};
+    s.format = AUDIO_S16SYS;  // 假设系统中音频数据的格式总是使用16位有符号数来表示
+    s.userdata = NULL;        // 不使用
+    s.freq = audio_base[reg_freq];      // 从寄存器读取频率
+    s.channels = audio_base[reg_channels]; // 从寄存器读取声道数
+    s.samples = audio_base[reg_samples];   // 从寄存器读取采样数
+    s.callback = audio_callback;           // 设置回调函数
+    
+    SDL_InitSubSystem(SDL_INIT_AUDIO);
+    SDL_OpenAudio(&s, NULL);
+    SDL_PauseAudio(0);  // 开始播放
+}
+
+static void audio_io_handler(uint32_t offset, int len, bool is_write) {
+    uint32_t reg_idx = offset / sizeof(uint32_t);
+    
+    if (is_write) {
+        // 写寄存器操作
+        switch (reg_idx) {
+            case reg_freq:
+            case reg_channels:
+            case reg_samples:
+                // 这些寄存器允许写入，用于设置SDL音频参数
+                break;
+            case reg_init:
+                // 写入init寄存器时，触发SDL音频子系统初始化
+                if (audio_base[reg_init] != 0) {
+                    audio_init_sdl();
+                }
+                break;
+            case reg_sbuf_size:
+            case reg_count:
+                // 这些寄存器只读，忽略写入
+                break;
+        }
+    } else {
+        // 读寄存器操作
+        switch (reg_idx) {
+            case reg_sbuf_size:
+                // 返回流缓冲区大小
+                audio_base[reg_sbuf_size] = CONFIG_SB_SIZE;
+                break;
+            case reg_count:
+                // 返回当前流缓冲区已使用大小
+                audio_base[reg_count] = buf_count;
+                break;
+        }
+    }
+}
+
+// 流缓冲区写入处理函数
+static void audio_sbuf_handler(uint32_t offset, int len, bool is_write) {
+    if (is_write) {
+        // 向流缓冲区写入音频数据
+        int space_left = CONFIG_SB_SIZE - buf_count;
+        int nwrite = (len <= space_left) ? len : space_left;
+        
+        if (nwrite > 0) {
+            // 更新队列尾指针和计数
+            buf_rear = (buf_rear + nwrite) % CONFIG_SB_SIZE;
+            buf_count += nwrite;
+        }
+    }
+}
+
 void init_audio() {
-  uint32_t space_size = sizeof(uint32_t) * nr_reg;
-  audio_base = (uint32_t *)new_space(space_size);
-  audio_base[reg_sbuf_size] = CONFIG_SB_SIZE;
-  audio_base[reg_count] = 0;
-  audio_base[nr_reg] = 7;
-/*
- * NEMU的简单声卡在初始化时会分别注册0x200处长度为24个字节的端口,
- * 以及0xa0000200处长度为24字节的MMIO空间, 它们都会映射到上述寄存器
- */
+    // 计算寄存器空间大小
+    uint32_t space_size = sizeof(uint32_t) * nr_reg;
+    // 分配寄存器空间
+    audio_base = (uint32_t *)new_space(space_size);
+    
+    // 初始化寄存器默认值
+    audio_base[reg_sbuf_size] = CONFIG_SB_SIZE;
+    audio_base[reg_count] = 0;
+    
+    // 根据配置选择端口I/O或内存映射I/O
 #ifdef CONFIG_HAS_PORT_IO
-  add_pio_map ("audio", CONFIG_AUDIO_CTL_PORT, audio_base, space_size, audio_io_handler);
+    add_pio_map ("audio", CONFIG_AUDIO_CTL_PORT, audio_base, space_size, audio_io_handler);
 #else
-  add_mmio_map("audio", CONFIG_AUDIO_CTL_MMIO, audio_base, space_size, audio_io_handler);
+    add_mmio_map("audio", CONFIG_AUDIO_CTL_MMIO, audio_base, space_size, audio_io_handler);
 #endif
-  /*
-   * 流缓冲区STREAM_BUF是一段MMIO空间, 用于存放来自程序的音频数据, 这些音频数据会在将来写入到SDL库中
-   */
-  sbuf = (uint8_t *)new_space(CONFIG_SB_SIZE);
-  add_mmio_map("audio-sbuf", CONFIG_SB_ADDR, sbuf, CONFIG_SB_SIZE, NULL);
+
+    // 分配并映射流缓冲区
+    sbuf = (uint8_t *)new_space(CONFIG_SB_SIZE);
+    add_mmio_map("audio-sbuf", CONFIG_SB_ADDR, sbuf, CONFIG_SB_SIZE, audio_sbuf_handler);
+    
+    // 初始化流缓冲区状态
+    buf_front = buf_rear = buf_count = 0;
 }
