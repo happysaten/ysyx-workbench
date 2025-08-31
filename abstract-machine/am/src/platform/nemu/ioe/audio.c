@@ -41,17 +41,34 @@ void __am_audio_status(AM_AUDIO_STATUS_T *stat) {
     stat->count = inl(AUDIO_COUNT_ADDR);
 }
 
-// 播放音频数据
+// // 播放音频数据
+// void __am_audio_play(AM_AUDIO_PLAY_T *ctl) {
+//     // 计算音频数据长度（字节数）
+//     uint32_t len = (uint8_t *)ctl->buf.end - (uint8_t *)ctl->buf.start;
+
+//     for (int i = 0; i < len; i++) {
+//         // 将音频数据逐字节写入音频缓冲区
+//         outb(AUDIO_SBUF_ADDR + i, ((uint8_t *)ctl->buf.start)[i]);
+//     }
+
+//     // 通知音频设备有新的数据可以播放
+//     // 写入数据长度到计数寄存器，触发音频播放
+//     outl(AUDIO_COUNT_ADDR, len);
+// }
+
 void __am_audio_play(AM_AUDIO_PLAY_T *ctl) {
-    // 计算音频数据长度（字节数）
-    uint32_t len = (uint8_t *)ctl->buf.end - (uint8_t *)ctl->buf.start;
-
-    for (int i = 0; i < len; i++) {
-        // 将音频数据逐字节写入音频缓冲区
-        outb(AUDIO_SBUF_ADDR + i, ((uint8_t *)ctl->buf.start)[i]);
-    }
-
-    // 通知音频设备有新的数据可以播放
-    // 写入数据长度到计数寄存器，触发音频播放
-    outl(AUDIO_COUNT_ADDR, len);
+  int len = ctl->buf.end - ctl->buf.start;
+  int bufsize = io_read(AM_AUDIO_CONFIG).bufsize;
+  int remainlen =  bufsize - io_read(AM_AUDIO_STATUS).count;
+ 
+  while (remainlen < len){
+    remainlen = bufsize - io_read(AM_AUDIO_STATUS).count;
+  }
+  uintptr_t sbufAddr = (uintptr_t)AUDIO_SBUF_ADDR + io_read(AM_AUDIO_STATUS).count;
+  for (int i = 0; i < len; i++){
+    outb(sbufAddr + i, *(uint8_t *)(ctl->buf.start + i));
+    //outl(AUDIO_COUNT_ADDR, io_read(AM_AUDIO_STATUS).count + 1);
+    //sbufAddr = (uintptr_t)AUDIO_SBUF_ADDR + io_read(AM_AUDIO_STATUS).count;
+  }
+  outl(AUDIO_COUNT_ADDR, io_read(AM_AUDIO_STATUS).count + len);
 }
