@@ -28,7 +28,7 @@ void __am_gpu_config(AM_GPU_CONFIG_T *cfg) {
 // 如果 sync 为 true，则同步帧缓冲到屏幕
 void __am_gpu_fbdraw(AM_GPU_FBDRAW_T *ctl) {
     uint32_t *fb = (uint32_t *)FB_ADDR; // 计算帧缓冲基地址
-    uint32_t *pixels = (uint32_t *)ctl->pixels; // 获取像素数据指针
+    uint32_t *pixels = ctl->pixels; // 获取像素数据指针
     uint32_t width = inl(VGACTL_ADDR) & 0xffff; // 屏幕宽度
 
     // 遍历图像的每一行和每一列
