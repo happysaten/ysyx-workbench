@@ -4,8 +4,6 @@
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 static unsigned long int next = 1;
-// 维护上次分配内存的位置，初始化为堆区起始位置
-static char *addr = NULL;
 
 int rand(void) {
     // RAND_MAX assumed to be 32767
@@ -29,10 +27,13 @@ int atoi(const char *nptr) {
     return x;
 }
 
+#if !defined(__ISA_NATIVE__)
 void *malloc(size_t size) {
     // On native, malloc() will be called during initializaion of C runtime.
     // Therefore do not call panic() here, else it will yield a dead recursion:
     //   panic() -> putchar() -> (glibc) -> malloc() -> panic()
+    // 维护上次分配内存的位置，初始化为堆区起始位置
+    static char *addr = NULL;
     // 如果是第一次调用malloc，初始化addr为堆区起始位置
     if (addr == NULL) {
         addr = (char *)heap.start;
@@ -61,5 +62,6 @@ void *malloc(size_t size) {
 }
 
 void free(void *ptr) {}
+#endif
 
 #endif

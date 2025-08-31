@@ -6,9 +6,9 @@ void __am_timer_init() {}
 
 // AM系统启动时间, 可读出系统启动后的微秒数.
 void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
-    uint64_t us_1 = inl(RTC_ADDR + 4);
-    uint64_t us_0 = inl(RTC_ADDR);
-    uptime->us = (us_1 << 32) | us_0;
+    uint64_t us_l = inl(RTC_ADDR);
+    uint64_t us_h = inl(RTC_ADDR + 4);
+    uptime->us = (us_h << 32) | us_l;
 }
 
 // AM实时时钟(RTC, Real Time Clock), 可读出当前的年月日时分秒
