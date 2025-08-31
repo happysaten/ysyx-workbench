@@ -12,8 +12,8 @@ void __am_gpu_init() {}
 // 获取 GPU 配置信息，包括宽度、高度和视频内存大小
 void __am_gpu_config(AM_GPU_CONFIG_T *cfg) {
     uint32_t vga_ctl = inl(VGACTL_ADDR);        // 从 VGA 控制地址读取配置
-    uint32_t width = vga_ctl & 0xffff;          // 低 16 位为宽度
-    uint32_t height = (vga_ctl >> 16) & 0xffff; // 高 16 位为高度
+    uint32_t width = vga_ctl >> 16;  // 高 16 位为宽度
+    uint32_t height = vga_ctl & 0xffff;         // 低 16 位为高度
     uint32_t vmemsz =
         width * height * 4; // 视频内存大小：宽度 * 高度 * 4 字节/像素
     *cfg = (AM_GPU_CONFIG_T){.present = true,
@@ -29,9 +29,9 @@ void __am_gpu_config(AM_GPU_CONFIG_T *cfg) {
 void __am_gpu_fbdraw(AM_GPU_FBDRAW_T *ctl) {
     uint32_t *fb = (uint32_t *)FB_ADDR; // 计算帧缓冲基地址
     uint32_t *pixels = ctl->pixels; // 获取像素数据指针
-    uint32_t width = inl(VGACTL_ADDR) & 0xffff; // 屏幕宽度
+    uint32_t width = inl(VGACTL_ADDR) >> 16; // 屏幕宽度（高16位）
 
-    // 修正：每次只写入一行的 ctl->w 个像素
+    // 遍历图像的每一行和每一列，输出像素信息到帧缓冲
     for (uint32_t row = 0; row < ctl->h; ++row) {
         uint32_t fb_index = (ctl->y + row) * width + ctl->x;
         uint32_t pixel_index = row * ctl->w;
