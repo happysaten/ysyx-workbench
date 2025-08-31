@@ -9,7 +9,7 @@ void __am_input_keybrd(AM_INPUT_KEYBRD_T *kbd) {
     if (code != 0) {
         // 提取键码（低15位）和按下状态（高位）
         kbd->keycode = code & ~KEYDOWN_MASK;
-        kbd->keydown = (code & KEYDOWN_MASK) ? 1 : 0;
+        kbd->keydown = (code & KEYDOWN_MASK) ? true : false;
     } else {
         // 无按键时，返回AM_KEY_NONE
         kbd->keydown = 0;
