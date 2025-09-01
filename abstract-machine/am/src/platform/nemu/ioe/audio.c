@@ -13,7 +13,7 @@
 // 音频设备初始化
 void __am_audio_init() {
     // 向初始化寄存器写入1，触发音频设备初始化
-    outl(AUDIO_INIT_ADDR, 1);
+    // outl(AUDIO_INIT_ADDR, 1);
 }
 
 // 获取音频设备配置信息
