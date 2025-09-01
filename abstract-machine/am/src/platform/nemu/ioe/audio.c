@@ -13,7 +13,7 @@
 // 音频设备初始化
 void __am_audio_init() {
     // 向初始化寄存器写入1，触发音频设备初始化
-    outl(AUDIO_INIT_ADDR, 1);
+    // outl(AUDIO_INIT_ADDR, 1);
 }
 
 // 获取音频设备配置信息
@@ -24,14 +24,15 @@ void __am_audio_config(AM_AUDIO_CONFIG_T *cfg) {
 
 // 设置音频控制参数
 void __am_audio_ctrl(AM_AUDIO_CTRL_T *ctrl) {
-    // 初始化音频设备
-    __am_audio_init();
     // 设置采样频率（如8000Hz）
     outl(AUDIO_FREQ_ADDR, ctrl->freq);
     // 设置声道数（1=单声道，2=立体声）
     outl(AUDIO_CHANNELS_ADDR, ctrl->channels);
     // 设置每次播放的样本数量
     outl(AUDIO_SAMPLES_ADDR, ctrl->samples);
+    // 初始化音频设备
+    __am_audio_init();
+    outl(AUDIO_INIT_ADDR, 1);
 }
 
 // 获取音频设备状态
