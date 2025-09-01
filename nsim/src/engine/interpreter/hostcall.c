@@ -27,7 +27,7 @@ void set_nsim_state(int state, vaddr_t pc, int halt_ret) {
 
 __attribute__((noinline)) void invalid_inst(vaddr_t thispc) {
     uint32_t temp[2];
-    vaddr_t pc = thispc - 4;
+    vaddr_t pc = thispc;
     temp[0] = inst_fetch(&pc, 4);
     temp[1] = inst_fetch(&pc, 4);
 
