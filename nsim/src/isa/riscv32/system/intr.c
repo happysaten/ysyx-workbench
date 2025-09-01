@@ -14,15 +14,43 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include "../local-include/reg.h"
 
+/**
+ * 触发异常/中断处理
+ * @param NO 异常/中断号 - 用于标识异常类型(如非法指令、系统调用等)
+ * @param epc 异常程序计数器 - 触发异常时的PC值
+ * @return 异常/中断向量地址 - 异常处理程序的入口地址
+ */
 word_t isa_raise_intr(word_t NO, vaddr_t epc) {
-  /* TODO: Trigger an interrupt/exception with ``NO''.
-   * Then return the address of the interrupt/exception vector.
+  /* 实现RISC-V异常处理机制:
+   * 1. 保存触发异常时的PC到mepc寄存器
+   * 2. 设置异常原因到mcause寄存器  
+   * 3. 更新mstatus寄存器的状态位
+   * 4. 返回异常处理程序入口地址(mtvec寄存器值)
    */
-
-  return 0;
+  
+  // 保存异常发生时的PC值到mepc寄存器
+  csr_write(0x341, epc);  // MEPC
+  
+  // 设置异常原因码到mcause寄存器
+  // 最高位为0表示异常，为1表示中断
+  csr_write(0x342, NO);   // MCAUSE
+  
+  // 更新mstatus寄存器
+  // 在实际实现中，这里应该保存和更新中断使能位等状态
+  // 简化实现：保持当前mstatus值不变
+  
+  // 返回异常向量地址，异常处理程序将从此地址开始执行
+  return csr_read(0x305);  // MTVEC
 }
 
+/**
+ * 查询待处理的中断
+ * @return 中断状态 - 当前返回INTR_EMPTY表示无待处理中断
+ */
 word_t isa_query_intr() {
+  // 目前返回无中断状态
+  // 在完整实现中，这里应该检查中断控制器和中断使能位
   return INTR_EMPTY;
 }
