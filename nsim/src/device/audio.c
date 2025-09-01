@@ -14,6 +14,7 @@
  ***************************************************************************************/
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mutex.h>
 #include <common.h>
 #include <device/map.h>
 
@@ -28,15 +29,20 @@ enum {
     nr_reg         // 寄存器总数
 };
 
-static uint8_t *sbuf = NULL;        // 流缓冲区指针
-static uint32_t *audio_base = NULL; // 音频寄存器基地址
+static uint8_t *sbuf = NULL;          // 流缓冲区指针
+static uint32_t *audio_base = NULL;   // 音频寄存器基地址
+static SDL_mutex *audio_mutex = NULL; // 音频线程安全互斥锁
 
 // SDL音频回调函数 - 从流缓冲区读取数据并填充到SDL缓冲区
+// 注意：此函数在SDL音频线程中运行，需要线程安全保护
 static void audio_callback(void *userdata, Uint8 *stream, int len) {
     // 边界检查：确保所有必要的指针和参数都有效
-    if (len <= 0 || !stream || !sbuf || !audio_base) {
+    if (len <= 0 || !stream || !sbuf || !audio_base || !audio_mutex) {
         return;
     }
+
+    // 获取互斥锁，保证与主线程的数据访问同步
+    SDL_LockMutex(audio_mutex);
 
     // 清零输出缓冲区
     SDL_memset(stream, 0, len);
@@ -71,6 +77,9 @@ static void audio_callback(void *userdata, Uint8 *stream, int len) {
         // 缓冲区已用完
         audio_base[reg_count] = 0;
     }
+
+    // 释放互斥锁
+    SDL_UnlockMutex(audio_mutex);
 }
 
 // 初始化SDL音频子系统
@@ -114,6 +123,13 @@ void init_audio() {
     uint32_t space_size = sizeof(uint32_t) * nr_reg;
     // 分配寄存器空间
     audio_base = (uint32_t *)new_space(space_size);
+
+    // 初始化音频线程安全互斥锁
+    audio_mutex = SDL_CreateMutex();
+    if (!audio_mutex) {
+        // 互斥锁创建失败的错误处理
+        // 在实际项目中应该有适当的错误处理机制
+    }
 
     // 初始化寄存器默认值
     audio_base[reg_sbuf_size] = CONFIG_SB_SIZE;
