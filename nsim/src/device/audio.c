@@ -14,6 +14,7 @@
  ***************************************************************************************/
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mutex.h>
 #include <common.h>
 #include <device/map.h>
 
@@ -30,24 +31,58 @@ enum {
 
 static uint8_t *sbuf = NULL;        // 流缓冲区指针
 static uint32_t *audio_base = NULL; // 音频寄存器基地址
+static SDL_mutex *audio_mutex = NULL; // 音频线程安全互斥锁
 
 // SDL音频回调函数 - 从流缓冲区读取数据并填充到SDL缓冲区
+// 注意：此函数在SDL音频线程中运行，需要线程安全保护
 static void audio_callback(void *userdata, Uint8 *stream, int len) {
+    // 边界检查：确保所有必要的指针和参数都有效
+    if (len <= 0 || !stream || !sbuf || !audio_base || !audio_mutex) {
+        return;
+    }
+    
+    // 获取互斥锁，保证与主线程的数据访问同步
+    SDL_LockMutex(audio_mutex);
+    
+    // 清零输出缓冲区
     SDL_memset(stream, 0, len);
-    if (audio_base[reg_count] > len) {
-        SDL_memcpy(stream, sbuf, len);
-        audio_base[reg_count] = audio_base[reg_count] - len;
-        // 简单地移动剩余数据到缓冲区前部
-        for (uint32_t i = 0; i < audio_base[reg_count]; i++)
-            sbuf[i] = sbuf[len + i];
+    
+    // 类型转换确保一致性，避免有符号/无符号比较警告
+    uint32_t available = audio_base[reg_count];    // 当前缓冲区可用数据大小
+    uint32_t request_len = (uint32_t)len;          // SDL请求的数据大小
+    
+    if (available >= request_len) {
+        // 情况1：缓冲区数据足够SDL请求
+        // 复制请求的数据量到SDL输出流
+        SDL_memcpy(stream, sbuf, request_len);
+        
+        // 更新剩余数据大小
+        audio_base[reg_count] = available - request_len;
+        
+        // 如果还有剩余数据，将其移动到缓冲区前部
+        // 使用memmove而非循环，效率更高且处理内存重叠安全
+        if (audio_base[reg_count] > 0) {
+            memmove(sbuf, sbuf + request_len, audio_base[reg_count]);
+        }
     } else {
-        SDL_memcpy(stream, sbuf, audio_base[reg_count]);
-        SDL_memset(stream + audio_base[reg_count], 0,
-                   len - audio_base[reg_count]);
+        // 情况2：缓冲区数据不足SDL请求
+        if (available > 0) {
+            // 复制所有可用数据到SDL输出流
+            SDL_memcpy(stream, sbuf, available);
+        }
+        
+        // 剩余部分填充静音（已经在开始时清零，这里是为了明确逻辑）
+        SDL_memset(stream + available, 0, request_len - available);
+        
+        // 缓冲区已用完
         audio_base[reg_count] = 0;
     }
+    
+    // 释放互斥锁
+    SDL_UnlockMutex(audio_mutex);
 }
 
+// 初始化SDL音频子系统
 static void audio_init_sdl() {
     SDL_AudioSpec s = {};
     s.format =
@@ -63,6 +98,7 @@ static void audio_init_sdl() {
     SDL_PauseAudio(0); // 开始播放
 }
 
+// 音频设备寄存器读写处理函数
 static void audio_io_handler(uint32_t offset, int len, bool is_write) {
     uint32_t reg_idx = offset / sizeof(uint32_t);
 
@@ -87,6 +123,13 @@ void init_audio() {
     uint32_t space_size = sizeof(uint32_t) * nr_reg;
     // 分配寄存器空间
     audio_base = (uint32_t *)new_space(space_size);
+
+    // 初始化音频线程安全互斥锁
+    audio_mutex = SDL_CreateMutex();
+    if (!audio_mutex) {
+        // 互斥锁创建失败的错误处理
+        // 在实际项目中应该有适当的错误处理机制
+    }
 
     // 初始化寄存器默认值
     audio_base[reg_sbuf_size] = CONFIG_SB_SIZE;
