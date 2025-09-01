@@ -31,7 +31,7 @@ void __am_audio_ctrl(AM_AUDIO_CTRL_T *ctrl) {
     // 设置每次播放的样本数量
     outl(AUDIO_SAMPLES_ADDR, ctrl->samples);
     // 初始化音频设备
-    __am_audio_init();
+    // __am_audio_init();
 }
 
 // 获取音频设备状态
