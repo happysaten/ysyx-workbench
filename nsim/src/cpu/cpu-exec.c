@@ -39,7 +39,7 @@ bool check_watchpoints();
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
     if (ITRACE_COND) {
-        log_write("%s\n", _this->logbuf);
+        log_write("[itrace] %s\n", _this->logbuf);
         void iringbuf_push(const char *itrace_str);
         iringbuf_push(_this->logbuf);
     }

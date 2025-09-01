@@ -13,8 +13,8 @@
  * See the Mulan PSL v2 for more details.
  ***************************************************************************************/
 
-#include <common.h>
 #include "local-include/reg.h"
+#include <common.h>
 #include <cpu/cpu.h>
 #include <cpu/decode.h>
 #include <cpu/ifetch.h>
@@ -159,6 +159,9 @@ static int decode_exec(Decode *s) {
     // bgeu: 如果src1>=src2则跳转（无符号比较）
     INSTPAT("??????? ????? ????? 111 ????? 11000 11", bgeu, B,
             if (src1 >= src2) s->dnpc = s->pc + imm;);
+    // lb: 从内存读取1字节有符号数据到rd
+    INSTPAT("??????? ????? ????? 000 ????? 00000 11", lb, I,
+            R(rd) = SEXT(Mr(src1 + imm, 1), 8));
     // lh: 从内存读取2字节有符号数据到rd
     INSTPAT("??????? ????? ????? 001 ????? 00000 11", lh, I,
             R(rd) = SEXT(Mr(src1 + imm, 2), 16));
@@ -183,6 +186,9 @@ static int decode_exec(Decode *s) {
     // addi: rd = src1 + imm，带符号立即数加法
     INSTPAT("??????? ????? ????? 000 ????? 00100 11", addi, I,
             R(rd) = src1 + imm);
+    // slti: rd = (src1 < imm) ? 1 : 0，有符号立即数小于置位
+    INSTPAT("??????? ????? ????? 010 ????? 00100 11", slti, I,
+            R(rd) = ((sword_t)src1 < (sword_t)imm) ? 1 : 0);
     // sltiu: rd = (src1 < imm) ? 1 : 0，无符号立即数小于置位
     INSTPAT("??????? ????? ????? 011 ????? 00100 11", sltiu, I,
             R(rd) = (src1 < (word_t)imm) ? 1 : 0);
@@ -213,6 +219,9 @@ static int decode_exec(Decode *s) {
     // sll: rd = src1 << (src2 & 0x1f)，逻辑左移
     INSTPAT("0000000 ????? ????? 001 ????? 01100 11", sll, R,
             R(rd) = src1 << (src2 & 0x1f));
+    // slt: rd = (src1 < src2) ? 1 : 0，有符号小于置位
+    INSTPAT("0000000 ????? ????? 010 ????? 01100 11", slt, R,
+            R(rd) = ((sword_t)src1 < (sword_t)src2) ? 1 : 0);
     // sltu: rd = (src1 < src2) ? 1 : 0，无符号小于置位
     INSTPAT("0000000 ????? ????? 011 ????? 01100 11", sltu, R,
             R(rd) = (src1 < src2) ? 1 : 0);
@@ -240,6 +249,11 @@ static int decode_exec(Decode *s) {
     // mulh: rd = 高32位(src1 * src2)，有符号乘法高位
     INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh, R, {
         int64_t res = (int64_t)(sword_t)src1 * (int64_t)(sword_t)src2;
+        R(rd) = (word_t)(res >> 32);
+    });
+    // mulhu: rd = 高32位(src1 * src2)，无符号乘法高位
+    INSTPAT("0000001 ????? ????? 011 ????? 01100 11", mulhu, R, {
+        uint64_t res = (uint64_t)src1 * (uint64_t)src2;
         R(rd) = (word_t)(res >> 32);
     });
     // div: rd = src1 / src2，除法（有符号）

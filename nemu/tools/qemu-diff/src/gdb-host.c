@@ -13,7 +13,7 @@
 * See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-#include "common.h"
+#include <common.h>
 
 static struct gdb_conn *conn;
 

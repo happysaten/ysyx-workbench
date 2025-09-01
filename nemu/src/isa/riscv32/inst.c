@@ -14,9 +14,11 @@
  ***************************************************************************************/
 
 #include "local-include/reg.h"
+#include <common.h>
 #include <cpu/cpu.h>
 #include <cpu/decode.h>
 #include <cpu/ifetch.h>
+#include <stdio.h>
 
 #define R(i) gpr(i)           // 访问通用寄存器
 #define Mr vaddr_read         // 读取虚拟地址
@@ -39,10 +41,16 @@ enum {
 #define src2R() do { *src2 = R(rs2); } while (0)
 // 取I型立即数
 #define immI()  do { *imm = SEXT(BITS(i, 31, 20), 12); } while (0)
-// 取U型立即数
-#define immU()  do { *imm = SEXT(BITS(i, 31, 12), 20) << 12; } while (0)
 // 取S型立即数
 #define immS()  do { *imm = (SEXT(BITS(i, 31, 25), 7) << 5) | BITS(i, 11, 7); } while (0)
+// 取B型立即数
+#define immB()  do { *imm = (SEXT((BITS(i, 31, 31) << 12) | (BITS(i, 7, 7) << 11) | \
+                                 (BITS(i, 30, 25) << 5) | (BITS(i, 11, 8) << 1), 13)); } while (0)
+// 取U型立即数
+#define immU()  do { *imm = SEXT(BITS(i, 31, 12), 20) << 12; } while (0)
+// 取J型立即数
+#define immJ()  do { *imm = (SEXT((BITS(i, 31, 31) << 20) | (BITS(i, 19, 12) << 12) | \
+                                 (BITS(i, 20, 20) << 11) | (BITS(i, 30, 21) << 1), 21)); } while (0)
 
 // 解码操作数
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2,
@@ -68,19 +76,13 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2,
     case TYPE_B: // B型指令，解码rs1、rs2和分支立即数
         src1R();
         src2R();
-        // B型立即数编码方式与S型类似，但需拼接不同位段
-        *imm = (SEXT((BITS(i, 31, 31) << 12) | (BITS(i, 7, 7) << 11) |
-                         (BITS(i, 30, 25) << 5) | (BITS(i, 11, 8) << 1),
-                     13));
+        immB();
         break;
     case TYPE_U: // U型指令，只解码imm
         immU();
         break;
     case TYPE_J: // J型指令，只解码imm
-        // J型立即数编码方式
-        *imm = (SEXT((BITS(i, 31, 31) << 20) | (BITS(i, 19, 12) << 12) |
-                         (BITS(i, 20, 20) << 11) | (BITS(i, 30, 21) << 1),
-                     21));
+        immJ();
         break;
     case TYPE_N: // 无操作数类型
         break;
@@ -106,17 +108,39 @@ static int decode_exec(Decode *s) {
 
     INSTPAT_START();
     // lui: rd = imm，加载高位立即数
-    INSTPAT("??????? ????? ????? ??? ????? 01101 11", lui, U,
-            R(rd) = imm);
+    INSTPAT("??????? ????? ????? ??? ????? 01101 11", lui, U, R(rd) = imm);
     // auipc: rd = pc + imm，计算当前pc加上立即数
     INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc, U,
             R(rd) = s->pc + imm);
     // jal: 跳转并链接，rd = 返回地址，pc跳转到目标
-    INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, R(rd) = s->snpc;
-            s->dnpc = s->pc + imm;);
+    INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {
+        R(rd) = s->snpc;
+        s->dnpc = s->pc + imm;
+        IFDEF(CONFIG_FTRACE, {
+            void ftrace_call(vaddr_t pc, vaddr_t target);
+            // rd==1 (ra) 视为call
+            if (rd == 1) {
+                void ftrace_call(vaddr_t pc, vaddr_t target);
+                ftrace_call(s->pc, s->dnpc);
+            }
+        });
+    });
+
     // jalr: 跳转并链接寄存器，rd = 返回地址，pc跳转到(src1+imm)&~1
-    INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, 
-            { word_t t = s->snpc; s->dnpc = (src1 + imm) & ~1; R(rd) = t; });
+    INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {
+        s->dnpc = (src1 + imm) & ~1;
+        R(rd) = s->snpc;
+        IFDEF(CONFIG_FTRACE, {
+            void ftrace_call(vaddr_t pc, vaddr_t target);
+            void ftrace_ret(vaddr_t pc);
+            // rd==1 (ra) 视为call
+            if (rd == 1)
+                ftrace_call(s->pc, s->dnpc);
+            // 标准RET: rd==0, rs1==1, imm==0
+            else if (s->isa.inst == 0x00008067)
+                ftrace_ret(s->pc);
+        })
+    });
     // beq: 如果src1==src2则跳转
     INSTPAT("??????? ????? ????? 000 ????? 11000 11", beq, B,
             if (src1 == src2) s->dnpc = s->pc + imm;);
@@ -135,6 +159,9 @@ static int decode_exec(Decode *s) {
     // bgeu: 如果src1>=src2则跳转（无符号比较）
     INSTPAT("??????? ????? ????? 111 ????? 11000 11", bgeu, B,
             if (src1 >= src2) s->dnpc = s->pc + imm;);
+    // lb: 从内存读取1字节有符号数据到rd
+    INSTPAT("??????? ????? ????? 000 ????? 00000 11", lb, I,
+            R(rd) = SEXT(Mr(src1 + imm, 1), 8));
     // lh: 从内存读取2字节有符号数据到rd
     INSTPAT("??????? ????? ????? 001 ????? 00000 11", lh, I,
             R(rd) = SEXT(Mr(src1 + imm, 2), 16));
@@ -159,6 +186,9 @@ static int decode_exec(Decode *s) {
     // addi: rd = src1 + imm，带符号立即数加法
     INSTPAT("??????? ????? ????? 000 ????? 00100 11", addi, I,
             R(rd) = src1 + imm);
+    // slti: rd = (src1 < imm) ? 1 : 0，有符号立即数小于置位
+    INSTPAT("??????? ????? ????? 010 ????? 00100 11", slti, I,
+            R(rd) = ((sword_t)src1 < (sword_t)imm) ? 1 : 0);
     // sltiu: rd = (src1 < imm) ? 1 : 0，无符号立即数小于置位
     INSTPAT("??????? ????? ????? 011 ????? 00100 11", sltiu, I,
             R(rd) = (src1 < (word_t)imm) ? 1 : 0);
@@ -189,6 +219,9 @@ static int decode_exec(Decode *s) {
     // sll: rd = src1 << (src2 & 0x1f)，逻辑左移
     INSTPAT("0000000 ????? ????? 001 ????? 01100 11", sll, R,
             R(rd) = src1 << (src2 & 0x1f));
+    // slt: rd = (src1 < src2) ? 1 : 0，有符号小于置位
+    INSTPAT("0000000 ????? ????? 010 ????? 01100 11", slt, R,
+            R(rd) = ((sword_t)src1 < (sword_t)src2) ? 1 : 0);
     // sltu: rd = (src1 < src2) ? 1 : 0，无符号小于置位
     INSTPAT("0000000 ????? ????? 011 ????? 01100 11", sltu, R,
             R(rd) = (src1 < src2) ? 1 : 0);
@@ -220,7 +253,8 @@ static int decode_exec(Decode *s) {
     });
     // div: rd = src1 / src2，除法（有符号）
     INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div, R,
-            R(rd) = (sword_t)src2 == 0 ? (word_t)-1 : (sword_t)src1 / (sword_t)src2);
+            R(rd) = (sword_t)src2 == 0 ? (word_t)-1
+                                       : (sword_t)src1 / (sword_t)src2);
     // divu: rd = src1 / src2，除法（无符号）
     INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu, R,
             R(rd) = src2 == 0 ? (word_t)-1 : src1 / src2);

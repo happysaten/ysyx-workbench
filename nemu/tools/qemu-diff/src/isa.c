@@ -13,7 +13,7 @@
 * See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-#include "common.h"
+#include <common.h>
 
 #if defined(CONFIG_ISA_x86)
 

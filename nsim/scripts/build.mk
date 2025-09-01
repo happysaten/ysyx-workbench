@@ -45,14 +45,26 @@ $(OBJ_DIR)/%.o: %.cc
 # Depencies
 -include $(OBJS:.o=.d)
 
-# Some convenient rules
+# Verilator sources and rules
+ifdef CONFIG_ISA_npc
+VSRCS = $(shell find $(abspath $(NPC_HOME)/vsrc) -name "*.sv" -o -name "*.vlt")
 
-.PHONY: app clean
+verilator:
+	# 提交git
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	@echo "Generating Verilator sources..."
+	verilator --cc --build \
+		--top-module top \
+		--trace-fst \
+		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
+		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
+		$(VSRCS) \
+		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
+endif
 
 app: $(BINARY)
 ifdef CONFIG_ISA_npc
-$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS)
-	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
+$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) verilator
 	@echo + LD $@
 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
 else
@@ -64,3 +76,7 @@ endif
 clean:
 	-rm -rf $(BUILD_DIR)
 	-rm -rf $(NSIM_HOME)/src/verilator/obj_dir
+
+# Some convenient rules
+
+.PHONY: app clean verilator

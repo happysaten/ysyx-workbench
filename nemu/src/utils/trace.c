@@ -61,7 +61,7 @@ void ftrace_call(vaddr_t pc, vaddr_t target) {
             strcat(indent, "  ");
         }
         // 记录函数调用
-        log_write("[ftrace]" FMT_WORD ": %scall [%s@" FMT_WORD "]\n", pc, indent,
+        log_write(FMT_WORD ": %scall [%s@" FMT_WORD "]\n", pc, indent,
                   func_name, target);
 
         // 增加调用深度
@@ -69,7 +69,7 @@ void ftrace_call(vaddr_t pc, vaddr_t target) {
             call_depth++;
         }
     } else
-        log_write("[ftrace]" FMT_WORD ": call [unknown function @ " FMT_WORD "]\n", pc,
+        log_write(FMT_WORD ": call [unknown function @ " FMT_WORD "]\n", pc,
                   target);
 }
 
@@ -87,7 +87,7 @@ void ftrace_ret(vaddr_t pc) {
             strcat(indent, "  ");
         }
         // 记录函数返回
-        log_write("[ftrace]" FMT_WORD ": %sret [%s]\n", pc, indent, func_name);
+        log_write(FMT_WORD ": %sret [%s]\n", pc, indent, func_name);
     }
 }
 #endif

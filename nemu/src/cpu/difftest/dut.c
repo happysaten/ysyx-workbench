@@ -18,6 +18,7 @@
 #include <isa.h>
 #include <cpu/cpu.h>
 #include <memory/paddr.h>
+#include <stdio.h>
 #include <utils.h>
 #include <difftest-def.h>
 

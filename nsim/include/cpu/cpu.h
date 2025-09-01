@@ -18,10 +18,18 @@
 
 #include <common.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void cpu_exec(uint64_t n);
 
 void set_nsim_state(int state, vaddr_t pc, int halt_ret);
 void invalid_inst(vaddr_t thispc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #define NSIMTRAP(thispc, code) set_nsim_state(NSIM_END, thispc, code)
 #define INV(thispc) invalid_inst(thispc)

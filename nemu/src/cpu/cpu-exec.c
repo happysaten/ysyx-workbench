@@ -13,10 +13,12 @@
  * See the Mulan PSL v2 for more details.
  ***************************************************************************************/
 
-#include <cpu/cpu.h>
-#include <cpu/decode.h>
-#include <cpu/difftest.h>
+#include "cpu/cpu.h"
+#include "cpu/decode.h"
+#include "cpu/difftest.h"
+#include "debug.h"
 #include <locale.h>
+#include <stddef.h>
 #include <stdio.h>
 
 /* The assembly code of instructions executed is only output to the screen
@@ -35,8 +37,12 @@ void device_update();
 bool check_watchpoints();
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
-#ifdef CONFIG_ITRACE
-    log_write("%s\n", _this->logbuf);
+#ifdef CONFIG_ITRACE_COND
+    if (ITRACE_COND) {
+        log_write("%s\n", _this->logbuf);
+        void iringbuf_push(const char *itrace_str);
+        iringbuf_push(_this->logbuf);
+    }
 #endif
     if (g_print_step) {
         IFDEF(CONFIG_ITRACE, puts(_this->logbuf));
@@ -47,7 +53,7 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
     // 检查监视点
     if (check_watchpoints()) {
         // 如果监视点触发，设置NEMU状态为停止
-        if(nemu_state.state == NEMU_RUNNING)
+        if (nemu_state.state == NEMU_RUNNING)
             nemu_state.state = NEMU_STOP;
         Log("Program paused due to watchpoint trigger\n");
     }
@@ -76,7 +82,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
     int space_len = ilen_max - ilen;
     if (space_len < 0)
         space_len = 0;
-    space_len = space_len * 3 + 1;
+    space_len = space_len * 3 + 8;
     memset(p, ' ', space_len);
     p += space_len;
 
@@ -115,6 +121,10 @@ static void statistic() {
 
 void assert_fail_msg() {
     isa_reg_display();
+#ifdef CONFIG_ITRACE
+    void iringbuf_dump();
+    iringbuf_dump();
+#endif
     statistic();
 }
 
@@ -145,6 +155,7 @@ void cpu_exec(uint64_t n) {
         break;
 
     case NEMU_END:
+        // Assert(0, "just for debugging iringbuf");
     case NEMU_ABORT:
         Log("nemu: %s at pc = " FMT_WORD,
             (nemu_state.state == NEMU_ABORT
