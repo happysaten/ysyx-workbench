@@ -251,6 +251,12 @@ static int decode_exec(Decode *s) {
         isa_raise_intr(11, s->pc);
     });
     
+    // csrw: CSR 写指令，将 rs1 的值写入 CSR
+    INSTPAT("??????? ????? ????? 001 00000 11100 11", csrw, I, {
+        // CSR 地址在 imm 字段中（即指令的 31:20 位）
+        csr_write(imm & 0xfff, src1);
+    });
+    
     // mul: rd = src1 * src2，乘法
     INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul, R,
             R(rd) = src1 * src2);
