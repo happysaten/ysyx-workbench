@@ -250,18 +250,9 @@ static int decode_exec(Decode *s) {
         // 调用 isa_raise_intr 函数，NO=11 表示环境调用异常，epc为当前pc
         word_t isa_raise_intr(word_t NO, vaddr_t epc);
         s->dnpc = isa_raise_intr(11, s->pc);
-        // printf("Hello from ecall\n");
 #ifdef CONFIG_ETRACE
-        // printf("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-        //           csr(CSR_MEPC), csr(CSR_MCAUSE));
-        extern bool log_enable();
-        extern uint64_t g_nr_guest_inst;
-        printf("log is %d, g_nr_guest_inst is %zu\n", log_enable(),
-               g_nr_guest_inst);
-
         log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
                   csr(CSR_MEPC), csr(CSR_MCAUSE));
-        for (volatile int i = 0; i < 10000000; i++) ;
 #endif
     });
 
