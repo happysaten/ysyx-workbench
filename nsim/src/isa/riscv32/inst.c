@@ -261,6 +261,7 @@ static int decode_exec(Decode *s) {
 
         log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
                   csr(CSR_MEPC), csr(CSR_MCAUSE));
+        for (volatile int i = 0; i < 10000000; i++) ;
 #endif
     });
 
