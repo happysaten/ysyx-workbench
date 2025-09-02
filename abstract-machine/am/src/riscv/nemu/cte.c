@@ -75,7 +75,7 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
     ctx->mepc = (uintptr_t)entry;
 
     // 设置Mstatus寄存器，开启中断（MIE位）
-    ctx->mstatus = 0x00001800; // MPP=11 (M-mode), MIE=1 (enable interrupts)
+    ctx->mstatus = 0x1800; // MPP=11 (M-mode), MIE=1 (enable interrupts)
     
     return ctx;
 }
