@@ -257,6 +257,12 @@ static int decode_exec(Decode *s) {
         csr(imm & 0xfff) = src1;
     });
 
+    // mret: 机器模式返回指令，从机器模式陷阱返回
+    INSTPAT("0011000 00010 00000 000 00000 11100 11", mret, N, {
+        // 从 mepc 寄存器中恢复 pc
+        s->dnpc = csr(CSR_MEPC);
+    });
+
     // mul: rd = src1 * src2，乘法
     INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul, R,
             R(rd) = src1 * src2);
