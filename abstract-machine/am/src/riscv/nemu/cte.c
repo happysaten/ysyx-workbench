@@ -30,7 +30,19 @@ Context* __am_irq_handle(Context *c) {
   if (user_handler) {
     Event ev = {0};
     switch (c->mcause) {
-      default: ev.event = EVENT_ERROR; break;
+      case 11: // Environment call from M-mode (自陷异常)
+        // 检查是否为yield操作：GPR1寄存器值为-1
+        if (c->GPR1 == -1) {
+          ev.event = EVENT_YIELD;
+        } else {
+          ev.event = EVENT_SYSCALL;
+        }
+        // 自陷异常需要将mepc+4，跳过ecall指令
+        c->mepc += 4;
+        break;
+      default: 
+        ev.event = EVENT_ERROR; 
+        break;
     }
 
     c = user_handler(ev, c);
