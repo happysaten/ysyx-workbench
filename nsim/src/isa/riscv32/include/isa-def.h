@@ -18,12 +18,6 @@
 
 #include <common.h>
 
-// CSR寄存器地址定义
-#define CSR_MSTATUS   0x300  // 机器状态寄存器
-#define CSR_MTVEC     0x305  // 机器异常向量基地址寄存器
-#define CSR_MEPC      0x341  // 机器异常程序计数器
-#define CSR_MCAUSE    0x342  // 机器异常原因寄存器
-
 typedef struct {
   word_t gpr[MUXDEF(CONFIG_RVE, 16, 32)];  // 通用寄存器组
   vaddr_t pc;                              // 程序计数器

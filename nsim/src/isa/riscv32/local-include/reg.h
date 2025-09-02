@@ -18,6 +18,12 @@
 
 #include <common.h>
 
+// CSR寄存器地址定义
+#define CSR_MSTATUS   0x300  // 机器状态寄存器
+#define CSR_MTVEC     0x305  // 机器异常向量基地址寄存器
+#define CSR_MEPC      0x341  // 机器异常程序计数器
+#define CSR_MCAUSE    0x342  // 机器异常原因寄存器
+
 // 检查通用寄存器索引的有效性
 // idx: 寄存器索引 (0-31 for RV32I, 0-15 for RV32E)
 // 返回: 有效的寄存器索引
@@ -44,9 +50,9 @@ static inline int check_reg_idx(int idx) {
   word_t result = 0; \
   switch(addr) { \
     case CSR_MSTATUS: result = csr_mstatus; break; \
-    case 0x305: result = csr_mtvec; break; \
-    case 0x341: result = csr_mepc; break; \
-    case 0x342: result = csr_mcause; break; \
+    case CSR_MTVEC: result = csr_mtvec; break; \
+    case CSR_MEPC: result = csr_mepc; break; \
+    case CSR_MCAUSE: result = csr_mcause; break; \
     default: \
       Assert(0, "Unsupported CSR read at address 0x%x\n", addr); \
         break; \
@@ -62,10 +68,10 @@ static inline int check_reg_idx(int idx) {
 // val: 要写入的值
 #define csr_write(addr, val) do { \
   switch(addr) { \
-    case 0x300: csr_mstatus = val; break;  /* MSTATUS */ \
-    case 0x305: csr_mtvec = val; break;    /* MTVEC */ \
-    case 0x341: csr_mepc = val; break;     /* MEPC */ \
-    case 0x342: csr_mcause = val; break;   /* MCAUSE */ \
+    case CSR_MSTATUS: csr_mstatus = val; break; /* MSTATUS */ \
+    case CSR_MTVEC: csr_mtvec = val; break;     /* MTVEC */ \
+    case CSR_MEPC: csr_mepc = val; break;     /* MEPC */ \
+    case CSR_MCAUSE: csr_mcause = val; break;   /* MCAUSE */ \
     default: \
       Assert(0, "Unsupported CSR write at address 0x%x\n", addr); \
         break; \
@@ -85,13 +91,13 @@ static inline const char *reg_name(int idx) {
 // 返回: CSR寄存器名称字符串
 static inline const char *csr_name(uint32_t addr) {
     switch (addr) {
-    case 0x300:
+    case CSR_MSTATUS:
         return "mstatus";
-    case 0x305:
+    case CSR_MTVEC:
         return "mtvec";
-    case 0x341:
+    case CSR_MEPC:
         return "mepc";
-    case 0x342:
+    case CSR_MCAUSE:
         return "mcause";
     default:
         return "unknown";
