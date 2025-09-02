@@ -254,9 +254,8 @@ static int decode_exec(Decode *s) {
         #ifdef CONFIG_ETRACE
         // printf("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
         //           csr(CSR_MEPC), csr(CSR_MCAUSE));
-        // log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-        //           csr(CSR_MEPC), csr(CSR_MCAUSE));
-        log_write("[etrace] ecall at pc = ");
+        _Log("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
+                  csr(CSR_MEPC), csr(CSR_MCAUSE));
         #endif
     });
 
