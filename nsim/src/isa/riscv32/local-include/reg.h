@@ -33,50 +33,50 @@ static inline int check_reg_idx(int idx) {
     return idx;
 }
 
+// 检查CSR寄存器地址的有效性
+// addr: CSR寄存器地址
+// 返回: 有效的CSR寄存器地址
+static inline uint32_t check_csr_addr(uint32_t addr) {
+    IFDEF(CONFIG_RT_CHECK, {
+        switch(addr) {
+            case CSR_MSTATUS:
+            case CSR_MTVEC:
+            case CSR_MEPC:
+            case CSR_MCAUSE:
+                break;
+            default:
+                Assert(0, "Invalid CSR address 0x%x\n", addr);
+        }
+    });
+    return addr;
+}
+
 // 通用寄存器访问宏
 // idx: 寄存器索引
 #define gpr(idx) (cpu.gpr[check_reg_idx(idx)])
 
-// CSR寄存器访问宏定义
-#define csr_mepc    cpu.mepc     // 机器异常程序计数器
-#define csr_mstatus cpu.mstatus  // 机器状态寄存器
-#define csr_mcause  cpu.mcause   // 机器异常原因寄存器
-#define csr_mtvec  cpu.mtvec    // 机器异常向量基地址寄存器
-
-// CSR寄存器读取函数
+// CSR寄存器地址获取内部宏
 // addr: CSR寄存器地址
-// 返回: CSR寄存器的值
-#define csr_read(addr) ({ \
-  word_t result = 0; \
-  switch(addr) { \
-    case CSR_MSTATUS: result = csr_mstatus; break; \
-    case CSR_MTVEC: result = csr_mtvec; break; \
-    case CSR_MEPC: result = csr_mepc; break; \
-    case CSR_MCAUSE: result = csr_mcause; break; \
-    default: \
-      Assert(0, "Unsupported CSR read at address 0x%x\n", addr); \
-        break; \
-  } \
-  result; \
+// 返回: 指向对应CSR寄存器的指针
+#define __csr_addr(addr) ({ \
+    uint32_t checked_addr = check_csr_addr(addr); \
+    word_t* ptr; \
+    switch(checked_addr) { \
+        case CSR_MSTATUS: ptr = &cpu.mstatus; break; \
+        case CSR_MTVEC:   ptr = &cpu.mtvec; break; \
+        case CSR_MEPC:    ptr = &cpu.mepc; break; \
+        case CSR_MCAUSE:  ptr = &cpu.mcause; break; \
+        default: \
+            Assert(0, "Unsupported CSR address 0x%x\n", checked_addr); \
+            ptr = &cpu.mstatus; \
+    } \
+    ptr; \
 })
 
-// CSR寄存器写入函数
+// CSR寄存器解引用宏
 // addr: CSR寄存器地址
-// val: 要写入的值
-// CSR寄存器写入函数
-// addr: CSR寄存器地址
-// val: 要写入的值
-#define csr_write(addr, val) do { \
-  switch(addr) { \
-    case CSR_MSTATUS: csr_mstatus = val; break; /* MSTATUS */ \
-    case CSR_MTVEC: csr_mtvec = val; break;     /* MTVEC */ \
-    case CSR_MEPC: csr_mepc = val; break;     /* MEPC */ \
-    case CSR_MCAUSE: csr_mcause = val; break;   /* MCAUSE */ \
-    default: \
-      Assert(0, "Unsupported CSR write at address 0x%x\n", addr); \
-        break; \
-  } \
-} while(0)
+// 返回对应CSR寄存器的引用，可作为左值或右值使用
+#define csr(addr) (*__csr_addr(addr))
 
 // 获取通用寄存器名称
 // idx: 寄存器索引

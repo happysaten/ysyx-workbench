@@ -31,18 +31,18 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
    */
   
   // 保存异常发生时的PC值到mepc寄存器
-  csr_write(CSR_MEPC, epc);  // MEPC
+  csr(CSR_MEPC) = epc;  // MEPC
   
   // 设置异常原因码到mcause寄存器
   // 最高位为0表示异常，为1表示中断
-  csr_write(CSR_MCAUSE, NO);  // MCAUSE
+  csr(CSR_MCAUSE) = NO;  // MCAUSE
   
   // 更新mstatus寄存器
   // 在实际实现中，这里应该保存和更新中断使能位等状态
   // 简化实现：保持当前mstatus值不变
   
   // 返回异常向量地址，异常处理程序将从此地址开始执行
-  return csr_read(CSR_MTVEC);  // MTVEC
+  return csr(CSR_MTVEC);  // MTVEC
 }
 
 /**
