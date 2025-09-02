@@ -43,7 +43,7 @@ static inline int check_reg_idx(int idx) {
 #define csr_read(addr) ({ \
   word_t result = 0; \
   switch(addr) { \
-    case 0x300: result = csr_mstatus; break; \
+    case CSR_MSTATUS: result = csr_mstatus; break; \
     case 0x305: result = csr_mtvec; break; \
     case 0x341: result = csr_mepc; break; \
     case 0x342: result = csr_mcause; break; \
