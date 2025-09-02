@@ -37,11 +37,6 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
     // 最高位为0表示异常，为1表示中断
     csr(CSR_MCAUSE) = NO; // MCAUSE
 
-    // 更新mstatus寄存器
-    // 在实际实现中，这里应该保存和更新中断使能位等状态
-    // 简化实现：保持当前mstatus值不变
-    _Log("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-              csr(CSR_MEPC), csr(CSR_MCAUSE));
     // 返回异常向量地址，异常处理程序将从此地址开始执行
     return csr(CSR_MTVEC); // MTVEC
 }
