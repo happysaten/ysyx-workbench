@@ -45,7 +45,7 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
     Log("mcause: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mcause, cpu.mcause);
     return false;
   }
-  if (ref_r->mtvec != cpu.mtvec) {
+  if (ref_r->mtvec == cpu.mtvec) {
     Log("mtvec: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mtvec, cpu.mtvec);
     return false;
   }
