@@ -248,7 +248,7 @@ static int decode_exec(Decode *s) {
     INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall, N, {
         // 调用 isa_raise_intr 函数，NO=11 表示环境调用异常，epc为当前pc
         word_t isa_raise_intr(word_t NO, vaddr_t epc);
-        s->dnpc=isa_raise_intr(11, s->pc);
+        isa_raise_intr(11, s->pc);
     });
 
     // csrw: CSR 写指令，将 rs1 的值写入 CSR
