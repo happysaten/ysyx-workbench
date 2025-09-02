@@ -31,14 +31,24 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
      */
 
     // 保存异常发生时的PC值到mepc寄存器
-    csr(CSR_MEPC) = epc; // MEPC
+    csr(CSR_MEPC) = epc;
 
     // 设置异常原因码到mcause寄存器
     // 最高位为0表示异常，为1表示中断
-    csr(CSR_MCAUSE) = NO; // MCAUSE
+    csr(CSR_MCAUSE) = NO;
 
+    // 更新 mstatus 寄存器
+    word_t mstatus = csr(CSR_MSTATUS);
+    // 保存当前中断使能状态：将 MIE 复制到 MPIE
+    word_t mie = (mstatus >> 3) & 0x1;  // 提取 MIE 字段 (bit 3)
+    mstatus = (mstatus & ~(1 << 7)) | (mie << 7);  // 将 MIE 设置到 MPIE (bit 7)
+    mstatus = (mstatus & ~(0x3 << 11)) | (0x3 << 11);  // 暂时假设为机器模式
+    // 禁用中断：清空 MIE 位
+    mstatus &= ~(1 << 3);
+    // 写回 mstatus 寄存器
+    csr(CSR_MSTATUS) = mstatus;
     // 返回异常向量地址，异常处理程序将从此地址开始执行
-    return csr(CSR_MTVEC); // MTVEC
+    return csr(CSR_MTVEC);
 }
 
 /**
