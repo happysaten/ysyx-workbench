@@ -252,10 +252,11 @@ static int decode_exec(Decode *s) {
         s->dnpc = isa_raise_intr(11, s->pc);
         // printf("Hello from ecall\n");
         #ifdef CONFIG_ETRACE
-        printf("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-                  csr(CSR_MEPC), csr(CSR_MCAUSE));
+        // printf("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
+        //           csr(CSR_MEPC), csr(CSR_MCAUSE));
         // log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
         //           csr(CSR_MEPC), csr(CSR_MCAUSE));
+        log_write("[etrace] ecall at pc = ");
         #endif
     });
 
