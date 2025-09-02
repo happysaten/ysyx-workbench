@@ -256,7 +256,7 @@ static int decode_exec(Decode *s) {
         //           csr(CSR_MEPC), csr(CSR_MCAUSE));
         extern bool log_enable();
         extern uint64_t g_nr_guest_inst;
-        printf("log is %d, g_nr_guest_inst is %zu", log_enable(),
+        printf("log is %d, g_nr_guest_inst is %zu\n", log_enable(),
                g_nr_guest_inst);
 
         log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
