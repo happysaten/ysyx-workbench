@@ -78,8 +78,7 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
     ctx->mstatus = 0x1800; // MPP=11 (M-mode), MIE=1 (enable interrupts)
     
     // 根据RISC-V ABI，函数第一个参数通过a0寄存器(x10)传递
-    // gpr[0]对应x10(a0)寄存器
-    ctx->gpr[0] = (uintptr_t)arg;
+    ctx->GPR2 = (uintptr_t)arg;
     
     return ctx;
 }
