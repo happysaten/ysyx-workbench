@@ -76,7 +76,21 @@ static inline uint32_t check_csr_addr(uint32_t addr) {
 // CSR寄存器解引用宏
 // addr: CSR寄存器地址
 // 返回对应CSR寄存器的引用，可作为左值或右值使用
-#define csr(addr) (*__csr_addr(addr))
+// #define csr(addr) (*__csr_addr(addr))
+#define csr(addr) (*({ \
+    uint32_t checked_addr = check_csr_addr(addr); \
+    word_t* ptr; \
+    switch(checked_addr) { \
+        case CSR_MSTATUS: ptr = &cpu.mstatus; break; \
+        case CSR_MTVEC:   ptr = &cpu.mtvec; break; \
+        case CSR_MEPC:    ptr = &cpu.mepc; break; \
+        case CSR_MCAUSE:  ptr = &cpu.mcause; break; \
+        default: \
+            Assert(0, "Unsupported CSR address 0x%x\n", checked_addr); \
+            ptr = &cpu.mstatus; \
+    } \
+    ptr; \
+}))
 
 // 获取通用寄存器名称
 // idx: 寄存器索引
