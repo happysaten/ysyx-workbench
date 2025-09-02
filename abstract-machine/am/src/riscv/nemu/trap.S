@@ -71,6 +71,9 @@ __am_asm_trap:
   mv a0, sp                  // 将上下文指针作为参数传递
   call __am_irq_handle       // 调用C语言中断处理函数
 
+  // 上下文切换：检查返回值是否为新的上下文指针
+  mv sp, a0                  // 将返回的上下文指针设置为新的栈指针
+
   // 恢复控制状态寄存器
   LOAD t1, OFFSET_STATUS(sp) // 从栈上加载mstatus
   LOAD t2, OFFSET_EPC(sp)    // 从栈上加载mepc
