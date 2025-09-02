@@ -125,8 +125,6 @@ static int decode_exec(Decode *s) {
                 ftrace_call(s->pc, s->dnpc);
             }
         });
-        log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-                  csr(CSR_MEPC), csr(CSR_MCAUSE));
     });
 
     // jalr: 跳转并链接寄存器，rd = 返回地址，pc跳转到(src1+imm)&~1
@@ -249,10 +247,12 @@ static int decode_exec(Decode *s) {
 
     // ecall: 环境调用，触发系统调用
     INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall, N, {
+        log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
+                  csr(CSR_MEPC), csr(CSR_MCAUSE));
         // 调用 isa_raise_intr 函数，NO=11 表示环境调用异常，epc为当前pc
         word_t isa_raise_intr(word_t NO, vaddr_t epc);
         s->dnpc = isa_raise_intr(11, s->pc);
-// printf("Hello from ecall\n");
+        // printf("Hello from ecall\n");
 #ifdef CONFIG_ETRACE
         // printf("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
         //           csr(CSR_MEPC), csr(CSR_MCAUSE));
