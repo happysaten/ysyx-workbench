@@ -65,7 +65,16 @@ bool cte_init(Context *(*handler)(Event, Context *)) {
 }
 
 Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
-    return NULL;
+    // 在栈底部（高地址）分配Context结构
+    Context *ctx = (Context *)((char *)kstack.end - sizeof(Context));
+    
+    // 清零整个上下文结构
+    memset(ctx, 0, sizeof(Context));
+    
+    // 设置程序计数器为入口函数地址
+    ctx->mepc = (uintptr_t)entry;
+    
+    return ctx;
 }
 
 void yield() {

@@ -1,4 +1,3 @@
-
 #define MAP(c, f) c(f)
 
 #define REGS(f) \
@@ -52,6 +51,10 @@ __am_asm_trap:
   move $a0, $sp
   jal __am_irq_handle
 
+  # 关键修改：切换到新的上下文结构
+  # __am_irq_handle()的返回值在$v0中，这是新的Context指针
+  move $sp, $v0
+
   lw $t0, OFFSET_LO($sp)
   lw $t1, OFFSET_HI($sp)
   lw $t3, OFFSET_STATUS($sp)
@@ -67,5 +70,6 @@ __am_asm_trap:
 
   MAP(REGS, POP)
 
-  addiu $sp, $sp, CONTEXT_SIZE
+  # 从新上下文恢复栈指针
+  lw $sp, OFFSET_SP($sp)
   eret
