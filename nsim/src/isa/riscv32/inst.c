@@ -257,6 +257,12 @@ static int decode_exec(Decode *s) {
         csr(imm & 0xfff) = src1;
     });
 
+    // csrr: CSR 读指令，将 CSR 的值读入 rd
+    INSTPAT("??????? ????? 00000 010 ????? 11100 11", csrr, I, {
+        // CSR 地址在 imm 字段中（即指令的 31:20 位）
+        R(rd) = csr(imm & 0xfff);
+    });
+
     // mret: 机器模式返回指令，从机器模式陷阱返回
     INSTPAT("0011000 00010 00000 000 00000 11100 11", mret, N, {
         // 从 mepc 寄存器中恢复 pc
