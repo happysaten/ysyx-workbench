@@ -38,14 +38,14 @@ static inline int check_reg_idx(int idx) {
 // 返回: 有效的CSR寄存器地址
 static inline uint32_t check_csr_addr(uint32_t addr) {
     IFDEF(CONFIG_RT_CHECK, {
-        switch(addr) {
-            case CSR_MSTATUS:
-            case CSR_MTVEC:
-            case CSR_MEPC:
-            case CSR_MCAUSE:
-                break;
-            default:
-                Assert(0, "Invalid CSR address 0x%x\n", addr);
+        switch (addr) {
+        case CSR_MSTATUS:
+        case CSR_MTVEC:
+        case CSR_MEPC:
+        case CSR_MCAUSE:
+            break;
+        default:
+            Assert(0, "Invalid CSR address 0x%x\n", addr);
         }
     });
     return addr;
