@@ -251,9 +251,10 @@ static int decode_exec(Decode *s) {
         word_t isa_raise_intr(word_t NO, vaddr_t epc);
         s->dnpc = isa_raise_intr(11, s->pc);
         // printf("Hello from ecall\n");
-        log_write("Hello from ecall\n");
-        // log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-        //           csr(CSR_MEPC), csr(CSR_MCAUSE));
+        #ifdef CONFIG_ETRACE
+        log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
+                  csr(CSR_MEPC), csr(CSR_MCAUSE));
+        #endif
     });
 
     // csrw: CSR 写指令，将 rs1 的值写入 CSR
