@@ -99,6 +99,19 @@ static int vprintf_helper(output_callback_t output, void *ctx, const char *fmt, 
             }
             break;
         }
+        case 'p': { // 指针
+            void *ptr = va_arg(ap, void*);
+            unsigned long val = (unsigned long)ptr;
+            output('0', ctx);
+            output('x', ctx);
+            count += 2;
+            itoa(val, numbuf, 16, 1);
+            for (char *s = numbuf; *s; ++s) {
+                output(*s, ctx);
+                count++;
+            }
+            break;
+        }
         case 'c': { // 字符
             char ch = (char)va_arg(ap, int);
             output(ch, ctx);
