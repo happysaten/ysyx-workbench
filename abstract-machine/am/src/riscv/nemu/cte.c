@@ -65,8 +65,8 @@ bool cte_init(Context *(*handler)(Event, Context *)) {
 }
 
 Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
-    printf("kstack.start = %p, kstack.end = %p\n", kstack.start, kstack.end);
-    printf("entry = %p, arg = %p\n", entry, arg);
+    // printf("kstack.start = %p, kstack.end = %p\n", kstack.start, kstack.end);
+    // printf("entry = %p, arg = %p\n", entry, arg);
     // 在栈底部（高地址）分配Context结构
     Context *ctx = (Context *)((char *)kstack.end - sizeof(Context));
     
