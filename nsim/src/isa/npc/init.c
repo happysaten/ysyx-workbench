@@ -42,8 +42,8 @@ static void restart() {
     /* 零号寄存器始终为0 */
     cpu.gpr[0] = 0;
 
-    /* Initialize mstatus register. */
-    cpu.mstatus = MUXDEF(CONFIG_RV64, 0xa00001800, 0x1800);
+    // /* Initialize mstatus register. */
+    // cpu.mstatus = MUXDEF(CONFIG_RV64, 0xa00001800, 0x1800);
 }
 
 // init_isa函数用于初始化ISA相关内容
