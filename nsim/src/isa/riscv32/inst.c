@@ -250,10 +250,6 @@ static int decode_exec(Decode *s) {
         // 调用 isa_raise_intr 函数，NO=11 表示环境调用异常，epc为当前pc
         word_t isa_raise_intr(word_t NO, vaddr_t epc);
         s->dnpc = isa_raise_intr(11, s->pc);
-#ifdef CONFIG_ETRACE
-        log_write("[etrace] ecall at pc = " FMT_WORD " cause = " FMT_WORD "\n",
-                  csr(CSR_MEPC), csr(CSR_MCAUSE));
-#endif
     });
 
     // csrw: CSR 写指令，将 rs1 的值写入 CSR
@@ -269,27 +265,8 @@ static int decode_exec(Decode *s) {
     });
 
     // mret: 机器模式返回指令，从机器模式陷阱返回
-    INSTPAT("0011000 00010 00000 000 00000 11100 11", mret, N, {
-        // 1. 从 mepc 寄存器中恢复 pc
-        s->dnpc = csr(CSR_MEPC);
-        // 2. 恢复特权级别：将 mstatus.MPP 的值复制到当前特权级别
-        word_t mstatus = csr(CSR_MSTATUS);
-        // 3. 恢复中断使能状态：将 mstatus.MPIE 复制到 mstatus.MIE
-        word_t mpie = (mstatus >> 7) & 0x1; // 提取 MPIE 字段 (bit 7)
-        mstatus =
-            (mstatus & ~0x8) | (mpie << 3); // 将 MPIE 的值设置到 MIE (bit 3)
-        // 4. 设置 mstatus.MPIE = 1（为下次中断做准备）
-        mstatus |= (1 << 7);
-        // 5. 清空 mstatus.MPP = 0（设置为用户模式）
-        mstatus &= ~(0x3 << 11);
-        // 6. 写回 mstatus 寄存器
-        csr(CSR_MSTATUS) = mstatus;
-
-#ifdef CONFIG_ETRACE
-        log_write("[etrace] mret at pc = " FMT_WORD " return to " FMT_WORD "\n",
-                  s->pc, s->dnpc);
-#endif
-    });
+    INSTPAT("0011000 00010 00000 000 00000 11100 11", mret, N,
+            { s->dnpc = isa_return_intr(s->pc); });
 
     // mul: rd = src1 * src2，乘法
     INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul, R,
