@@ -18,11 +18,13 @@
 
 #include <common.h>
 
-// CSR寄存器地址定义
-#define CSR_MSTATUS   0x300  // 机器状态寄存器
-#define CSR_MTVEC     0x305  // 机器异常向量基地址寄存器
-#define CSR_MEPC      0x341  // 机器异常程序计数器
-#define CSR_MCAUSE    0x342  // 机器异常原因寄存器
+// CSR寄存器地址枚举定义
+typedef enum {
+    CSR_MSTATUS = 0x300,  // 机器状态寄存器
+    CSR_MTVEC   = 0x305,  // 机器异常向量基地址寄存器
+    CSR_MEPC    = 0x341,  // 机器异常程序计数器
+    CSR_MCAUSE  = 0x342   // 机器异常原因寄存器
+} csr_addr_t;
 
 // 检查通用寄存器索引的有效性
 // idx: 寄存器索引 (0-31 for RV32I, 0-15 for RV32E)
@@ -36,7 +38,7 @@ static inline int check_reg_idx(int idx) {
 // 检查CSR寄存器地址的有效性
 // addr: CSR寄存器地址
 // 返回: 有效的CSR寄存器地址
-static inline uint32_t check_csr_addr(uint32_t addr) {
+static inline csr_addr_t check_csr_addr(csr_addr_t addr) {
     IFDEF(CONFIG_RT_CHECK, {
         switch (addr) {
         case CSR_MSTATUS:
@@ -59,7 +61,7 @@ static inline uint32_t check_csr_addr(uint32_t addr) {
 // addr: CSR寄存器地址
 // 返回对应CSR寄存器的引用，可作为左值或右值使用
 #define csr(addr) *({ \
-    uint32_t checked_addr = check_csr_addr(addr); \
+    csr_addr_t checked_addr = check_csr_addr(addr); \
     word_t* ptr; \
     switch(checked_addr) { \
         case CSR_MSTATUS: ptr = &cpu.mstatus; break; \
@@ -84,7 +86,7 @@ static inline const char *reg_name(int idx) {
 // 获取CSR寄存器名称
 // addr: CSR寄存器地址
 // 返回: CSR寄存器名称字符串
-static inline const char *csr_name(uint32_t addr) {
+static inline const char *csr_name(csr_addr_t addr) {
     switch (addr) {
     case CSR_MSTATUS:
         return "mstatus";
