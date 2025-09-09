@@ -162,16 +162,16 @@ module gpr (
     // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
     // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
 
-    import "DPI-C" function void write_gpr_npc(
-        input logic [ 4:0] idx,
-        input logic [31:0] data
-    );
-
     always_ff @(posedge clk) begin
         if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
+
+    import "DPI-C" function void write_gpr_npc(
+        input logic [ 4:0] idx,
+        input logic [31:0] data
+    );
     always_comb begin
         if (we) write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
@@ -182,13 +182,6 @@ module gpr (
     end
 endmodule
 
-
-// typedef enum logic [11:0] {
-//     CSR_MTVEC   = 12'h305,
-//     CSR_MEPC    = 12'h341,
-//     CSR_MSTATUS = 12'h300,
-//     CSR_MCAUSE  = 12'h342
-// } csr_addr_t;
 
 module csr #(
     localparam int N = 4  // CSR寄存器数量
@@ -202,7 +195,24 @@ module csr #(
         for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
     end
 
+    import "DPI-C" function void write_csr_npc(
+        input logic [ 1:0] idx,
+        input logic [31:0] data
+    );
+
+    always_comb begin
+        for (int i = 0; i < N; i++)
+        if (we[i]) write_csr_npc(i[1:0], din[i]);  // 更新DPI-C接口CSR寄存器
+    end
+
 endmodule
+
+// typedef enum logic [11:0] {
+//     CSR_MTVEC   = 12'h305,
+//     CSR_MEPC    = 12'h341,
+//     CSR_MSTATUS = 12'h300,
+//     CSR_MCAUSE  = 12'h342
+// } csr_addr_t;
 
 module inst_decode (
     input [31:0] inst,  // 输入指令

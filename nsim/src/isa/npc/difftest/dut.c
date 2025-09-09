@@ -33,26 +33,26 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
         return false;
     }
 
-    // // Check CSR registers
-    // if (ref_r->mstatus != cpu.mstatus) {
-    //     Log("mstatus: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mstatus,
-    //         cpu.mstatus);
-    //     return false;
-    // }
-    // if (ref_r->mepc != cpu.mepc) {
-    //     Log("mepc: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mepc, cpu.mepc);
-    //     return false;
-    // }
-    // if (ref_r->mcause != cpu.mcause) {
-    //     Log("mcause: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mcause,
-    //         cpu.mcause);
-    //     return false;
-    // }
-    // if (ref_r->mtvec != cpu.mtvec) {
-    //     Log("mtvec: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mtvec,
-    //         cpu.mtvec);
-    //     return false;
-    // }
+    // Check CSR registers
+    if (ref_r->mstatus != cpu.mstatus) {
+        Log("mstatus: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mstatus,
+            cpu.mstatus);
+        return false;
+    }
+    if (ref_r->mepc != cpu.mepc) {
+        Log("mepc: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mepc, cpu.mepc);
+        return false;
+    }
+    if (ref_r->mcause != cpu.mcause) {
+        Log("mcause: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mcause,
+            cpu.mcause);
+        return false;
+    }
+    if (ref_r->mtvec != cpu.mtvec) {
+        Log("mtvec: ref = " FMT_WORD ", dut = " FMT_WORD, ref_r->mtvec,
+            cpu.mtvec);
+        return false;
+    }
 
     return true;
 }
