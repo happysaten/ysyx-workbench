@@ -22,9 +22,8 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
     // return false;
     for (int i = 0; i < ARRLEN(cpu.gpr); i++) {
         if (ref_r->gpr[i] != cpu.gpr[i]) {
-            Log("%s: ref = " FMT_WORD ", dut = " FMT_WORD ", diff = " FMT_WORD,
-                reg_name(i), ref_r->gpr[i], cpu.gpr[i],
-                ref_r->gpr[i] ^ cpu.gpr[i]);
+            Log("%s: ref = " FMT_WORD ", dut = " FMT_WORD ,
+                reg_name(i), ref_r->gpr[i], cpu.gpr[i]);
             return false;
         }
     }
