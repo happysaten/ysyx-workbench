@@ -42,6 +42,7 @@ module top (
 
 
     // 寄存器堆信号
+    logic we;
     logic [4:0] rs1, rs2, rd;
     logic [31:0] rdata1, rdata2, wdata;
 
@@ -107,10 +108,13 @@ module top (
         .jump_en    (jump_en)
     );
 
+    assign we = (|rd) && (inst_type == TYPE_I || inst_type == TYPE_R || inst_type == TYPE_U || inst_type == TYPE_J);  // 写使能信号，waddr不为0且是I/R/U/J型指令时使能写
+
     // 寄存器堆实例
     gpr u_gpr (
         .clk(clk),
         .reset(reset_sync),
+        .we(we),
         .waddr(rd),
         .wdata(wdata),
         .raddr1(rs1),
@@ -132,6 +136,7 @@ endmodule
 module gpr (
     input clk,  // 时钟信号
     input reset,  // 复位信号
+    input we,  // 写使能信号
     input [4:0] waddr,  // 写寄存器地址
     input [31:0] wdata,  // 写数据
     input [4:0] raddr1,  // 读寄存器1地址
@@ -148,8 +153,6 @@ module gpr (
         input logic [ 4:0] idx,
         input logic [31:0] data
     );
-
-    wire we = |waddr;  // 写使能信号，waddr不为0时使能写
 
     always_ff @(posedge clk) begin
         if (reset) begin
