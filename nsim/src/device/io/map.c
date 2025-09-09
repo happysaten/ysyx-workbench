@@ -67,7 +67,7 @@ word_t map_read(paddr_t addr, int len, IOMap *map) {
   word_t ret = host_read(map->space + offset, len);   // 从主机内存读取数据
 #ifdef CONFIG_DTRACE
   if (map && map->name) {
-    log_write("[dtrace] read  dev=%s addr=0x%lx len=%d data=0x%lx\n", map->name, addr, len, ret);
+    log_write("[dtrace] read  dev=%s addr=0x%x len=%d data=0x%x\n", map->name, addr, len, ret);
   }
 #endif
   return ret;
@@ -88,7 +88,7 @@ void map_write(paddr_t addr, int len, word_t data, IOMap *map) {
   invoke_callback(map->callback, offset, len, true);  // 调用回调函数处理写入操作
 #ifdef CONFIG_DTRACE
   if (map && map->name) {
-    log_write("[dtrace] write dev=%s addr=0x%lx len=%d data=0x%lx\n", map->name, addr, len, data);
+    log_write("[dtrace] write dev=%s addr=0x%x len=%d data=0x%x\n", map->name, addr, len, data);
   }
 #endif
 }

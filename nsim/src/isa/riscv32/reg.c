@@ -23,6 +23,10 @@ const char *regs[] = {
   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
 };
 
+const char *csr_regs[] = {
+  "mepc", "mstatus", "mcause", "mtvec"
+};
+
 void isa_reg_display() {
   for (int i = 0; i < ARRLEN(cpu.gpr); i++) {
     printf("%-3s: 0x%08x\t", regs[i], cpu.gpr[i]);
@@ -31,6 +35,12 @@ void isa_reg_display() {
     }
   }
   printf("pc : 0x%08x\n", cpu.pc);
+  
+  // 显示CSR寄存器
+  printf("mepc   : 0x%08x\t", cpu.mepc);
+  printf("mstatus: 0x%08x\n", cpu.mstatus);
+  printf("mcause : 0x%08x\t", cpu.mcause);
+  printf("mtvec  : 0x%08x\n", cpu.mtvec);
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
@@ -51,6 +61,24 @@ word_t isa_reg_str2val(const char *s, bool *success) {
   if (strcmp(s, "pc") == 0) {
     *success = true;
     return cpu.pc; // 返回程序计数器的值
+  }
+
+  // 检查CSR寄存器
+  if (strcmp(s, "mepc") == 0) {
+    *success = true;
+    return cpu.mepc;
+  }
+  if (strcmp(s, "mstatus") == 0) {
+    *success = true;
+    return cpu.mstatus;
+  }
+  if (strcmp(s, "mcause") == 0) {
+    *success = true;
+    return cpu.mcause;
+  }
+  if (strcmp(s, "mtvec") == 0) {
+    *success = true;
+    return cpu.mtvec;
   }
 
   // 未找到匹配的寄存器
