@@ -163,7 +163,7 @@ module gpr (
         end
     end
 
-    always_comb begin
+    always_ff @(posedge clk) begin
         if (we) write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
