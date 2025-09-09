@@ -156,7 +156,7 @@ module gpr (
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 初始化寄存器为0
+            // for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 初始化寄存器为0
         end else if (we) begin
             regfile[waddr] <= wdata;  // 写入数据到指定寄存器
             // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -181,23 +181,23 @@ endmodule
 //     CSR_MCAUSE  = 12'h342
 // } csr_addr_t;
 
-// module csr #(
-//     localparam int N = 4  // CSR寄存器数量
-// ) (
-//     input clk,  // 时钟信号
-//     input reset,  // 复位信号
-//     input [N-1:0] we,  // 写使能信号
-//     input [N-1:0][31:0] din,  // CSR寄存器地址
-//     output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
-// );
-//     always @(posedge clk) begin
-//         if (reset) dout <= '0;
-//         else begin
-//             for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
-//         end
-//     end
+module csr #(
+    localparam int N = 4  // CSR寄存器数量
+) (
+    input clk,  // 时钟信号
+    input reset,  // 复位信号
+    input [N-1:0] we,  // 写使能信号
+    input [N-1:0][31:0] din,  // CSR寄存器地址
+    output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
+);
+    always @(posedge clk) begin
+        if (reset) dout <= '0;
+        else begin
+            for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
+        end
+    end
 
-// endmodule
+endmodule
 
 module inst_decode (
     input [31:0] inst,  // 输入指令
