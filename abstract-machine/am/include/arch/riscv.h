@@ -8,8 +8,12 @@
 #endif
 
 struct Context {
-  // TODO: fix the order of these members to match trap.S
-  uintptr_t mepc, mcause, gpr[NR_REGS], mstatus;
+  // 按照trap.S中的保存顺序重新组织
+  // 通用寄存器按索引顺序保存（除了x0和x2）
+  uintptr_t gpr[NR_REGS];
+  // 控制状态寄存器
+  uintptr_t mcause, mstatus, mepc;
+  // 地址空间信息，与x0共用存储空间
   void *pdir;
 };
 
@@ -19,9 +23,9 @@ struct Context {
 #define GPR1 gpr[17] // a7
 #endif
 
-#define GPR2 gpr[0]
-#define GPR3 gpr[0]
-#define GPR4 gpr[0]
-#define GPRx gpr[0]
+#define GPR2 gpr[10]  // a0
+#define GPR3 gpr[11]  // a1
+#define GPR4 gpr[12]  // a2
+#define GPRx gpr[10]  // a0
 
 #endif
