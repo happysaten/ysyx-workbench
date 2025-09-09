@@ -9,6 +9,8 @@ extern "C" {
 
 void update_gprs(word_t *gprs);
 void write_gpr(int idx, word_t data);
+void update_csrs(word_t *csrs);
+void write_csr(int idx, word_t data);
 void update_inst(word_t inst, vaddr_t dnpc);
 void ebreak(void);
 
