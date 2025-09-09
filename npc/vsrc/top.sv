@@ -427,7 +427,7 @@ module exe (
 
         // ecall时的mstatus修改
         mstatus_ecall = csr_rdata[2];
-        mstatus_ecall[7] = mstatus_ecall[3];  // 保存当前中断使能状态：将MIE复制到MPIE (bit 7)
+        mstatus_ecall[7] = ~mstatus_ecall[3];  // 保存当前中断使能状态：将MIE复制到MPIE (bit 7)
         mstatus_ecall[12:11] = 2'b11;  // 设置MPP字段为机器模式 (bits 12:11 = 11)
         mstatus_ecall[3] = 1'b0;  // 禁用中断：清空MIE位 (bit 3)
 
