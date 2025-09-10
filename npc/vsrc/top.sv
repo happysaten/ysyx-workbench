@@ -89,6 +89,18 @@ module top (
         .inst_type(inst_type)  // 输出指令类型
     );
 
+    // CSR 相关信号
+    logic [3:0] csr_we;
+    logic [3:0][31:0] csr_wdata, csr_rdata;
+
+    // CSR 模块实例
+    csr u_csr (
+        .clk (clk),
+        .we  (csr_we),
+        .din (csr_wdata),
+        .dout(csr_rdata)
+    );
+
     // 执行单元实例
     logic [31:0] jump_target;  // 新增：跳转目标
     logic        jump_en;  // 新增：跳转使能
@@ -105,7 +117,10 @@ module top (
         .inst_type  (inst_type),
         .dest       (wdata),
         .jump_target(jump_target),
-        .jump_en    (jump_en)
+        .jump_en    (jump_en),
+        .csr_we     (csr_we),
+        .csr_wdata  (csr_wdata),
+        .csr_rdata  (csr_rdata)
     );
 
     assign we = (|rd) && (inst_type == TYPE_I || inst_type == TYPE_R || inst_type == TYPE_U || inst_type == TYPE_J);  // 写使能信号，waddr不为0且是I/R/U/J型指令时使能写
@@ -113,7 +128,6 @@ module top (
     // 寄存器堆实例
     gpr u_gpr (
         .clk(clk),
-        .reset(reset_sync),
         .we(we),
         .waddr(rd),
         .wdata(wdata),
@@ -135,7 +149,6 @@ endmodule
 
 module gpr (
     input clk,  // 时钟信号
-    input reset,  // 复位信号
     input we,  // 写使能信号
     input [4:0] waddr,  // 写寄存器地址
     input [31:0] wdata,  // 写数据
@@ -149,20 +162,16 @@ module gpr (
     // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
     // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
 
+    always_ff @(posedge clk) begin
+        if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
+        // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
+    end
+
+
     import "DPI-C" function void write_gpr_npc(
         input logic [ 4:0] idx,
         input logic [31:0] data
     );
-
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 初始化寄存器为0
-        end else if (we) begin
-            regfile[waddr] <= wdata;  // 写入数据到指定寄存器
-            // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
-        end
-    end
-
     always_comb begin
         if (we) write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
@@ -174,30 +183,36 @@ module gpr (
 endmodule
 
 
+module csr #(
+    localparam int N = 4  // CSR寄存器数量
+) (
+    input clk,  // 时钟信号
+    input [N-1:0] we,  // 写使能信号
+    input [N-1:0][31:0] din,  // CSR寄存器地址
+    output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
+);
+    always @(posedge clk) begin
+        for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
+    end
+
+    import "DPI-C" function void write_csr_npc(
+        input logic [ 1:0] idx,
+        input logic [31:0] data
+    );
+
+    always_comb begin
+        for (int i = 0; i < N; i++)
+        if (we[i]) write_csr_npc(i[1:0], din[i]);  // 更新DPI-C接口CSR寄存器
+    end
+
+endmodule
+
 // typedef enum logic [11:0] {
 //     CSR_MTVEC   = 12'h305,
 //     CSR_MEPC    = 12'h341,
 //     CSR_MSTATUS = 12'h300,
 //     CSR_MCAUSE  = 12'h342
 // } csr_addr_t;
-
-// module csr #(
-//     localparam int N = 4  // CSR寄存器数量
-// ) (
-//     input clk,  // 时钟信号
-//     input reset,  // 复位信号
-//     input [N-1:0] we,  // 写使能信号
-//     input [N-1:0][31:0] din,  // CSR寄存器地址
-//     output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
-// );
-//     always @(posedge clk) begin
-//         if (reset) dout <= '0;
-//         else begin
-//             for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
-//         end
-//     end
-
-// endmodule
 
 module inst_decode (
     input [31:0] inst,  // 输入指令
@@ -219,16 +234,13 @@ module inst_decode (
 
     always_comb begin
         unique case (opcode)
-            7'b0110011: inst_type = TYPE_R;  // R型指令
-            7'b0010011: inst_type = TYPE_I;  // I型指令
-            7'b0000011: inst_type = TYPE_I;  // Load指令
-            7'b0100011: inst_type = TYPE_S;  // Store指令
-            7'b1100011: inst_type = TYPE_B;  // Branch指令
-            7'b0110111: inst_type = TYPE_U;  // LUI指令
-            7'b0010111: inst_type = TYPE_U;  // AUIPC指令
-            7'b1101111: inst_type = TYPE_J;   // JAL
-            7'b1100111: inst_type = TYPE_I;   // JALR 归为I型
-            default:    inst_type = TYPE_N;   // 无操作数类型
+            7'b0110011: inst_type = TYPE_R;  // 寄存器类型
+            7'b0010011, 7'b0000011, 7'b1100111, 7'b1110011: inst_type = TYPE_I;  // 立即数类型
+            7'b0100011: inst_type = TYPE_S;  // 存储类型
+            7'b1100011: inst_type = TYPE_B;  // 分支类型
+            7'b0110111, 7'b0010111: inst_type = TYPE_U;  // 上位立即数类型
+            7'b1101111: inst_type = TYPE_J;  // 跳转类型
+            default: inst_type = TYPE_N;  // 无操作数类型
         endcase
     end
     always_comb begin
@@ -247,25 +259,24 @@ module inst_decode (
             default: imm = 32'h0;
         endcase
     end
-    import "DPI-C" function void NPCTRAP();
-    always_comb begin
-        if (inst == 32'b00000000000100000000000001110011) NPCTRAP();
-    end
 endmodule
 
 module exe (
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [ 6:0] funct7,
-    input         [31:0] src1,
-    input         [31:0] src2,
-    input         [31:0] imm,
-    input         [31:0] pc,
-    input         [31:0] snpc,
-    input  inst_t        inst_type,
-    output logic  [31:0] dest,
-    output logic  [31:0] jump_target,
-    output logic         jump_en
+    input         [ 6:0]       opcode,
+    input         [ 2:0]       funct3,
+    input         [ 6:0]       funct7,
+    input         [31:0]       src1,
+    input         [31:0]       src2,
+    input         [31:0]       imm,
+    input         [31:0]       pc,
+    input         [31:0]       snpc,
+    input  inst_t              inst_type,
+    output logic  [31:0]       dest,
+    output logic  [31:0]       jump_target,
+    output logic               jump_en,
+    output logic  [ 3:0]       csr_we,
+    output logic  [ 3:0][31:0] csr_wdata,
+    input         [ 3:0][31:0] csr_rdata
 );
     // ALU 信号
     logic [31:0] alu_a, alu_b, alu_result;
@@ -292,6 +303,18 @@ module exe (
     );
 
     import "DPI-C" function void NPCINV(input int pc);  // 指令非法
+    import "DPI-C" function void NPCTRAP();  // ebreak 指令
+
+    // CSR 地址映射到索引
+    function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
+        unique case (addr)
+            12'h305: return 2'd0;  // CSR_MTVEC
+            12'h341: return 2'd1;  // CSR_MEPC
+            12'h300: return 2'd2;  // CSR_MSTATUS
+            12'h342: return 2'd3;  // CSR_MCAUSE
+            default: return 2'd0;
+        endcase
+    endfunction
 
     // 操作数选择：使用 inst_type 和特定操作码判断
     always_comb begin
@@ -304,6 +327,16 @@ module exe (
                 if (opcode == 7'b1100111) begin  // JALR
                     jump_target = {alu_result[31:1], 1'b0};  // 低位清零
                     jump_en = 1'b1;
+                end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin
+                    if (imm == 32'h0) begin  // ecall
+                        // ecall 跳转到异常处理程序入口地址
+                        jump_target = csr_rdata[0];  // CSR_MTVEC index = 0
+                        jump_en = 1'b1;
+                    end else if (imm == 32'h302) begin  // mret
+                        // mret 跳转到异常返回地址
+                        jump_target = csr_rdata[1];  // CSR_MEPC index = 1
+                        jump_en = 1'b1;
+                    end
                 end
             end
             TYPE_R: begin
@@ -380,10 +413,29 @@ module exe (
         // TYPE_B 分支指令已在上面处理
     end
 
-    int mem_rdata;
+    int          mem_rdata;
+    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    logic [31:0] mstatus_ecall;  // 临时存储mstatus的修改值
+    logic [31:0] mstatus_mret;  // mret时的mstatus修改值
+
     // 结果输出处理
     always_comb begin
         mem_rdata = 0;
+        // CSR 信号初始化
+        csr_we = '0;
+        csr_wdata = '0;
+
+        // ecall时的mstatus修改
+        mstatus_ecall = csr_rdata[2];
+        mstatus_ecall[7] = mstatus_ecall[3];  // 保存当前中断使能状态：将MIE复制到MPIE (bit 7)
+        mstatus_ecall[12:11] = 2'b11;  // 设置MPP字段为机器模式 (bits 12:11 = 11)
+        mstatus_ecall[3] = 1'b0;  // 禁用中断：清空MIE位 (bit 3)
+
+        // mret时的mstatus修改
+        mstatus_mret = csr_rdata[2];
+        mstatus_mret[3] = mstatus_mret[7];  // 将MPIE的值设置到MIE (bit 3)
+        mstatus_mret[7] = 1'b1;  // 设置MPIE = 1 (为下次中断做准备)
+        mstatus_mret[12:11] = 2'b00;  // 清空MPP = 0 (设置为用户模式)
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1100111)  // JALR
@@ -399,6 +451,48 @@ module exe (
                         default: begin
                             dest = 32'h0;
                             NPCINV(pc);  // 不支持的Load类型
+                        end
+                    endcase
+                end else if (opcode == 7'b1110011) begin  // 系统指令
+                    unique case (funct3)
+                        3'b000: begin
+                            if (imm == 32'h0) begin  // ecall: imm字段为0
+                                // 实现硬件版本的 isa_raise_intr 逻辑
+                                csr_we = 4'b1110;  // 写使能 mstatus, mepc, mcause
+                                // 1. 保存异常发生时的PC值到mepc寄存器
+                                csr_wdata[1] = pc;
+                                // 2. 设置异常原因码到mcause寄存器 (NO=11表示环境调用)
+                                csr_wdata[3] = 32'd11;  // 环境调用异常码
+                                // 3. 更新mstatus寄存器
+                                csr_wdata[2] = mstatus_ecall;
+                                dest = 32'h0;  // ecall不写回寄存器
+                            end else if (imm == 32'h1) begin  // ebreak: imm字段为1
+                                // ebreak 调用 NPCTRAP
+                                NPCTRAP();
+                                dest = 32'h0;  // ebreak不写回寄存器
+                            end else if (imm == 32'h302) begin  // mret: imm字段为0x302
+                                // 实现硬件版本的 isa_return_intr 逻辑
+                                csr_we[2] = 1'b1;  // 写使能 mstatus
+                                csr_wdata[2] = mstatus_mret;  // 恢复mstatus寄存器
+                                dest = 32'h0;  // mret不写回寄存器
+                            end else begin
+                                dest = 32'h0;
+                                NPCINV(pc);  // 不支持的系统调用
+                            end
+                        end
+                        3'b001: begin  // csrw
+                            // CSR写指令：将src1的值写入CSR
+                            csr_we[csr_idx] = 1'b1;
+                            csr_wdata[csr_idx] = src1;
+                            dest = 32'h0;
+                        end
+                        3'b010: begin  // csrr
+                            // CSR读指令：将CSR的值读入rd
+                            dest = csr_rdata[csr_idx];
+                        end
+                        default: begin
+                            dest = 32'h0;
+                            NPCINV(pc);  // 不支持的CSR操作
                         end
                     endcase
                 end else begin  // I型整数运算/移位指令
@@ -524,7 +618,7 @@ module adder #(
 );
     wire [WIDTH-1:0] B1;
     assign B1 = {WIDTH{is_sub}} ^ B;
-    assign {Carry, Result} = A + B1 + is_sub;
+    assign {Carry, Result} = A + B1 + is_sub;  //忽略此位宽问题
     assign Overflow = (A[WIDTH-1] == B1[WIDTH-1]) && (Result[WIDTH-1] != A[WIDTH-1]);
     assign Zero = ~(|Result);
 

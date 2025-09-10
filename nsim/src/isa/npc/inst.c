@@ -32,7 +32,13 @@ void update_csrs(word_t *csrs) {
 
 // 写入CSR寄存器
 void write_csr(int idx, word_t data) {
-  csr(idx) = data;
+  switch (idx) {
+    case 0 : csr(CSR_MTVEC) = data; break;
+    case 1 : csr(CSR_MEPC) = data; break;
+    case 2 : csr(CSR_MSTATUS) = data; break;
+    case 3 : csr(CSR_MCAUSE) = data; break;
+    default: panic("write_csr idx = %d", idx);
+  }
 }
 
 // 静态指令解码结构体指针
