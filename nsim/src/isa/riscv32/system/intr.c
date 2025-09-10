@@ -14,6 +14,7 @@
  ***************************************************************************************/
 
 #include "../local-include/reg.h"
+#include "macro.h"
 #include <isa.h>
 
 /**
@@ -40,11 +41,9 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
     // 更新 mstatus 寄存器
     word_t mstatus = csr(CSR_MSTATUS);
     // 保存当前中断使能状态：将 MIE 复制到 MPIE
-    word_t mie = (mstatus >> 3) & 0x1;            // 提取 MIE 字段 (bit 3)
-    mstatus = (mstatus & ~(1 << 7)) | (mie << 7); // 将 MIE 设置到 MPIE (bit 7)
-    mstatus = (mstatus & ~(0x3 << 11)) | (0x3 << 11); // 暂时假设为机器模式
-    // 禁用中断：清空 MIE 位
-    mstatus &= ~(1 << 3);
+    mstatus = (mstatus & ~(1 << 7)) | (BITS(mstatus, 3, 3) << 7); // MIE -> MPIE
+    mstatus &= ~(1 << 3);   // 禁用中断：清空 MIE 位
+    mstatus |= (0x3 << 11); // 暂时假设为机器模式
     // 写回 mstatus 寄存器
     csr(CSR_MSTATUS) = mstatus;
 
@@ -60,12 +59,9 @@ word_t isa_return_intr(vaddr_t pc) {
     // 恢复特权级别：将 mstatus.MPP 的值复制到当前特权级别
     word_t mstatus = csr(CSR_MSTATUS);
     // 恢复中断使能状态：将 mstatus.MPIE 复制到 mstatus.MIE
-    word_t mpie = (mstatus >> 7) & 0x1;       // 提取 MPIE 字段 (bit 7)
-    mstatus = (mstatus & ~0x8) | (mpie << 3); // 将 MPIE 的值设置到 MIE (bit 3)
-    // 设置 mstatus.MPIE = 1（为下次中断做准备）
-    mstatus |= (1 << 7);
-    // 清空 mstatus.MPP = 0（设置为用户模式）
-    mstatus &= ~(0x3 << 11);
+    mstatus = (mstatus & ~(1 << 3)) | (BITS(mstatus, 7, 7) << 3); // MPIE -> MIE
+    mstatus |= (1 << 7); // 设置 MPIE = 1，为下次中断做准备
+    mstatus &= ~(0x3 << 11); // 清空 MPP = 0，设置为用户模式
     // 写回 mstatus 寄存器
     csr(CSR_MSTATUS) = mstatus;
 
