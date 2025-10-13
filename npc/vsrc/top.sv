@@ -33,14 +33,6 @@ module top (
     // input [31:0] inst,  // 输入指令
     // output logic [31:0] pc  // 程序计数器输出
 );
-    logic reset_sync;  // 复位信号
-    // assign reset_sync = reset;
-    always @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
-
-
     // 寄存器堆信号
     logic we;
     logic [4:0] rs1, rs2, rd;
@@ -55,29 +47,23 @@ module top (
     inst_t inst_type;
 
     // snpc: 顺序下一个pc，dnpc: 实际下一个pc
-    localparam int RESET_PC = 32'h80000000;  // 复位时PC的初始值
-    logic [31:0] pc;  // 程序计数器
-    logic [31:0] snpc, dnpc;
-
-    // 总是读取地址为`raddr & ~0x3u`的4字节返回
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    // 更新DPI-C接口的指令和下一个PC
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
+    logic [31:0] pc;  // 程序计数器（由 ifu 输出）
+    logic [31:0] snpc;
     logic [31:0] inst;
-    always_comb inst = pmem_read_npc(pc);  // 读取当前PC地址的指令
-    always_comb update_inst_npc(inst, dnpc);
 
-    always @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;  // 复位时PC初始化为0x80000000
-        else pc <= dnpc;
-    end
-
+    // IFU 实例化：负责 PC 和取指
+    ifu u_ifu (
+        .clk(clk),
+        .reset(reset),
+        .jump_target(jump_target),
+        .jump_en(jump_en),
+        .pc(pc),
+        .snpc(snpc),
+        .inst(inst)
+    );
 
     // 指令解码实例
-    inst_decode u_decode (
+    idu u_idu (
         .inst(inst),
         .opcode(opcode),
         .funct3(funct3),
@@ -137,14 +123,51 @@ module top (
         .rdata2(rdata2)
     );
 
+endmodule
 
-    // PC选择逻辑
+// 新增：IFU 模块，负责 PC 管理与指令读取
+module ifu (
+    input  logic        clk,
+    input  logic        reset,
+    input  logic [31:0] jump_target,
+    input  logic        jump_en,
+    output logic [31:0] pc,
+    output logic [31:0] snpc,
+    output logic [31:0] inst
+);
+    localparam int RESET_PC = 32'h80000000;
+    logic reset_sync;
+    logic [31:0] dnpc;
+
+    // DPI 接口：从内存读取指令并上报 instruction + next pc
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void update_inst_npc(
+        input int inst,
+        input int dnpc
+    );
+
+    // 同步复位信号（保留原逻辑）
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+
+    // 读取当前 PC 指令并通知 DPI
+    always_comb inst = pmem_read_npc(pc);
+    always_comb update_inst_npc(inst, dnpc);
+
+    // PC 寄存器更新
+    always_ff @(posedge clk) begin
+        if (reset_sync) pc <= RESET_PC;
+        else pc <= dnpc;
+    end
+
+    // snpc / dnpc 选择逻辑
     always_comb begin
         snpc = pc + 4;
         if (jump_en) dnpc = jump_target;
         else dnpc = snpc;
     end
-
 endmodule
 
 module gpr (
@@ -214,7 +237,7 @@ endmodule
 //     CSR_MCAUSE  = 12'h342
 // } csr_addr_t;
 
-module inst_decode (
+module idu (
     input [31:0] inst,  // 输入指令
     output [6:0] opcode,  // 操作码
     output [2:0] funct3,  // 功能码
@@ -498,7 +521,7 @@ module exe (
                 end else begin  // I型整数运算/移位指令
                     unique case (funct3)
                         3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111:
-                        dest = alu_result;
+                        dest = alu_result+1'b1;
                         default: begin
                             dest = 32'h0;
                             NPCINV(pc);  // 不支持的I型运算
