@@ -521,7 +521,7 @@ module exe (
                 end else begin  // I型整数运算/移位指令
                     unique case (funct3)
                         3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111:
-                        dest = alu_result+1'b1;
+                        dest = alu_result;
                         default: begin
                             dest = 32'h0;
                             NPCINV(pc);  // 不支持的I型运算
