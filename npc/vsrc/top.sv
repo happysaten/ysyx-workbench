@@ -19,23 +19,7 @@ module top (
     // input [31:0] inst,  // 输入指令
     // output logic [31:0] pc  // 程序计数器输出
 );
-    // 寄存器堆信号
-    logic we;
-    logic [4:0] rs1, rs2, rd;
-    logic [31:0] rdata1, rdata2, wdata;
-    logic        gpr_we;
-    logic [31:0] alu_result;
-    logic [31:0] load_data;
-    logic [31:0] jump_target;
-    logic        jump_en;
 
-    // 解码信号
-    logic [6:0] opcode, funct7;
-    logic [2:0] funct3;
-    logic [31:0] imm;
-
-    // 指令类型信号
-    inst_t inst_type;
 
     // snpc: 顺序下一个pc，dnpc: 实际下一个pc
     logic [31:0] pc;  // 程序计数器（由 ifu 输出）
@@ -53,6 +37,15 @@ module top (
         .inst(inst)
     );
 
+    // 解码信号
+    logic [6:0] opcode, funct7;
+    logic [2:0] funct3;
+    logic [31:0] imm;
+    logic [4:0] rs1, rs2, rd;
+
+    // 指令类型信号
+    inst_t inst_type;
+
     // 指令解码实例
     idu u_idu (
         .inst(inst),
@@ -66,9 +59,30 @@ module top (
         .inst_type(inst_type)  // 输出指令类型
     );
 
+    // 寄存器堆信号
+    logic [31:0] rdata1, rdata2, wdata;
+    logic        gpr_we;
+    logic [31:0] alu_result;
+    logic [31:0] load_data;
+    logic [31:0] jump_target;
+    logic        jump_en;
+
     // CSR 相关信号
     logic [3:0] csr_we;
     logic [3:0][31:0] csr_wdata, csr_rdata;
+
+    // 寄存器堆实例
+    gpr u_gpr (
+        .clk(clk),
+        .we(gpr_we && (|rd)),
+        .waddr(rd),
+        .wdata(wdata),
+        .raddr1(rs1),
+        .raddr2(rs2),
+        .rdata1(rdata1),
+        .rdata2(rdata2)
+    );
+
 
     // CSR 模块实例
     csr u_csr (
@@ -78,7 +92,8 @@ module top (
         .dout(csr_rdata)
     );
 
-    // 执行单元实例
+
+    // 执行单元信号
     logic [31:0] jump_target_exu, jump_target_sys;
     logic        jump_en_exu, jump_en_sys;
 
@@ -126,21 +141,9 @@ module top (
         .sys_jump_en   (jump_en_sys)
     );
 
-    assign jump_en     = jump_en_sys ? 1'b1 : jump_en_exu;
-    assign jump_target = jump_en_sys ? jump_target_sys : jump_target_exu;
-    assign we          = gpr_we && (|rd);
-
-    // 寄存器堆实例
-    gpr u_gpr (
-        .clk(clk),
-        .we(we),
-        .waddr(rd),
-        .wdata(wdata),
-        .raddr1(rs1),
-        .raddr2(rs2),
-        .rdata1(rdata1),
-        .rdata2(rdata2)
-    );
+    assign {jump_en, jump_target} = jump_en_sys ?
+                             {1'b1, jump_target_sys} :
+                             {jump_en_exu, jump_target_exu};
 
 endmodule
 
