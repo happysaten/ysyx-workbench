@@ -82,19 +82,24 @@ module top (
     logic [31:0] alu_result;  // ALU计算结果
     logic [31:0] jump_target_exu;  // 跳转目标地址
     logic jump_en_exu;
+    logic [31:0] csr_read_data;  // CSR读取的数据
     exu u_exu (
-        .opcode     (opcode),
-        .funct3     (funct3),
-        .funct7     (funct7),
-        .src1       (rdata1),
-        .src2       (rdata2),
-        .imm        (imm),
-        .pc         (pc),
-        .snpc       (snpc),
-        .inst_type  (inst_type),
-        .alu_result (alu_result),
-        .jump_target(jump_target_exu),
-        .jump_en    (jump_en_exu)
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .funct7       (funct7),
+        .src1         (rdata1),
+        .src2         (rdata2),
+        .imm          (imm),
+        .pc           (pc),
+        .snpc         (snpc),
+        .inst_type    (inst_type),
+        .csr_rdata    (csr_rdata),
+        .alu_result   (alu_result),
+        .jump_target  (jump_target_exu),
+        .jump_en      (jump_en_exu),
+        .csr_we       (csr_we),
+        .csr_wdata    (csr_wdata),
+        .csr_read_data(csr_read_data)
     );
 
     // LSU：负责加载和存储指令的内存访问
@@ -116,17 +121,13 @@ module top (
         .inst_type      (inst_type),
         .opcode         (opcode),
         .funct3         (funct3),
-        .imm            (imm),
         .pc             (pc),
         .snpc           (snpc),
         .alu_result     (alu_result),
         .load_data      (load_data),
-        .src1           (rdata1),
-        .csr_rdata      (csr_rdata),
+        .csr_read_data  (csr_read_data),
         .wdata          (wdata),
         .gpr_we         (gpr_we),
-        .csr_we         (csr_we),
-        .csr_wdata      (csr_wdata),
         .sys_jump_target(jump_target_sys),
         .sys_jump_en    (jump_en_sys)
     );
@@ -303,10 +304,17 @@ module exu (
     input         [31:0] pc,
     input         [31:0] snpc,
     input  inst_t        inst_type,
+    input  logic  [ 3:0][31:0] csr_rdata,
     output logic  [31:0] alu_result,
     output logic  [31:0] jump_target,
-    output logic         jump_en
+    output logic         jump_en,
+    output logic  [ 3:0] csr_we,
+    output logic  [ 3:0][31:0] csr_wdata,
+    output logic  [31:0] csr_read_data
 );
+    import "DPI-C" function void NPCINV(input int pc);
+    import "DPI-C" function void NPCTRAP();
+
     logic [31:0] alu_a, alu_b;
     alu_op_t alu_op;
 
@@ -319,9 +327,30 @@ module exu (
         .Result(alu_result)
     );
 
+    function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
+        unique case (addr)
+            12'h305: return 2'd0;
+            12'h341: return 2'd1;
+            12'h300: return 2'd2;
+            12'h342: return 2'd3;
+            default: return 2'd0;
+        endcase
+    endfunction
+
+    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    logic [31:0] mstatus_ecall;
+    logic [31:0] mstatus_mret;
+
     always_comb begin
         jump_target = 32'h0;
         jump_en     = 1'b0;
+        csr_we      = '0;
+        csr_wdata   = '0;
+        csr_read_data = 32'h0;
+
+        mstatus_ecall = csr_rdata[2];
+        mstatus_mret  = csr_rdata[2];
+
         unique case (inst_type)
             TYPE_I: begin
                 alu_a = src1;
@@ -329,6 +358,49 @@ module exu (
                 if (opcode == 7'b1100111) begin
                     jump_target = {alu_result[31:1], 1'b0};
                     jump_en     = 1'b1;
+                end else if (opcode == 7'b1110011) begin
+                    // CSR指令执行
+                    unique case (funct3)
+                        3'b000: begin
+                            if (imm == 32'h0) begin
+                                // ECALL
+                                csr_we               = 4'b1110;
+                                csr_wdata[1]         = pc;
+                                csr_wdata[3]         = 32'd11;
+                                mstatus_ecall[7]     = mstatus_ecall[3];
+                                mstatus_ecall[3]     = 1'b0;
+                                mstatus_ecall[12:11] = 2'b11;
+                                csr_wdata[2]         = mstatus_ecall;
+                                jump_target          = csr_rdata[0];
+                                jump_en              = 1'b1;
+                            end else if (imm == 32'h1) begin
+                                // EBREAK
+                                NPCTRAP();
+                            end else if (imm == 32'h302) begin
+                                // MRET
+                                csr_we[2]           = 1'b1;
+                                mstatus_mret[3]     = mstatus_mret[7];
+                                mstatus_mret[7]     = 1'b1;
+                                mstatus_mret[12:11] = 2'b00;
+                                csr_wdata[2]        = mstatus_mret;
+                                jump_target         = csr_rdata[1];
+                                jump_en             = 1'b1;
+                            end else begin
+                                NPCINV(pc);
+                            end
+                        end
+                        3'b001: begin
+                            // CSRRW
+                            csr_we[csr_idx]    = 1'b1;
+                            csr_wdata[csr_idx] = src1;
+                            csr_read_data      = csr_rdata[csr_idx];
+                        end
+                        3'b010: begin
+                            // CSRRS
+                            csr_read_data = csr_rdata[csr_idx];
+                        end
+                        default: NPCINV(pc);
+                    endcase
                 end
             end
             TYPE_R: begin
@@ -439,97 +511,45 @@ module lsu (
 endmodule
 
 module wbu (
-    input  inst_t              inst_type,
-    input  logic  [ 6:0]       opcode,
-    input  logic  [ 2:0]       funct3,
-    input  logic  [31:0]       imm,
-    input  logic  [31:0]       pc,
-    input  logic  [31:0]       snpc,
-    input  logic  [31:0]       alu_result,
-    input  logic  [31:0]       load_data,
-    input  logic  [31:0]       src1,
-    input  logic  [ 3:0][31:0] csr_rdata,
-    output logic  [31:0]       wdata,
-    output logic               gpr_we,
-    output logic  [ 3:0]       csr_we,
-    output logic  [ 3:0][31:0] csr_wdata,
-    output logic  [31:0]       sys_jump_target,
-    output logic               sys_jump_en
+    input  inst_t        inst_type,
+    input  logic  [ 6:0] opcode,
+    input  logic  [ 2:0] funct3,
+    input  logic  [31:0] pc,
+    input  logic  [31:0] snpc,
+    input  logic  [31:0] alu_result,
+    input  logic  [31:0] load_data,
+    input  logic  [31:0] csr_read_data,
+    output logic  [31:0] wdata,
+    output logic         gpr_we,
+    output logic  [31:0] sys_jump_target,
+    output logic         sys_jump_en
 );
     import "DPI-C" function void NPCINV(input int pc);
-    import "DPI-C" function void NPCTRAP();
-
-    function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
-        unique case (addr)
-            12'h305: return 2'd0;
-            12'h341: return 2'd1;
-            12'h300: return 2'd2;
-            12'h342: return 2'd3;
-            default: return 2'd0;
-        endcase
-    endfunction
-
-    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
-    logic [31:0] mstatus_ecall;
-    logic [31:0] mstatus_mret;
 
     always_comb begin
         wdata           = 32'h0;
         gpr_we          = 1'b0;
-        csr_we          = '0;
-        csr_wdata       = '0;
         sys_jump_target = 32'h0;
         sys_jump_en     = 1'b0;
-
-        mstatus_ecall   = csr_rdata[2];
-        mstatus_mret    = csr_rdata[2];
 
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1100111) begin
+                    // JALR
                     wdata  = snpc;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b0000011) begin
+                    // Load指令: 写回内存数据
                     wdata  = load_data;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b1110011) begin
-                    unique case (funct3)
-                        3'b000: begin
-                            if (imm == 32'h0) begin
-                                csr_we               = 4'b1110;
-                                csr_wdata[1]         = pc;
-                                csr_wdata[3]         = 32'd11;
-                                mstatus_ecall[7]     = mstatus_ecall[3];
-                                mstatus_ecall[3]     = 1'b0;
-                                mstatus_ecall[12:11] = 2'b11;
-                                csr_wdata[2]         = mstatus_ecall;
-                                sys_jump_target      = csr_rdata[0];
-                                sys_jump_en          = 1'b1;
-                            end else if (imm == 32'h1) begin
-                                NPCTRAP();
-                            end else if (imm == 32'h302) begin
-                                csr_we[2]           = 1'b1;
-                                mstatus_mret[3]     = mstatus_mret[7];
-                                mstatus_mret[7]     = 1'b1;
-                                mstatus_mret[12:11] = 2'b00;
-                                csr_wdata[2]        = mstatus_mret;
-                                sys_jump_target     = csr_rdata[1];
-                                sys_jump_en         = 1'b1;
-                            end else begin
-                                NPCINV(pc);
-                            end
-                        end
-                        3'b001: begin
-                            csr_we[csr_idx]    = 1'b1;
-                            csr_wdata[csr_idx] = src1;
-                        end
-                        3'b010: begin
-                            wdata  = csr_rdata[csr_idx];
-                            gpr_we = 1'b1;
-                        end
-                        default: NPCINV(pc);
-                    endcase
+                    // CSR指令: 写回CSR读值
+                    if (funct3 == 3'b001 || funct3 == 3'b010) begin
+                        wdata  = csr_read_data;
+                        gpr_we = 1'b1;
+                    end
                 end else begin
+                    // 其他I型指令(算术/逻辑): 写回ALU结果
                     unique case (funct3)
                         3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111: begin
                             wdata  = alu_result;
@@ -553,6 +573,7 @@ module wbu (
                 gpr_we = 1'b1;
             end
             TYPE_J: begin
+                // JAL
                 wdata  = snpc;
                 gpr_we = 1'b1;
             end
