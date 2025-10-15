@@ -114,16 +114,16 @@ module top (
 
     // WBU：负责写回GPR和CSR
     wbu u_wbu (
-        .inst_type      (inst_type),
-        .opcode         (opcode),
-        .funct3         (funct3),
-        .pc             (pc),
-        .snpc           (snpc),
-        .alu_result     (alu_result),
-        .load_data      (load_data),
-        .csr_read_data  (csr_read_data),
-        .wdata          (wdata),
-        .gpr_we         (gpr_we)
+        .inst_type    (inst_type),
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .pc           (pc),
+        .snpc         (snpc),
+        .alu_result   (alu_result),
+        .load_data    (load_data),
+        .csr_read_data(csr_read_data),
+        .wdata        (wdata),
+        .gpr_we       (gpr_we)
     );
 
 endmodule
@@ -285,22 +285,22 @@ module idu (
 endmodule
 
 module exu (
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [ 6:0] funct7,
-    input         [31:0] src1,
-    input         [31:0] src2,
-    input         [31:0] imm,
-    input         [31:0] pc,
-    input         [31:0] snpc,
-    input  inst_t        inst_type,
+    input         [ 6:0]       opcode,
+    input         [ 2:0]       funct3,
+    input         [ 6:0]       funct7,
+    input         [31:0]       src1,
+    input         [31:0]       src2,
+    input         [31:0]       imm,
+    input         [31:0]       pc,
+    input         [31:0]       snpc,
+    input  inst_t              inst_type,
     input  logic  [ 3:0][31:0] csr_rdata,
-    output logic  [31:0] alu_result,
-    output logic  [31:0] jump_target,
-    output logic         jump_en,
-    output logic  [ 3:0] csr_we,
+    output logic  [31:0]       alu_result,
+    output logic  [31:0]       jump_target,
+    output logic               jump_en,
+    output logic  [ 3:0]       csr_we,
     output logic  [ 3:0][31:0] csr_wdata,
-    output logic  [31:0] csr_read_data
+    output logic  [31:0]       csr_read_data
 );
     import "DPI-C" function void NPCINV(input int pc);
     import "DPI-C" function void NPCTRAP();
@@ -327,20 +327,9 @@ module exu (
         endcase
     endfunction
 
-    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
-    logic [31:0] mstatus_ecall;
-    logic [31:0] mstatus_mret;
-
     always_comb begin
         jump_target = 32'h0;
         jump_en     = 1'b0;
-        csr_we      = '0;
-        csr_wdata   = '0;
-        csr_read_data = 32'h0;
-
-        mstatus_ecall = csr_rdata[2];
-        mstatus_mret  = csr_rdata[2];
-
         unique case (inst_type)
             TYPE_I: begin
                 alu_a = src1;
@@ -348,46 +337,21 @@ module exu (
                 if (opcode == 7'b1100111) begin
                     jump_target = {alu_result[31:1], 1'b0};
                     jump_en     = 1'b1;
-                end else if (opcode == 7'b1110011) begin
-                    // CSR指令执行
-                    unique case (funct3)
-                        3'b000: begin
-                            if (imm == 32'h0) begin
-                                // ECALL
-                                csr_we               = 4'b1110;
-                                csr_wdata[1]         = pc;
-                                csr_wdata[3]         = 32'd11;
-                                mstatus_ecall[7]     = mstatus_ecall[3];
-                                mstatus_ecall[3]     = 1'b0;
-                                mstatus_ecall[12:11] = 2'b11;
-                                csr_wdata[2]         = mstatus_ecall;
-                                jump_target          = csr_rdata[0];
-                                jump_en              = 1'b1;
-                            end else if (imm == 32'h1) begin
-                                // EBREAK
-                                NPCTRAP();
-                            end else if (imm == 32'h302) begin
-                                // MRET
-                                csr_we[2]           = 1'b1;
-                                mstatus_mret[3]     = mstatus_mret[7];
-                                mstatus_mret[7]     = 1'b1;
-                                mstatus_mret[12:11] = 2'b00;
-                                csr_wdata[2]        = mstatus_mret;
-                                jump_target         = csr_rdata[1];
-                                jump_en             = 1'b1;
-                            end else begin
-                                NPCINV(pc);
-                            end
+                end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin
+                    unique case (imm)
+                        32'h0: begin
+                            // ECALL
+                            jump_target = csr_rdata[0];
+                            jump_en     = 1'b1;
                         end
-                        3'b001: begin
-                            // CSRRW
-                            csr_we[csr_idx]    = 1'b1;
-                            csr_wdata[csr_idx] = src1;
-                            csr_read_data      = csr_rdata[csr_idx];
+                        32'h1: begin
+                            // EBREAK
+                            NPCTRAP();
                         end
-                        3'b010: begin
-                            // CSRRS
-                            csr_read_data = csr_rdata[csr_idx];
+                        32'h302: begin
+                            // MRET
+                            jump_target = csr_rdata[1];
+                            jump_en     = 1'b1;
                         end
                         default: NPCINV(pc);
                     endcase
@@ -450,6 +414,54 @@ module exu (
             endcase
         end
     end
+
+
+    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    logic [31:0] mstatus_ecall;
+    logic [31:0] mstatus_mret;
+    always_comb begin
+        csr_we        = '0;
+        csr_wdata     = '0;
+        csr_read_data = 32'h0;
+
+        mstatus_ecall = csr_rdata[2];
+        mstatus_mret  = csr_rdata[2];
+        if (inst_type == TYPE_I && opcode == 7'b1110011) begin
+            // CSR指令执行
+            unique case (funct3)
+                3'b000: begin
+                    if (imm == 32'h0) begin
+                        // ECALL
+                        csr_we               = 4'b1110;
+                        csr_wdata[1]         = pc;
+                        csr_wdata[3]         = 32'd11;
+                        mstatus_ecall[7]     = mstatus_ecall[3];
+                        mstatus_ecall[3]     = 1'b0;
+                        mstatus_ecall[12:11] = 2'b11;
+                        csr_wdata[2]         = mstatus_ecall;
+                    end else if (imm == 32'h302) begin
+                        // MRET
+                        csr_we[2]           = 1'b1;
+                        mstatus_mret[3]     = mstatus_mret[7];
+                        mstatus_mret[7]     = 1'b1;
+                        mstatus_mret[12:11] = 2'b00;
+                        csr_wdata[2]        = mstatus_mret;
+                    end
+                end
+                3'b001: begin
+                    // CSRRW
+                    csr_we[csr_idx]    = 1'b1;
+                    csr_wdata[csr_idx] = src1;
+                end
+                3'b010: begin
+                    // CSRRR
+                    csr_read_data = csr_rdata[csr_idx];
+                end
+                default: NPCINV(pc);
+            endcase
+        end
+    end
+
 endmodule
 
 module lsu (
@@ -515,8 +527,8 @@ module wbu (
     import "DPI-C" function void NPCINV(input int pc);
 
     always_comb begin
-        wdata           = 32'h0;
-        gpr_we          = 1'b0;
+        wdata  = 32'h0;
+        gpr_we = 1'b0;
 
         unique case (inst_type)
             TYPE_I: begin
