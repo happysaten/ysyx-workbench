@@ -344,16 +344,12 @@ module exu (
                             jump_target = csr_rdata[0];
                             jump_en     = 1'b1;
                         end
-                        32'h1: begin
-                            // EBREAK
-                            ;
-                        end
                         32'h302: begin
                             // MRET
                             jump_target = csr_rdata[1];
                             jump_en     = 1'b1;
                         end
-                        // default: NPCINV(pc);
+                        default: ;
                     endcase
                 end
             end
@@ -449,6 +445,10 @@ module exu (
                     end else if (imm == 32'h1) begin
                         // EBREAK
                         NPCTRAP();
+                    end
+                    else begin
+                        // 不支持的系统指令保持兼容旧行为
+                        NPCINV(pc);
                     end
                 end
                 3'b001: begin
