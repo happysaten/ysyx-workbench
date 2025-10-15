@@ -172,8 +172,10 @@ module ifu (
     end
 
     // 读取当前 PC 指令并通知 DPI
-    always_comb inst = pmem_read_npc(pc);
-    always_comb update_inst_npc(inst, dnpc);
+    always_comb begin
+        inst = pmem_read_npc(pc);
+        update_inst_npc(inst, dnpc);
+    end
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -182,11 +184,8 @@ module ifu (
     end
 
     // snpc / dnpc 选择逻辑
-    always_comb begin
-        snpc = pc + 4;
-        if (jump_en) dnpc = jump_target;
-        else dnpc = snpc;
-    end
+    assign snpc = pc + 4;
+    assign dnpc = jump_en ? jump_target : snpc;
 endmodule
 
 module gpr (
