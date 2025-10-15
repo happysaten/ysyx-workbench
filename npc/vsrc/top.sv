@@ -91,7 +91,7 @@ module top (
     logic [31:0] jump_target;  // 新增：跳转目标
     logic        jump_en;  // 新增：跳转使能
 
-    exe u_exe (
+    exu u_exu (
         .opcode     (opcode),
         .funct3     (funct3),
         .funct7     (funct7),
@@ -284,7 +284,7 @@ module idu (
     end
 endmodule
 
-module exe (
+module exu (
     input         [ 6:0]       opcode,
     input         [ 2:0]       funct3,
     input         [ 6:0]       funct7,
@@ -464,7 +464,7 @@ module exe (
                 if (opcode == 7'b1100111)  // JALR
                     dest = snpc;
                 else if (opcode == 7'b0000011) begin  // Load指令
-                    mem_rdata = pmem_read_npc(src1 + imm);
+                    mem_rdata = pmem_read_npc(alu_result);
                     unique case (funct3)
                         3'b000: dest = {{24{mem_rdata[7]}}, mem_rdata[7:0]};  // lb
                         3'b010: dest = mem_rdata;  // lw
