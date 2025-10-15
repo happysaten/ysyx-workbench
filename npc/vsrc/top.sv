@@ -129,7 +129,7 @@ module top (
         .wdata          (wdata),
         .gpr_we         (gpr_we),
         .csr_we         (csr_we),
-        .csr_wdata      (csr_wdata),
+        .csr_wdata      (csr_wdata)
     );
 
 endmodule
