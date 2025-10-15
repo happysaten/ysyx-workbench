@@ -80,8 +80,6 @@ module top (
 
     // EXU：负责根据控制信号来进行运算和跳转
     logic [31:0] alu_result;  // ALU计算结果
-    logic [31:0] jump_target_exu;  // 跳转目标地址
-    logic jump_en_exu;
     logic [31:0] csr_read_data;  // CSR读取的数据
     exu u_exu (
         .opcode       (opcode),
@@ -95,8 +93,8 @@ module top (
         .inst_type    (inst_type),
         .csr_rdata    (csr_rdata),
         .alu_result   (alu_result),
-        .jump_target  (jump_target_exu),
-        .jump_en      (jump_en_exu),
+        .jump_target  (jump_target),
+        .jump_en      (jump_en),
         .csr_we       (csr_we),
         .csr_wdata    (csr_wdata),
         .csr_read_data(csr_read_data)
@@ -115,8 +113,6 @@ module top (
     );
 
     // WBU：负责写回GPR和CSR
-    logic [31:0] jump_target_sys;  // CSR跳转目标地址
-    logic jump_en_sys;
     wbu u_wbu (
         .inst_type      (inst_type),
         .opcode         (opcode),
@@ -127,14 +123,8 @@ module top (
         .load_data      (load_data),
         .csr_read_data  (csr_read_data),
         .wdata          (wdata),
-        .gpr_we         (gpr_we),
-        .sys_jump_target(jump_target_sys),
-        .sys_jump_en    (jump_en_sys)
+        .gpr_we         (gpr_we)
     );
-
-    assign {jump_en, jump_target} = jump_en_sys ?
-                             {1'b1, jump_target_sys} :
-                             {jump_en_exu, jump_target_exu};
 
 endmodule
 
@@ -520,17 +510,13 @@ module wbu (
     input  logic  [31:0] load_data,
     input  logic  [31:0] csr_read_data,
     output logic  [31:0] wdata,
-    output logic         gpr_we,
-    output logic  [31:0] sys_jump_target,
-    output logic         sys_jump_en
+    output logic         gpr_we
 );
     import "DPI-C" function void NPCINV(input int pc);
 
     always_comb begin
         wdata           = 32'h0;
         gpr_we          = 1'b0;
-        sys_jump_target = 32'h0;
-        sys_jump_en     = 1'b0;
 
         unique case (inst_type)
             TYPE_I: begin
