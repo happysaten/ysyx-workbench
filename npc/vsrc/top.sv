@@ -474,6 +474,8 @@ module wbu (
         endcase
     endfunction
 
+    logic [31:0] sys_jump_target;
+    logic        sys_jump_en;
     wire [1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
     logic [31:0] mstatus_ecall;
     logic [31:0] mstatus_mret;
