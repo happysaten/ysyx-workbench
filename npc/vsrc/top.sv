@@ -26,8 +26,7 @@ module top (
     logic        gpr_we;
     logic [31:0] alu_result;
     logic [31:0] load_data;
-    logic [31:0] jump_target;
-    logic        jump_en;
+    logic [31:0] pc_next;
 
     // 解码信号
     logic [6:0] opcode, funct7;
@@ -44,13 +43,12 @@ module top (
 
     // IFU 实例化：负责 PC 和取指
     ifu u_ifu (
-        .clk(clk),
-        .reset(reset),
-        .jump_target(jump_target),
-        .jump_en(jump_en),
-        .pc(pc),
-        .snpc(snpc),
-        .inst(inst)
+        .clk     (clk),
+        .reset   (reset),
+        .next_pc (pc_next),
+        .pc      (pc),
+        .snpc    (snpc),
+        .inst    (inst)
     );
 
     // 指令解码实例
@@ -79,8 +77,8 @@ module top (
     );
 
     // 执行单元实例
-    logic [31:0] jump_target_exu, jump_target_sys;
-    logic        jump_en_exu, jump_en_sys;
+    logic [31:0] jump_target_exu;
+    logic        jump_en_exu;
 
     exu u_exu (
         .opcode     (opcode),
@@ -108,27 +106,26 @@ module top (
     );
 
     wbu u_wbu (
-        .inst_type     (inst_type),
-        .opcode        (opcode),
-        .funct3        (funct3),
-        .imm           (imm),
-        .pc            (pc),
-        .snpc          (snpc),
-        .alu_result    (alu_result),
-        .load_data     (load_data),
-        .src1          (rdata1),
-        .csr_rdata     (csr_rdata),
-        .wdata         (wdata),
-        .gpr_we        (gpr_we),
-        .csr_we        (csr_we),
-        .csr_wdata     (csr_wdata),
-        .sys_jump_target(jump_target_sys),
-        .sys_jump_en   (jump_en_sys)
+        .inst_type      (inst_type),
+        .opcode         (opcode),
+        .funct3         (funct3),
+        .imm            (imm),
+        .pc             (pc),
+        .snpc           (snpc),
+        .alu_result     (alu_result),
+        .load_data      (load_data),
+        .src1           (rdata1),
+        .csr_rdata      (csr_rdata),
+        .jump_target_exu(jump_target_exu),
+        .jump_en_exu    (jump_en_exu),
+        .wdata          (wdata),
+        .gpr_we         (gpr_we),
+        .csr_we         (csr_we),
+        .csr_wdata      (csr_wdata),
+        .next_pc        (pc_next)
     );
 
-    assign jump_en     = jump_en_sys ? 1'b1 : jump_en_exu;
-    assign jump_target = jump_en_sys ? jump_target_sys : jump_target_exu;
-    assign we          = gpr_we && (|rd);
+    assign we = gpr_we && (|rd);
 
     // 寄存器堆实例
     gpr u_gpr (
@@ -148,15 +145,14 @@ endmodule
 module ifu (
     input  logic        clk,
     input  logic        reset,
-    input  logic [31:0] jump_target,
-    input  logic        jump_en,
+    input  logic [31:0] next_pc,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] inst
 );
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
-    logic [31:0] dnpc;
+    logic [31:0] inst_local;
 
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -173,19 +169,18 @@ module ifu (
 
     // 读取当前 PC 指令并通知 DPI
     always_comb begin
-        inst = pmem_read_npc(pc);
-        update_inst_npc(inst, dnpc);
+        inst_local = pmem_read_npc(pc);
+        inst       = inst_local;
+        update_inst_npc(inst_local, next_pc);
     end
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset_sync) pc <= RESET_PC;
-        else pc <= dnpc;
+        else pc <= next_pc;
     end
 
-    // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
-    assign dnpc = jump_en ? jump_target : snpc;
 endmodule
 
 module gpr (
@@ -453,17 +448,18 @@ module wbu (
     input  logic [2:0]         funct3,
     input  logic [31:0]        imm,
     input  logic [31:0]        pc,
-    input  logic [31:0]        snpc,
+    input  logic [31:0]     snpc,
     input  logic [31:0]        alu_result,
     input  logic [31:0]        load_data,
     input  logic [31:0]        src1,
     input  logic [ 3:0][31:0]  csr_rdata,
+    input  logic [31:0]        jump_target_exu,
+    input  logic               jump_en_exu,
     output logic [31:0]        wdata,
     output logic               gpr_we,
     output logic [ 3:0]        csr_we,
     output logic [ 3:0][31:0]  csr_wdata,
-    output logic [31:0]        sys_jump_target,
-    output logic               sys_jump_en
+    output logic [31:0]        next_pc
 );
     import "DPI-C" function void NPCINV(input int pc);
     import "DPI-C" function void NPCTRAP();
@@ -489,6 +485,7 @@ module wbu (
         csr_wdata       = '0;
         sys_jump_target = 32'h0;
         sys_jump_en     = 1'b0;
+        next_pc         = snpc;
 
         mstatus_ecall = csr_rdata[2];
         mstatus_mret  = csr_rdata[2];
@@ -569,6 +566,9 @@ module wbu (
             end
             default: ; // TYPE_B / TYPE_S / TYPE_N 不写回寄存器
         endcase
+
+        if (sys_jump_en) next_pc = sys_jump_target;
+        else if (jump_en_exu) next_pc = jump_target_exu;
     end
 endmodule
 
