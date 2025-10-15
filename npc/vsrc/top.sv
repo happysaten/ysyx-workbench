@@ -21,7 +21,7 @@ module top (
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc, snpc, 跳转目标地址
     logic        jump_en;
-    logic [31:0] inst; // 当前指令
+    logic [31:0] inst;  // 当前指令
     ifu u_ifu (
         .clk(clk),
         .reset(reset),
@@ -53,7 +53,7 @@ module top (
 
     // GPR：通用寄存器组
     logic [31:0] rdata1, rdata2, wdata;  // 读寄存器组数据1、2，写寄存器数据
-    logic       gpr_we;
+    logic gpr_we;
     gpr u_gpr (
         .clk(clk),
         .we(gpr_we && (|rd)),
@@ -66,7 +66,7 @@ module top (
     );
 
     // CSR：控制状态寄存器
-    logic [3:0][31:0] csr_wdata, csr_rdata; // CSR写数据，读数据
+    logic [3:0][31:0] csr_wdata, csr_rdata;  // CSR写数据，读数据
     logic [3:0] csr_we;
     csr u_csr (
         .clk (clk),
@@ -79,8 +79,6 @@ module top (
     // EXU：负责根据控制信号来进行运算和跳转
     logic [31:0] alu_result;  // ALU计算结果
     logic [31:0] csr_result;  // CSR操作结果
-    logic [3:0] csr_we_exu;  // CSR写使能
-    logic [3:0][31:0] csr_wdata_exu;  // CSR写数据
     exu u_exu (
         .opcode     (opcode),
         .funct3     (funct3),
@@ -96,12 +94,12 @@ module top (
         .csr_result (csr_result),
         .jump_target(jump_target),
         .jump_en    (jump_en),
-        .csr_we     (csr_we_exu),
-        .csr_wdata  (csr_wdata_exu)
+        .csr_we     (csr_we),
+        .csr_wdata  (csr_wdata)
     );
 
     // LSU：负责加载和存储指令的内存访问
-    logic [31:0] load_data; // 加载数据
+    logic [31:0] load_data;  // 加载数据
     lsu u_lsu (
         .inst_type (inst_type),
         .opcode    (opcode),
@@ -114,20 +112,16 @@ module top (
 
     // WBU：负责写回GPR和CSR
     wbu u_wbu (
-        .inst_type      (inst_type),
-        .opcode         (opcode),
-        .funct3         (funct3),
-        .pc             (pc),
-        .snpc           (snpc),
-        .alu_result     (alu_result),
-        .csr_result     (csr_result),
-        .load_data      (load_data),
-        .csr_we_exu     (csr_we_exu),
-        .csr_wdata_exu  (csr_wdata_exu),
-        .wdata          (wdata),
-        .gpr_we         (gpr_we),
-        .csr_we         (csr_we),
-        .csr_wdata      (csr_wdata)
+        .inst_type    (inst_type),
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .pc           (pc),
+        .snpc         (snpc),
+        .alu_result   (alu_result),
+        .csr_result   (csr_result),
+        .load_data    (load_data),
+        .wdata        (wdata),
+        .gpr_we       (gpr_we)
     );
 
 endmodule
@@ -289,21 +283,21 @@ module idu (
 endmodule
 
 module exu (
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [ 6:0] funct7,
-    input         [31:0] src1,
-    input         [31:0] src2,
-    input         [31:0] imm,
-    input         [31:0] pc,
-    input         [31:0] snpc,
-    input  inst_t        inst_type,
+    input         [ 6:0]       opcode,
+    input         [ 2:0]       funct3,
+    input         [ 6:0]       funct7,
+    input         [31:0]       src1,
+    input         [31:0]       src2,
+    input         [31:0]       imm,
+    input         [31:0]       pc,
+    input         [31:0]       snpc,
+    input  inst_t              inst_type,
     input  logic  [ 3:0][31:0] csr_rdata,
-    output logic  [31:0] alu_result,
-    output logic  [31:0] csr_result,
-    output logic  [31:0] jump_target,
-    output logic         jump_en,
-    output logic  [ 3:0] csr_we,
+    output logic  [31:0]       alu_result,
+    output logic  [31:0]       csr_result,
+    output logic  [31:0]       jump_target,
+    output logic               jump_en,
+    output logic  [ 3:0]       csr_we,
     output logic  [ 3:0][31:0] csr_wdata
 );
     logic [31:0] alu_a, alu_b;
@@ -337,28 +331,26 @@ module exu (
         csr_result  = 32'h0;
         csr_we      = '0;
         csr_wdata   = '0;
-        
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1110011) begin
                     // CSR指令处理
-                    logic [1:0] csr_idx;
+                    logic [ 1:0] csr_idx;
                     logic [31:0] mstatus_temp;
                     csr_idx = csr_addr_to_idx(imm[11:0]);
-                    
                     unique case (funct3)
                         3'b000: begin  // ECALL/EBREAK/MRET
                             if (imm == 32'h0) begin  // ECALL
-                                csr_we               = 4'b1110;
-                                csr_wdata[1]         = pc;
-                                csr_wdata[3]         = 32'd11;
-                                mstatus_temp         = csr_rdata[2];
-                                mstatus_temp[7]      = mstatus_temp[3];
-                                mstatus_temp[3]      = 1'b0;
-                                mstatus_temp[12:11]  = 2'b11;
-                                csr_wdata[2]         = mstatus_temp;
-                                jump_target          = csr_rdata[0];
-                                jump_en              = 1'b1;
+                                csr_we              = 4'b1110;
+                                csr_wdata[1]        = pc;
+                                csr_wdata[3]        = 32'd11;
+                                mstatus_temp        = csr_rdata[2];
+                                mstatus_temp[7]     = mstatus_temp[3];
+                                mstatus_temp[3]     = 1'b0;
+                                mstatus_temp[12:11] = 2'b11;
+                                csr_wdata[2]        = mstatus_temp;
+                                jump_target         = csr_rdata[0];
+                                jump_en             = 1'b1;
                             end else if (imm == 32'h1) begin  // EBREAK
                                 NPCTRAP();
                             end else if (imm == 32'h302) begin  // MRET
@@ -383,12 +375,12 @@ module exu (
                         end
                         default: NPCINV(pc);
                     endcase
-                    
+
                     alu_a = src1;
                     alu_b = imm;
                 end else if (opcode == 7'b1100111) begin
-                    alu_a = src1;
-                    alu_b = imm;
+                    alu_a       = src1;
+                    alu_b       = imm;
                     jump_target = {alu_result[31:1], 1'b0};
                     jump_en     = 1'b1;
                 end else begin
@@ -512,20 +504,14 @@ module wbu (
     input  logic  [31:0]       alu_result,
     input  logic  [31:0]       csr_result,
     input  logic  [31:0]       load_data,
-    input  logic  [ 3:0]       csr_we_exu,
-    input  logic  [ 3:0][31:0] csr_wdata_exu,
     output logic  [31:0]       wdata,
-    output logic               gpr_we,
-    output logic  [ 3:0]       csr_we,
-    output logic  [ 3:0][31:0] csr_wdata
+    output logic               gpr_we
 );
     import "DPI-C" function void NPCINV(input int pc);
 
     always_comb begin
-        wdata           = 32'h0;
-        gpr_we          = 1'b0;
-        csr_we          = csr_we_exu;
-        csr_wdata       = csr_wdata_exu;
+        wdata     = 32'h0;
+        gpr_we    = 1'b0;
 
         unique case (inst_type)
             TYPE_I: begin
