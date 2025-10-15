@@ -78,8 +78,6 @@ module top (
 
     // EXU：负责根据控制信号来进行运算和跳转
     logic [31:0] alu_result;  // ALU计算结果
-    logic [31:0] jump_target_exu;  // 跳转目标地址
-    logic jump_en_exu;
     logic [31:0] csr_result;  // CSR操作结果
     logic [3:0] csr_we_exu;  // CSR写使能
     logic [3:0][31:0] csr_wdata_exu;  // CSR写数据
