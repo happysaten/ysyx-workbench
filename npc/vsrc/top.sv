@@ -1,4 +1,4 @@
-`include "alu_pkgs.sv"
+`include "alu_pkgs.svh"
 import alu_pkgs::alu_op_t;
 
 // 指令类型枚举
