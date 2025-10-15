@@ -169,9 +169,8 @@ module ifu (
 
     // 读取当前 PC 指令并通知 DPI
     always_comb begin
-        inst_local = pmem_read_npc(pc);
-        inst       = inst_local;
-        update_inst_npc(inst_local, next_pc);
+        inst = pmem_read_npc(pc);
+        update_inst_npc(inst, pc);
     end
 
     // PC 寄存器更新
