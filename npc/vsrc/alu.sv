@@ -1,4 +1,4 @@
-import alu_pkg::alu_op_t;
+import alu_pkg::*;
 
 // 带有逻辑运算的简单ALU
 module alu #(

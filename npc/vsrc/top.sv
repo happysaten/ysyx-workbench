@@ -1,4 +1,4 @@
-import alu_pkg::alu_op_t;
+import alu_pkg::*;
 
 // 指令类型枚举
 typedef enum logic [2:0] {
