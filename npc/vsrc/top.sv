@@ -376,8 +376,9 @@ module exu (
                         default: NPCINV(pc);
                     endcase
 
-                    alu_a = src1;
-                    alu_b = imm;
+                    // CSR 指令不需要 ALU，设置为默认值避免循环
+                    alu_a = 32'h0;
+                    alu_b = 32'h0;
                 end else if (opcode == 7'b1100111) begin
                     alu_a       = src1;
                     alu_b       = imm;
