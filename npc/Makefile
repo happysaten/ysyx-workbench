@@ -18,7 +18,6 @@ verilator:
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
-# 		-I$(NPC_HOME)/vsrc/include \
 		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
 		$(VSRCS) \
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
