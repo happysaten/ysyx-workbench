@@ -331,12 +331,10 @@ module exu (
         csr_result  = 32'h0;
         csr_we      = '0;
         csr_wdata   = '0;
-        alu_a       = 32'h0;
-        alu_b       = 32'h0;
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1110011) begin
-                    // CSR指令处理 - 不使用ALU
+                    // CSR指令处理
                     logic [ 1:0] csr_idx;
                     logic [31:0] mstatus_temp;
                     csr_idx = csr_addr_to_idx(imm[11:0]);
@@ -377,6 +375,9 @@ module exu (
                         end
                         default: NPCINV(pc);
                     endcase
+
+                    alu_a = src1;
+                    alu_b = imm;
                 end else if (opcode == 7'b1100111) begin
                     alu_a       = src1;
                     alu_b       = imm;
@@ -419,7 +420,10 @@ module exu (
                 alu_a = src1;
                 alu_b = imm;
             end
-            default: ;
+            default: begin
+                alu_a = src1;
+                alu_b = src2;
+            end
         endcase
     end
 
