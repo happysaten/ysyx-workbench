@@ -6,6 +6,8 @@
 !*.[cSh]
 !*.v
 !*.sv
+!*.vh
+!*.svh
 !*.vlt
 !*.cc
 !*.cpp

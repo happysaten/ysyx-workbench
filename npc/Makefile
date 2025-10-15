@@ -8,6 +8,7 @@ all:
 
 WORK_DIR = $(abspath .)
 CVCFLAGS ?=
+OBJ_DIR = $(NSIM_HOME)/src/verilator/obj_dir
 
 verilator:
 	# 提交git
@@ -17,12 +18,12 @@ verilator:
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
-		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
+		--Mdir $(OBJ_DIR) \
 		$(VSRCS) \
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
 
 clean:
-	rm -rf $(NSIM_HOME)/src/verilator/obj_dir
+	rm -rf $(OBJ_DIR)
 
 include ../Makefile
 .PHONY: all clean verilator
