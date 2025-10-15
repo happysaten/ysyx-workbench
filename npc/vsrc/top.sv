@@ -355,7 +355,7 @@ module exu (
                 //         end
                 //         default: NPCINV(pc);
                 //     endcase
-                // end
+                end
             end
             TYPE_R: begin
                 alu_a = src1;
