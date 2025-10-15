@@ -339,20 +339,20 @@ module exu (
                     jump_en     = 1'b1;
                 end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin
                     unique case (imm)
-                        // 32'h0: begin
-                        //     // ECALL
-                        //     jump_target = csr_rdata[0];
-                        //     jump_en     = 1'b1;
-                        // end
+                        32'h0: begin
+                            // ECALL
+                            jump_target = csr_rdata[0];
+                            jump_en     = 1'b1;
+                        end
                         32'h1: begin
                             // EBREAK
                             ;
                         end
-                        // 32'h302: begin
-                        //     // MRET
-                        //     jump_target = csr_rdata[1];
-                        //     jump_en     = 1'b1;
-                        // end
+                        32'h302: begin
+                            // MRET
+                            jump_target = csr_rdata[1];
+                            jump_en     = 1'b1;
+                        end
                         // default: NPCINV(pc);
                     endcase
                 end
