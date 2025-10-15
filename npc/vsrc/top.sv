@@ -23,7 +23,7 @@ module top (
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc, snpc, 跳转目标地址
     logic        jump_en;
-    logic [31:0] inst; // 当前指令
+    logic [31:0] inst;  // 当前指令
     ifu u_ifu (
         .clk(clk),
         .reset(reset),
@@ -55,10 +55,10 @@ module top (
 
     // GPR：通用寄存器组
     logic [31:0] rdata1, rdata2, wdata_wbu;  // wdata_wbu 为原 WBU 输出
-    logic [31:0] wdata_exu;                  // EXU 在 CSR 情况下的写回数据
-    logic       gpr_we_wbu;
-    logic       gpr_we_exu;
-    logic       gpr_we_final;
+    logic [31:0] wdata_exu;  // EXU 在 CSR 情况下的写回数据
+    logic        gpr_we_wbu;
+    logic        gpr_we_exu;
+    logic        gpr_we_final;
     gpr u_gpr (
         .clk(clk),
         .we(gpr_we_final && (|rd)),
@@ -71,7 +71,8 @@ module top (
     );
 
     // CSR：控制状态寄存器
-    logic [3:0][31:0] csr_wdata_exu, csr_rdata; // CSR 写数据由 EXU 驱动，读数据输出给 EXU
+    logic [3:0][31:0]
+        csr_wdata_exu, csr_rdata;  // CSR 写数据由 EXU 驱动，读数据输出给 EXU
     logic [3:0] csr_we_exu;
     csr u_csr (
         .clk (clk),
@@ -86,28 +87,28 @@ module top (
     logic [31:0] jump_target_exu;  // 跳转目标地址
     logic jump_en_exu;
     exu u_exu (
-        .opcode        (opcode),
-        .funct3        (funct3),
-        .funct7        (funct7),
-        .src1          (rdata1),
-        .src2          (rdata2),
-        .imm           (imm),
-        .pc            (pc),
-        .snpc          (snpc),
-        .inst_type     (inst_type),
-        .csr_rdata     (csr_rdata),
+        .opcode   (opcode),
+        .funct3   (funct3),
+        .funct7   (funct7),
+        .src1     (rdata1),
+        .src2     (rdata2),
+        .imm      (imm),
+        .pc       (pc),
+        .snpc     (snpc),
+        .inst_type(inst_type),
+        .csr_rdata(csr_rdata),
 
-        .alu_result    (alu_result),
-        .jump_target   (jump_target_exu),
-        .jump_en       (jump_en_exu),
+        .alu_result (alu_result),
+        .jump_target(jump_target_exu),
+        .jump_en    (jump_en_exu),
 
         // 新增 CSR/系统信号由 EXU 产生
-        .csr_we        (csr_we_exu),
-        .csr_wdata     (csr_wdata_exu),
+        .csr_we   (csr_we_exu),
+        .csr_wdata(csr_wdata_exu),
 
         // EXU 在 CSR 读（csrr?）时对 GPR 的写回
-        .exu_wdata     (wdata_exu),
-        .exu_gpr_we    (gpr_we_exu),
+        .exu_wdata (wdata_exu),
+        .exu_gpr_we(gpr_we_exu),
 
         // EXU 产生的系统跳转（ecall/mret 导致的跳转）
         .sys_jump_target(sys_jump_target),
@@ -115,7 +116,7 @@ module top (
     );
 
     // LSU：负责加载和存储指令的内存访问
-    logic [31:0] load_data; // 加载数据
+    logic [31:0] load_data;  // 加载数据
     lsu u_lsu (
         .inst_type (inst_type),
         .opcode    (opcode),
@@ -127,7 +128,7 @@ module top (
     );
 
     // WBU：负责写回GPR（不再处理 CSR）
-    logic [31:0] jump_target_sys; // 保留（来自 WBU 的系统跳转，通常未使用）
+    logic [31:0] jump_target_sys;  // 保留（来自 WBU 的系统跳转，通常未使用）
     logic jump_en_sys;
     wbu u_wbu (
         .inst_type      (inst_type),
@@ -312,28 +313,28 @@ module idu (
 endmodule
 
 module exu (
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [ 6:0] funct7,
-    input         [31:0] src1,
-    input         [31:0] src2,
-    input         [31:0] imm,
-    input         [31:0] pc,
-    input         [31:0] snpc,
-    input  inst_t        inst_type,
-    input  logic [3:0][31:0] csr_rdata,   // CSR 读数据输入
+    input        [ 6:0]       opcode,
+    input        [ 2:0]       funct3,
+    input        [ 6:0]       funct7,
+    input        [31:0]       src1,
+    input        [31:0]       src2,
+    input        [31:0]       imm,
+    input        [31:0]       pc,
+    input        [31:0]       snpc,
+    input inst_t              inst_type,
+    input logic  [ 3:0][31:0] csr_rdata,  // CSR 读数据输入
 
-    output logic  [31:0] alu_result,
-    output logic  [31:0] jump_target,
-    output logic         jump_en,
+    output logic [31:0] alu_result,
+    output logic [31:0] jump_target,
+    output logic        jump_en,
 
     // CSR 输出（EXU 负责 CSR 写）
-    output logic  [3:0]       csr_we,
-    output logic  [3:0][31:0] csr_wdata,
+    output logic [3:0]       csr_we,
+    output logic [3:0][31:0] csr_wdata,
 
     // EXU 对 GPR 的写回（仅在 CSR 指令需要写回时使用）
-    output logic  [31:0] exu_wdata,
-    output logic         exu_gpr_we,
+    output logic [31:0] exu_wdata,
+    output logic        exu_gpr_we,
 
     // EXU 产生的系统跳转（ecall/mret 等）
     output logic [31:0] sys_jump_target,
@@ -436,15 +437,17 @@ module exu (
         endcase
     endfunction
 
+    logic [31:0] mstatus_ecall, mstatus_mret;
+
     // EXU 负责处理 CSR 指令并提供 CSR 写与可能的 GPR 写回以及系统跳转
     always_comb begin
         // 默认清零
-        csr_we        = '0;
-        csr_wdata     = '0;
-        exu_wdata     = 32'h0;
-        exu_gpr_we    = 1'b0;
-        sys_jump_target= 32'h0;
-        sys_jump_en   = 1'b0;
+        csr_we          = '0;
+        csr_wdata       = '0;
+        exu_wdata       = 32'h0;
+        exu_gpr_we      = 1'b0;
+        sys_jump_target = 32'h0;
+        sys_jump_en     = 1'b0;
 
         // 仅当为系统/CSR 指令时处理
         if (inst_type == TYPE_I && opcode == 7'b1110011) begin
@@ -453,31 +456,29 @@ module exu (
                     // ECALL/EBREAK/MRET 等（使用 imm 区分）
                     if (imm == 32'h0) begin
                         // ecall: 保存 PC/CAUSE/MSTATUS 等并跳转到 MTVEC
-                        csr_we               = 4'b1110;
-                        csr_wdata[1]         = pc;            // MEPC
-                        csr_wdata[3]         = 32'd11;        // MCAUSE = 11 (environment call from M-mode)
+                        csr_we = 4'b1110;
+                        csr_wdata[1] = pc;  // MEPC
+                        csr_wdata[3] = 32'd11;  // MCAUSE = 11 (environment call from M-mode)
                         // 修改 mstatus: 保存旧中断使能并禁用
-                        logic [31:0] mstatus_ecall;
                         mstatus_ecall = csr_rdata[2];
-                        mstatus_ecall[7]     = mstatus_ecall[3];
-                        mstatus_ecall[3]     = 1'b0;
+                        mstatus_ecall[7] = mstatus_ecall[3];
+                        mstatus_ecall[3] = 1'b0;
                         mstatus_ecall[12:11] = 2'b11;
-                        csr_wdata[2]         = mstatus_ecall;
-                        sys_jump_target      = csr_rdata[0];  // MTVEC
-                        sys_jump_en          = 1'b1;
+                        csr_wdata[2] = mstatus_ecall;
+                        sys_jump_target = csr_rdata[0];  // MTVEC
+                        sys_jump_en = 1'b1;
                     end else if (imm == 32'h1) begin
                         // breakpoint/trap
                         NPCTRAP();
                     end else if (imm == 32'h302) begin
                         // mret: 恢复 mstatus 并跳转到 MEPC
                         csr_we[2]           = 1'b1;
-                        logic [31:0] mstatus_mret;
-                        mstatus_mret = csr_rdata[2];
+                        mstatus_mret        = csr_rdata[2];
                         mstatus_mret[3]     = mstatus_mret[7];
                         mstatus_mret[7]     = 1'b1;
                         mstatus_mret[12:11] = 2'b00;
                         csr_wdata[2]        = mstatus_mret;
-                        sys_jump_target     = csr_rdata[1]; // MEPC
+                        sys_jump_target     = csr_rdata[1];  // MEPC
                         sys_jump_en         = 1'b1;
                     end else begin
                         NPCINV(pc);
@@ -494,7 +495,7 @@ module exu (
                     // CSRR? read CSR -> rd （返回值写回 GPR）
                     logic [1:0] csr_idx;
                     csr_idx = csr_addr_to_idx(imm[11:0]);
-                    exu_wdata  = csr_rdata[csr_idx];
+                    exu_wdata = csr_rdata[csr_idx];
                     exu_gpr_we = 1'b1;
                 end
                 default: NPCINV(pc);
@@ -553,20 +554,20 @@ module lsu (
 endmodule
 
 module wbu (
-    input  inst_t              inst_type,
-    input  logic  [ 6:0]       opcode,
-    input  logic  [ 2:0]       funct3,
-    input  logic  [31:0]       imm,
-    input  logic  [31:0]       pc,
-    input  logic  [31:0]       snpc,
-    input  logic  [31:0]       alu_result,
-    input  logic  [31:0]       load_data,
-    input  logic  [31:0]       src1,
+    input  inst_t        inst_type,
+    input  logic  [ 6:0] opcode,
+    input  logic  [ 2:0] funct3,
+    input  logic  [31:0] imm,
+    input  logic  [31:0] pc,
+    input  logic  [31:0] snpc,
+    input  logic  [31:0] alu_result,
+    input  logic  [31:0] load_data,
+    input  logic  [31:0] src1,
     // CSR 相关已由 EXU 处理，移除 csr_rdata/csr_we/csr_wdata 端口
-    output logic  [31:0]       wdata,
-    output logic               gpr_we,
-    output logic  [31:0]       sys_jump_target,
-    output logic               sys_jump_en
+    output logic  [31:0] wdata,
+    output logic         gpr_we,
+    output logic  [31:0] sys_jump_target,
+    output logic         sys_jump_en
 );
     import "DPI-C" function void NPCINV(input int pc);
     import "DPI-C" function void NPCTRAP();
