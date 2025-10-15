@@ -1,4 +1,4 @@
-`include "include/alu_pkgs.sv"
+import alu_pkgs::*;
 
 // 带有逻辑运算的简单ALU
 module alu #(
