@@ -26,8 +26,6 @@ module top (
     logic        gpr_we;
     logic [31:0] alu_result;
     logic [31:0] load_data;
-    logic [31:0] jump_target_exu, jump_target_sys;
-    logic        jump_en_exu, jump_en_sys;
     logic [31:0] jump_target;
     logic        jump_en;
 
@@ -81,8 +79,8 @@ module top (
     );
 
     // 执行单元实例
-    logic [31:0] jump_target_exu;  // 新增：跳转目标
-    logic        jump_en_exu;  // 新增：跳转使能
+    logic [31:0] jump_target_exu, jump_target_sys;
+    logic        jump_en_exu, jump_en_sys;
 
     exu u_exu (
         .opcode     (opcode),
