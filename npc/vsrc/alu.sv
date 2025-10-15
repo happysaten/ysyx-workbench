@@ -1,4 +1,5 @@
-import alu_pkgs::*;
+`include "alu_pkgs.sv"
+import alu_pkgs::alu_op_t;
 
 // 带有逻辑运算的简单ALU
 module alu #(

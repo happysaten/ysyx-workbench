@@ -1,4 +1,5 @@
-import alu_pkgs::*;
+`include "alu_pkgs.sv"
+import alu_pkgs::alu_op_t;
 
 // 指令类型枚举
 typedef enum logic [2:0] {
