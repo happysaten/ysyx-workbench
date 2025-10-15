@@ -416,51 +416,51 @@ module exu (
     end
 
 
-    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
-    logic [31:0] mstatus_ecall;
-    logic [31:0] mstatus_mret;
-    always_comb begin
-        csr_we        = '0;
-        csr_wdata     = '0;
-        csr_read_data = 32'h0;
+    // wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    // logic [31:0] mstatus_ecall;
+    // logic [31:0] mstatus_mret;
+    // always_comb begin
+    //     csr_we        = '0;
+    //     csr_wdata     = '0;
+    //     csr_read_data = 32'h0;
 
-        mstatus_ecall = csr_rdata[2];
-        mstatus_mret  = csr_rdata[2];
-        if (inst_type == TYPE_I && opcode == 7'b1110011) begin
-            // CSR指令执行
-            unique case (funct3)
-                3'b000: begin
-                    if (imm == 32'h0) begin
-                        // ECALL
-                        csr_we               = 4'b1110;
-                        csr_wdata[1]         = pc;
-                        csr_wdata[3]         = 32'd11;
-                        mstatus_ecall[7]     = mstatus_ecall[3];
-                        mstatus_ecall[3]     = 1'b0;
-                        mstatus_ecall[12:11] = 2'b11;
-                        csr_wdata[2]         = mstatus_ecall;
-                    end else if (imm == 32'h302) begin
-                        // MRET
-                        csr_we[2]           = 1'b1;
-                        mstatus_mret[3]     = mstatus_mret[7];
-                        mstatus_mret[7]     = 1'b1;
-                        mstatus_mret[12:11] = 2'b00;
-                        csr_wdata[2]        = mstatus_mret;
-                    end
-                end
-                3'b001: begin
-                    // CSRRW
-                    csr_we[csr_idx]    = 1'b1;
-                    csr_wdata[csr_idx] = src1;
-                end
-                3'b010: begin
-                    // CSRRR
-                    csr_read_data = csr_rdata[csr_idx];
-                end
-                default: NPCINV(pc);
-            endcase
-        end
-    end
+    //     mstatus_ecall = csr_rdata[2];
+    //     mstatus_mret  = csr_rdata[2];
+    //     if (inst_type == TYPE_I && opcode == 7'b1110011) begin
+    //         // CSR指令执行
+    //         unique case (funct3)
+    //             3'b000: begin
+    //                 if (imm == 32'h0) begin
+    //                     // ECALL
+    //                     csr_we               = 4'b1110;
+    //                     csr_wdata[1]         = pc;
+    //                     csr_wdata[3]         = 32'd11;
+    //                     mstatus_ecall[7]     = mstatus_ecall[3];
+    //                     mstatus_ecall[3]     = 1'b0;
+    //                     mstatus_ecall[12:11] = 2'b11;
+    //                     csr_wdata[2]         = mstatus_ecall;
+    //                 end else if (imm == 32'h302) begin
+    //                     // MRET
+    //                     csr_we[2]           = 1'b1;
+    //                     mstatus_mret[3]     = mstatus_mret[7];
+    //                     mstatus_mret[7]     = 1'b1;
+    //                     mstatus_mret[12:11] = 2'b00;
+    //                     csr_wdata[2]        = mstatus_mret;
+    //                 end
+    //             end
+    //             3'b001: begin
+    //                 // CSRRW
+    //                 csr_we[csr_idx]    = 1'b1;
+    //                 csr_wdata[csr_idx] = src1;
+    //             end
+    //             3'b010: begin
+    //                 // CSRRR
+    //                 csr_read_data = csr_rdata[csr_idx];
+    //             end
+    //             default: NPCINV(pc);
+    //         endcase
+    //     end
+    // end
 
 endmodule
 
@@ -542,7 +542,7 @@ module wbu (
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b1110011) begin
                     // CSR指令: 写回CSR读值
-                    if (funct3 == 3'b001 || funct3 == 3'b010) begin
+                    if (funct3 == 3'b010) begin
                         wdata  = csr_read_data;
                         gpr_we = 1'b1;
                     end
