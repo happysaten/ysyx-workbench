@@ -54,16 +54,13 @@ module top (
     );
 
     // GPR：通用寄存器组
-    logic [31:0] rdata1, rdata2, wdata_wbu;  // wdata_wbu 为原 WBU 输出
-    logic [31:0] wdata_exu;  // EXU 在 CSR 情况下的写回数据
-    logic        gpr_we_wbu;
-    logic        gpr_we_exu;
-    logic        gpr_we_final;
+    logic [31:0] rdata1, rdata2, wdata;  // 读寄存器组数据1、2，写寄存器数据
+    logic gpr_we;
     gpr u_gpr (
         .clk(clk),
-        .we(gpr_we_final && (|rd)),
+        .we(gpr_we && (|rd)),
         .waddr(rd),
-        .wdata(gpr_we_exu ? wdata_exu : wdata_wbu),
+        .wdata(wdata),
         .raddr1(rs1),
         .raddr2(rs2),
         .rdata1(rdata1),
@@ -71,48 +68,33 @@ module top (
     );
 
     // CSR：控制状态寄存器
-    logic [3:0][31:0]
-        csr_wdata_exu, csr_rdata;  // CSR 写数据由 EXU 驱动，读数据输出给 EXU
-    logic [3:0] csr_we_exu;
+    logic [3:0][31:0] csr_wdata, csr_rdata;  // CSR写数据，读数据
+    logic [3:0] csr_we;
     csr u_csr (
         .clk (clk),
-        .we  (csr_we_exu),
-        .din (csr_wdata_exu),
+        .we  (csr_we),
+        .din (csr_wdata),
         .dout(csr_rdata)
     );
 
 
-    // EXU：负责根据控制信号来进行运算、跳转并执行 CSR（CSR 执行已迁移到 EXU）
+    // EXU：负责根据控制信号来进行运算和跳转
     logic [31:0] alu_result;  // ALU计算结果
     logic [31:0] jump_target_exu;  // 跳转目标地址
     logic jump_en_exu;
     exu u_exu (
-        .opcode   (opcode),
-        .funct3   (funct3),
-        .funct7   (funct7),
-        .src1     (rdata1),
-        .src2     (rdata2),
-        .imm      (imm),
-        .pc       (pc),
-        .snpc     (snpc),
-        .inst_type(inst_type),
-        .csr_rdata(csr_rdata),
-
+        .opcode     (opcode),
+        .funct3     (funct3),
+        .funct7     (funct7),
+        .src1       (rdata1),
+        .src2       (rdata2),
+        .imm        (imm),
+        .pc         (pc),
+        .snpc       (snpc),
+        .inst_type  (inst_type),
         .alu_result (alu_result),
         .jump_target(jump_target_exu),
-        .jump_en    (jump_en_exu),
-
-        // 新增 CSR/系统信号由 EXU 产生
-        .csr_we   (csr_we_exu),
-        .csr_wdata(csr_wdata_exu),
-
-        // EXU 在 CSR 读（csrr?）时对 GPR 的写回
-        .exu_wdata (wdata_exu),
-        .exu_gpr_we(gpr_we_exu),
-
-        // EXU 产生的系统跳转（ecall/mret 导致的跳转）
-        .sys_jump_target(sys_jump_target),
-        .sys_jump_en   (sys_jump_en)
+        .jump_en    (jump_en_exu)
     );
 
     // LSU：负责加载和存储指令的内存访问
@@ -127,8 +109,8 @@ module top (
         .load_data (load_data)
     );
 
-    // WBU：负责写回GPR（不再处理 CSR）
-    logic [31:0] jump_target_sys;  // 保留（来自 WBU 的系统跳转，通常未使用）
+    // WBU：负责写回GPR和CSR
+    logic [31:0] jump_target_sys;  // CSR跳转目标地址
     logic jump_en_sys;
     wbu u_wbu (
         .inst_type      (inst_type),
@@ -140,19 +122,18 @@ module top (
         .alu_result     (alu_result),
         .load_data      (load_data),
         .src1           (rdata1),
-        .wdata          (wdata_wbu),
-        .gpr_we         (gpr_we_wbu),
+        .csr_rdata      (csr_rdata),
+        .wdata          (wdata),
+        .gpr_we         (gpr_we),
+        .csr_we         (csr_we),
+        .csr_wdata      (csr_wdata),
         .sys_jump_target(jump_target_sys),
         .sys_jump_en    (jump_en_sys)
     );
 
-    // 最终合并 GPR 写使能：EXU 的 CSR 写回优先
-    assign gpr_we_final = gpr_we_exu ? gpr_we_exu : gpr_we_wbu;
-
-    // 跳转来源优先级：EXU 的系统跳（ecall/mret 等） -> EXU 常规跳转 -> WBU（保留，不常用）
-    assign {jump_en, jump_target} = sys_jump_en ? {1'b1, sys_jump_target} :
-                                    (jump_en_exu ? {jump_en_exu, jump_target_exu} :
-                                    {jump_en_sys, jump_target_sys});
+    assign {jump_en, jump_target} = jump_en_sys ?
+                             {1'b1, jump_target_sys} :
+                             {jump_en_exu, jump_target_exu};
 
 endmodule
 
@@ -313,36 +294,19 @@ module idu (
 endmodule
 
 module exu (
-    input        [ 6:0]       opcode,
-    input        [ 2:0]       funct3,
-    input        [ 6:0]       funct7,
-    input        [31:0]       src1,
-    input        [31:0]       src2,
-    input        [31:0]       imm,
-    input        [31:0]       pc,
-    input        [31:0]       snpc,
-    input inst_t              inst_type,
-    input logic  [ 3:0][31:0] csr_rdata,  // CSR 读数据输入
-
-    output logic [31:0] alu_result,
-    output logic [31:0] jump_target,
-    output logic        jump_en,
-
-    // CSR 输出（EXU 负责 CSR 写）
-    output logic [3:0]       csr_we,
-    output logic [3:0][31:0] csr_wdata,
-
-    // EXU 对 GPR 的写回（仅在 CSR 指令需要写回时使用）
-    output logic [31:0] exu_wdata,
-    output logic        exu_gpr_we,
-
-    // EXU 产生的系统跳转（ecall/mret 等）
-    output logic [31:0] sys_jump_target,
-    output logic        sys_jump_en
+    input         [ 6:0] opcode,
+    input         [ 2:0] funct3,
+    input         [ 6:0] funct7,
+    input         [31:0] src1,
+    input         [31:0] src2,
+    input         [31:0] imm,
+    input         [31:0] pc,
+    input         [31:0] snpc,
+    input  inst_t        inst_type,
+    output logic  [31:0] alu_result,
+    output logic  [31:0] jump_target,
+    output logic         jump_en
 );
-    import "DPI-C" function void NPCINV(input int pc);
-    import "DPI-C" function void NPCTRAP();
-
     logic [31:0] alu_a, alu_b;
     alu_op_t alu_op;
 
@@ -355,7 +319,6 @@ module exu (
         .Result(alu_result)
     );
 
-    // 原有 ALU / 跳转决策逻辑（保持）
     always_comb begin
         jump_target = 32'h0;
         jump_en     = 1'b0;
@@ -425,84 +388,6 @@ module exu (
             endcase
         end
     end
-
-    // CSR 地址到数组索引的小函数（沿用原逻辑）
-    function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
-        unique case (addr)
-            12'h305: return 2'd0;
-            12'h341: return 2'd1;
-            12'h300: return 2'd2;
-            12'h342: return 2'd3;
-            default: return 2'd0;
-        endcase
-    endfunction
-
-    logic [31:0] mstatus_ecall, mstatus_mret;
-
-    // EXU 负责处理 CSR 指令并提供 CSR 写与可能的 GPR 写回以及系统跳转
-    always_comb begin
-        // 默认清零
-        csr_we          = '0;
-        csr_wdata       = '0;
-        exu_wdata       = 32'h0;
-        exu_gpr_we      = 1'b0;
-        sys_jump_target = 32'h0;
-        sys_jump_en     = 1'b0;
-
-        // 仅当为系统/CSR 指令时处理
-        if (inst_type == TYPE_I && opcode == 7'b1110011) begin
-            unique case (funct3)
-                3'b000: begin
-                    // ECALL/EBREAK/MRET 等（使用 imm 区分）
-                    if (imm == 32'h0) begin
-                        // ecall: 保存 PC/CAUSE/MSTATUS 等并跳转到 MTVEC
-                        csr_we = 4'b1110;
-                        csr_wdata[1] = pc;  // MEPC
-                        csr_wdata[3] = 32'd11;  // MCAUSE = 11 (environment call from M-mode)
-                        // 修改 mstatus: 保存旧中断使能并禁用
-                        mstatus_ecall = csr_rdata[2];
-                        mstatus_ecall[7] = mstatus_ecall[3];
-                        mstatus_ecall[3] = 1'b0;
-                        mstatus_ecall[12:11] = 2'b11;
-                        csr_wdata[2] = mstatus_ecall;
-                        sys_jump_target = csr_rdata[0];  // MTVEC
-                        sys_jump_en = 1'b1;
-                    end else if (imm == 32'h1) begin
-                        // breakpoint/trap
-                        NPCTRAP();
-                    end else if (imm == 32'h302) begin
-                        // mret: 恢复 mstatus 并跳转到 MEPC
-                        csr_we[2]           = 1'b1;
-                        mstatus_mret        = csr_rdata[2];
-                        mstatus_mret[3]     = mstatus_mret[7];
-                        mstatus_mret[7]     = 1'b1;
-                        mstatus_mret[12:11] = 2'b00;
-                        csr_wdata[2]        = mstatus_mret;
-                        sys_jump_target     = csr_rdata[1];  // MEPC
-                        sys_jump_en         = 1'b1;
-                    end else begin
-                        NPCINV(pc);
-                    end
-                end
-                3'b001: begin
-                    // CSRRW-like: write CSR <- rs1
-                    logic [1:0] csr_idx;
-                    csr_idx = csr_addr_to_idx(imm[11:0]);
-                    csr_we[csr_idx]    = 1'b1;
-                    csr_wdata[csr_idx] = src1;
-                end
-                3'b010: begin
-                    // CSRR? read CSR -> rd （返回值写回 GPR）
-                    logic [1:0] csr_idx;
-                    csr_idx = csr_addr_to_idx(imm[11:0]);
-                    exu_wdata = csr_rdata[csr_idx];
-                    exu_gpr_we = 1'b1;
-                end
-                default: NPCINV(pc);
-            endcase
-        end
-    end
-
 endmodule
 
 module lsu (
@@ -554,29 +439,50 @@ module lsu (
 endmodule
 
 module wbu (
-    input  inst_t        inst_type,
-    input  logic  [ 6:0] opcode,
-    input  logic  [ 2:0] funct3,
-    input  logic  [31:0] imm,
-    input  logic  [31:0] pc,
-    input  logic  [31:0] snpc,
-    input  logic  [31:0] alu_result,
-    input  logic  [31:0] load_data,
-    input  logic  [31:0] src1,
-    // CSR 相关已由 EXU 处理，移除 csr_rdata/csr_we/csr_wdata 端口
-    output logic  [31:0] wdata,
-    output logic         gpr_we,
-    output logic  [31:0] sys_jump_target,
-    output logic         sys_jump_en
+    input  inst_t              inst_type,
+    input  logic  [ 6:0]       opcode,
+    input  logic  [ 2:0]       funct3,
+    input  logic  [31:0]       imm,
+    input  logic  [31:0]       pc,
+    input  logic  [31:0]       snpc,
+    input  logic  [31:0]       alu_result,
+    input  logic  [31:0]       load_data,
+    input  logic  [31:0]       src1,
+    input  logic  [ 3:0][31:0] csr_rdata,
+    output logic  [31:0]       wdata,
+    output logic               gpr_we,
+    output logic  [ 3:0]       csr_we,
+    output logic  [ 3:0][31:0] csr_wdata,
+    output logic  [31:0]       sys_jump_target,
+    output logic               sys_jump_en
 );
     import "DPI-C" function void NPCINV(input int pc);
     import "DPI-C" function void NPCTRAP();
 
+    function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
+        unique case (addr)
+            12'h305: return 2'd0;
+            12'h341: return 2'd1;
+            12'h300: return 2'd2;
+            12'h342: return 2'd3;
+            default: return 2'd0;
+        endcase
+    endfunction
+
+    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    logic [31:0] mstatus_ecall;
+    logic [31:0] mstatus_mret;
+
     always_comb begin
         wdata           = 32'h0;
         gpr_we          = 1'b0;
+        csr_we          = '0;
+        csr_wdata       = '0;
         sys_jump_target = 32'h0;
         sys_jump_en     = 1'b0;
+
+        mstatus_ecall   = csr_rdata[2];
+        mstatus_mret    = csr_rdata[2];
 
         unique case (inst_type)
             TYPE_I: begin
@@ -586,6 +492,43 @@ module wbu (
                 end else if (opcode == 7'b0000011) begin
                     wdata  = load_data;
                     gpr_we = 1'b1;
+                end else if (opcode == 7'b1110011) begin
+                    unique case (funct3)
+                        3'b000: begin
+                            if (imm == 32'h0) begin
+                                csr_we               = 4'b1110;
+                                csr_wdata[1]         = pc;
+                                csr_wdata[3]         = 32'd11;
+                                mstatus_ecall[7]     = mstatus_ecall[3];
+                                mstatus_ecall[3]     = 1'b0;
+                                mstatus_ecall[12:11] = 2'b11;
+                                csr_wdata[2]         = mstatus_ecall;
+                                sys_jump_target      = csr_rdata[0];
+                                sys_jump_en          = 1'b1;
+                            end else if (imm == 32'h1) begin
+                                NPCTRAP();
+                            end else if (imm == 32'h302) begin
+                                csr_we[2]           = 1'b1;
+                                mstatus_mret[3]     = mstatus_mret[7];
+                                mstatus_mret[7]     = 1'b1;
+                                mstatus_mret[12:11] = 2'b00;
+                                csr_wdata[2]        = mstatus_mret;
+                                sys_jump_target     = csr_rdata[1];
+                                sys_jump_en         = 1'b1;
+                            end else begin
+                                NPCINV(pc);
+                            end
+                        end
+                        3'b001: begin
+                            csr_we[csr_idx]    = 1'b1;
+                            csr_wdata[csr_idx] = src1;
+                        end
+                        3'b010: begin
+                            wdata  = csr_rdata[csr_idx];
+                            gpr_we = 1'b1;
+                        end
+                        default: NPCINV(pc);
+                    endcase
                 end else begin
                     unique case (funct3)
                         3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111: begin
