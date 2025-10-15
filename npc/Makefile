@@ -1,4 +1,4 @@
-VSRCS = $(shell find $(abspath .)/vsrc -name "*.sv" -o -name "*.vlt")
+VSRCS = $(shell find $(abspath .)/vsrc -name "*.sv" -o -name "*.svh" -o -name "*.vlt")
 IMG ?=
 all:
 	# 提交git
