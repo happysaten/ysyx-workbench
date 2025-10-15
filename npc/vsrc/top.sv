@@ -547,9 +547,9 @@ module exu (
             TYPE_S: begin  // Store指令
                 // S型指令：sb, sh, sw
                 unique case (funct3)
-                    3'b000:  pmem_write_npc(alu_result, src2, 8'h1);  // sb
-                    3'b001:  pmem_write_npc(alu_result, src2, 8'h3);  // sh
-                    3'b010:  pmem_write_npc(alu_result, src2, 8'hf);  // sw
+                    3'b000:  pmem_write_npc(src1 + imm, src2, 8'h1);  // sb
+                    3'b001:  pmem_write_npc(src1 + imm, src2, 8'h3);  // sh
+                    3'b010:  pmem_write_npc(src1 + imm, src2, 8'hf);  // sw
                     default: ;  // 不支持的store类型
                 endcase
                 dest = 32'h0;
