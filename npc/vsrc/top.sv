@@ -24,7 +24,7 @@ module top (
     logic [31:0] pc, snpc, jump_target;  // pc, snpc, 跳转目标地址
     logic        jump_en;
     logic [31:0] inst;  // 当前指令
-    ifu u_ifu (
+    IFU u_ifu (
         .clk(clk),
         .reset(reset),
         .jump_target(jump_target),
@@ -41,7 +41,7 @@ module top (
     logic [31:0] imm;
     logic [4:0] rs1, rs2, rd;
     inst_t inst_type;
-    idu u_idu (
+    IDU u_idu (
         .inst(inst),
         .opcode(opcode),
         .funct3(funct3),
@@ -56,7 +56,7 @@ module top (
     // GPR：通用寄存器组
     logic [31:0] rdata1, rdata2, wdata;  // 读寄存器组数据1、2，写寄存器数据
     logic gpr_we;
-    gpr u_gpr (
+    GPR u_gpr (
         .clk(clk),
         .we(gpr_we && (|rd)),
         .waddr(rd),
@@ -70,7 +70,7 @@ module top (
     // CSR：控制状态寄存器
     logic [3:0][31:0] csr_wdata, csr_rdata;  // CSR写数据，读数据
     logic [3:0] csr_we;
-    csr u_csr (
+    CSR u_csr (
         .clk (clk),
         .we  (csr_we),
         .din (csr_wdata),
@@ -81,7 +81,7 @@ module top (
     // EXU：负责根据控制信号来进行运算和跳转
     logic [31:0] alu_result;  // ALU计算结果
     logic [31:0] csr_read_data;  // CSR读取的数据
-    exu u_exu (
+    EXU u_exu (
         .opcode       (opcode),
         .funct3       (funct3),
         .funct7       (funct7),
@@ -102,7 +102,7 @@ module top (
 
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
-    lsu u_lsu (
+    LSU u_lsu (
         .inst_type (inst_type),
         .opcode    (opcode),
         .funct3    (funct3),
@@ -112,8 +112,8 @@ module top (
         .load_data (load_data)
     );
 
-    // WBU：负责写回GPR和CSR
-    wbu u_wbu (
+    // WBU：负责写回GPR
+    WBU u_wbu (
         .inst_type    (inst_type),
         .opcode       (opcode),
         .funct3       (funct3),
@@ -128,8 +128,8 @@ module top (
 
 endmodule
 
-// 新增：IFU 模块，负责 PC 管理与指令读取
-module ifu (
+// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
+module IFU (
     input  logic        clk,
     input  logic        reset,
     input  logic [31:0] jump_target,
@@ -170,74 +170,8 @@ module ifu (
     assign dnpc = jump_en ? jump_target : snpc;
 endmodule
 
-module gpr (
-    input clk,  // 时钟信号
-    input we,  // 写使能信号
-    input [4:0] waddr,  // 写寄存器地址
-    input [31:0] wdata,  // 写数据
-    input [4:0] raddr1,  // 读寄存器1地址
-    input [4:0] raddr2,  // 读寄存器2地址
-    output logic [31:0] rdata1,  // 读寄存器1数据
-    output logic [31:0] rdata2  // 读寄存器2数据
-);
-    logic [31:0] regfile[32];  // 寄存器文件
-
-    // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
-    // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
-
-    always_ff @(posedge clk) begin
-        if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
-        // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
-    end
-
-
-    import "DPI-C" function void write_gpr_npc(
-        input logic [ 4:0] idx,
-        input logic [31:0] data
-    );
-    always_comb begin
-        if (we) write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
-    end
-
-    always_comb begin
-        rdata1 = (raddr1 == 5'b0) ? 32'h0 : regfile[raddr1];  // 如果是x0，返回0
-        rdata2 = (raddr2 == 5'b0) ? 32'h0 : regfile[raddr2];  // 如果是x0，返回0
-    end
-endmodule
-
-
-module csr #(
-    localparam int N = 4  // CSR寄存器数量
-) (
-    input clk,  // 时钟信号
-    input [N-1:0] we,  // 写使能信号
-    input [N-1:0][31:0] din,  // CSR寄存器地址
-    output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
-);
-    always @(posedge clk) begin
-        for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
-    end
-
-    import "DPI-C" function void write_csr_npc(
-        input logic [ 1:0] idx,
-        input logic [31:0] data
-    );
-
-    always_comb begin
-        for (int i = 0; i < N; i++)
-        if (we[i]) write_csr_npc(i[1:0], din[i]);  // 更新DPI-C接口CSR寄存器
-    end
-
-endmodule
-
-// typedef enum logic [11:0] {
-//     CSR_MTVEC   = 12'h305,
-//     CSR_MEPC    = 12'h341,
-//     CSR_MSTATUS = 12'h300,
-//     CSR_MCAUSE  = 12'h342
-// } csr_addr_t;
-
-module idu (
+// IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
+module IDU (
     input [31:0] inst,  // 输入指令
     output [6:0] opcode,  // 操作码
     output [2:0] funct3,  // 功能码
@@ -284,7 +218,76 @@ module idu (
     end
 endmodule
 
-module exu (
+// GPR(General Purpose Register) 负责通用寄存器的读写
+module GPR (
+    input clk,  // 时钟信号
+    input we,  // 写使能信号
+    input [4:0] waddr,  // 写寄存器地址
+    input [31:0] wdata,  // 写数据
+    input [4:0] raddr1,  // 读寄存器1地址
+    input [4:0] raddr2,  // 读寄存器2地址
+    output logic [31:0] rdata1,  // 读寄存器1数据
+    output logic [31:0] rdata2  // 读寄存器2数据
+);
+    logic [31:0] regfile[32];  // 寄存器文件
+
+    // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
+    // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
+
+    always_ff @(posedge clk) begin
+        if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
+        // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
+    end
+
+
+    import "DPI-C" function void write_gpr_npc(
+        input logic [ 4:0] idx,
+        input logic [31:0] data
+    );
+    always_comb begin
+        if (we) write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
+    end
+
+    always_comb begin
+        rdata1 = (raddr1 == 5'b0) ? 32'h0 : regfile[raddr1];  // 如果是x0，返回0
+        rdata2 = (raddr2 == 5'b0) ? 32'h0 : regfile[raddr2];  // 如果是x0，返回0
+    end
+endmodule
+
+// CSR(Control and Status Register) 负责控制和状态寄存器的读写
+module CSR #(
+    localparam int N = 4  // CSR寄存器数量
+) (
+    input clk,  // 时钟信号
+    input [N-1:0] we,  // 写使能信号
+    input [N-1:0][31:0] din,  // CSR寄存器地址
+    output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
+);
+    always @(posedge clk) begin
+        for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
+    end
+
+    import "DPI-C" function void write_csr_npc(
+        input logic [ 1:0] idx,
+        input logic [31:0] data
+    );
+
+    always_comb begin
+        for (int i = 0; i < N; i++)
+        if (we[i]) write_csr_npc(i[1:0], din[i]);  // 更新DPI-C接口CSR寄存器
+    end
+
+endmodule
+
+// typedef enum logic [11:0] {
+//     CSR_MTVEC   = 12'h305,
+//     CSR_MEPC    = 12'h341,
+//     CSR_MSTATUS = 12'h300,
+//     CSR_MCAUSE  = 12'h342
+// } csr_addr_t;
+
+// EXU(Execute Unit) 负责根据控制信号控制ALU, 对数据进行计算
+module EXU (
     input         [ 6:0]       opcode,
     input         [ 2:0]       funct3,
     input         [ 6:0]       funct7,
@@ -334,10 +337,10 @@ module exu (
             TYPE_I: begin
                 alu_a = src1;
                 alu_b = imm;
-                if (opcode == 7'b1100111) begin
+                if (opcode == 7'b1100111) begin  // JALR
                     jump_target = {alu_result[31:1], 1'b0};
                     jump_en     = 1'b1;
-                end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin
+                end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin  // SYSTEM
                     unique case (imm)
                         32'h0: begin
                             // ECALL
@@ -396,25 +399,24 @@ module exu (
         alu_op = ALU_ADD;
         if (opcode == 7'b0010011 || opcode == 7'b0110011) begin
             unique case (funct3)
-                3'b000: begin
+                3'b000: begin  // ADD/ADDI 或 SUB
                     if (inst_type == TYPE_R && funct7 == 7'b0100000) alu_op = ALU_SUB;
                 end
-                3'b001:  alu_op = ALU_SLL;
-                3'b010:  alu_op = ALU_SLT;
-                3'b011:  alu_op = ALU_SLTU;
-                3'b100:  alu_op = ALU_XOR;
-                3'b101:  alu_op = (funct7[5] == 1'b1) ? ALU_SRA : ALU_SRL;
-                3'b110:  alu_op = ALU_OR;
-                3'b111:  alu_op = ALU_AND;
+                3'b001:  alu_op = ALU_SLL;  // SLLI/SLL
+                3'b010:  alu_op = ALU_SLT;  // SLTI/SLT
+                3'b011:  alu_op = ALU_SLTU;  // SLTIU/SLTU
+                3'b100:  alu_op = ALU_XOR;  // XORI/XOR
+                3'b101:  alu_op = (funct7[5] == 1'b1) ? ALU_SRA : ALU_SRL;  // SRAI/SRA 或 SRLI/SRL
+                3'b110:  alu_op = ALU_OR;  // ORI/OR
+                3'b111:  alu_op = ALU_AND;  // ANDI/AND
                 default: alu_op = ALU_ADD;
             endcase
         end
     end
 
 
-    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
-    logic [31:0] mstatus_ecall;
-    logic [31:0] mstatus_mret;
+    wire [1:0] csr_idx = csr_addr_to_idx(imm[11:0]);  // CSR寄存器索引
+    logic [31:0] mstatus_ecall, mstatus_mret;  // mstatus临时变量
     always_comb begin
         csr_we        = '0;
         csr_wdata     = '0;
@@ -445,8 +447,7 @@ module exu (
                     end else if (imm == 32'h1) begin
                         // EBREAK
                         NPCTRAP();
-                    end
-                    else begin
+                    end else begin
                         // 不支持的系统指令保持兼容旧行为
                         NPCINV(pc);
                     end
@@ -467,7 +468,8 @@ module exu (
 
 endmodule
 
-module lsu (
+// LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
+module LSU (
     input  inst_t        inst_type,
     input  logic  [ 6:0] opcode,
     input  logic  [ 2:0] funct3,
@@ -492,11 +494,11 @@ module lsu (
         if (inst_type == TYPE_I && opcode == 7'b0000011) begin
             mem_rdata_raw = pmem_read_npc(addr);
             unique case (funct3)
-                3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};
-                3'b010: load_data = mem_rdata_raw;
-                3'b001: load_data = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};
-                3'b101: load_data = {16'b0, mem_rdata_raw[15:0]};
-                3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};
+                3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
+                3'b010: load_data = mem_rdata_raw;  // LW
+                3'b001: load_data = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};  // LH
+                3'b101: load_data = {16'b0, mem_rdata_raw[15:0]};  // LHU
+                3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};  // LBU
                 default: begin
                     load_data = 32'h0;
                     NPCINV(pc);
@@ -506,16 +508,17 @@ module lsu (
 
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
-                3'b000:  pmem_write_npc(addr, store_data, 8'h1);
-                3'b001:  pmem_write_npc(addr, store_data, 8'h3);
-                3'b010:  pmem_write_npc(addr, store_data, 8'hf);
+                3'b000:  pmem_write_npc(addr, store_data, 8'h1);  // SB
+                3'b001:  pmem_write_npc(addr, store_data, 8'h3);  // SH
+                3'b010:  pmem_write_npc(addr, store_data, 8'hf);  // SW
                 default: ;  // 不支持的 store 类型保持兼容旧行为
             endcase
         end
     end
 endmodule
 
-module wbu (
+// WBU(WriteBack Unit): 将数据写入寄存器
+module WBU (
     input  inst_t        inst_type,
     input  logic  [ 6:0] opcode,
     input  logic  [ 2:0] funct3,
