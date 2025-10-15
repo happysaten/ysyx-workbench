@@ -175,8 +175,8 @@ module ifu (
     // always_comb inst = pmem_read_npc(pc);
     // always_comb update_inst_npc(inst, dnpc);
     always_comb begin
+        update_inst_npc(inst, dnpc);
         inst = pmem_read_npc(pc);
-        update_inst_npc(inst, snpc);
     end
 
     // PC 寄存器更新
