@@ -334,51 +334,50 @@ module exu (
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1110011) begin
-                    // CSR指令处理
-                    logic [ 1:0] csr_idx;
-                    logic [31:0] mstatus_temp;
-                    csr_idx = csr_addr_to_idx(imm[11:0]);
-                    unique case (funct3)
-                        3'b000: begin  // ECALL/EBREAK/MRET
-                            if (imm == 32'h0) begin  // ECALL
-                                csr_we              = 4'b1110;
-                                csr_wdata[1]        = pc;
-                                csr_wdata[3]        = 32'd11;
-                                mstatus_temp        = csr_rdata[2];
-                                mstatus_temp[7]     = mstatus_temp[3];
-                                mstatus_temp[3]     = 1'b0;
-                                mstatus_temp[12:11] = 2'b11;
-                                csr_wdata[2]        = mstatus_temp;
-                                jump_target         = csr_rdata[0];
-                                jump_en             = 1'b1;
-                            end else if (imm == 32'h1) begin  // EBREAK
-                                NPCTRAP();
-                            end else if (imm == 32'h302) begin  // MRET
-                                csr_we[2]           = 1'b1;
-                                mstatus_temp        = csr_rdata[2];
-                                mstatus_temp[3]     = mstatus_temp[7];
-                                mstatus_temp[7]     = 1'b1;
-                                mstatus_temp[12:11] = 2'b00;
-                                csr_wdata[2]        = mstatus_temp;
-                                jump_target         = csr_rdata[1];
-                                jump_en             = 1'b1;
-                            end else begin
-                                NPCINV(pc);
-                            end
-                        end
-                        3'b001: begin  // CSRRW
-                            csr_we[csr_idx]    = 1'b1;
-                            csr_wdata[csr_idx] = src1;
-                        end
-                        3'b010: begin  // CSRRS (read only)
-                            csr_result = csr_rdata[csr_idx];
-                        end
-                        default: NPCINV(pc);
-                    endcase
+                    // // CSR指令处理
+                    // logic [ 1:0] csr_idx;
+                    // logic [31:0] mstatus_temp;
+                    // csr_idx = csr_addr_to_idx(imm[11:0]);
+                    // unique case (funct3)
+                    //     3'b000: begin  // ECALL/EBREAK/MRET
+                    //         if (imm == 32'h0) begin  // ECALL
+                    //             csr_we              = 4'b1110;
+                    //             csr_wdata[1]        = pc;
+                    //             csr_wdata[3]        = 32'd11;
+                    //             mstatus_temp        = csr_rdata[2];
+                    //             mstatus_temp[7]     = mstatus_temp[3];
+                    //             mstatus_temp[3]     = 1'b0;
+                    //             mstatus_temp[12:11] = 2'b11;
+                    //             csr_wdata[2]        = mstatus_temp;
+                    //             jump_target         = csr_rdata[0];
+                    //             jump_en             = 1'b1;
+                    //         end else if (imm == 32'h1) begin  // EBREAK
+                    //             NPCTRAP();
+                    //         end else if (imm == 32'h302) begin  // MRET
+                    //             csr_we[2]           = 1'b1;
+                    //             mstatus_temp        = csr_rdata[2];
+                    //             mstatus_temp[3]     = mstatus_temp[7];
+                    //             mstatus_temp[7]     = 1'b1;
+                    //             mstatus_temp[12:11] = 2'b00;
+                    //             csr_wdata[2]        = mstatus_temp;
+                    //             jump_target         = csr_rdata[1];
+                    //             jump_en             = 1'b1;
+                    //         end else begin
+                    //             NPCINV(pc);
+                    //         end
+                    //     end
+                    //     3'b001: begin  // CSRRW
+                    //         csr_we[csr_idx]    = 1'b1;
+                    //         csr_wdata[csr_idx] = src1;
+                    //     end
+                    //     3'b010: begin  // CSRRS (read only)
+                    //         csr_result = csr_rdata[csr_idx];
+                    //     end
+                    //     default: NPCINV(pc);
+                    // endcase
 
-                    // CSR 指令不需要 ALU，设置为默认值避免循环
-                    alu_a = 32'h0;
-                    alu_b = 32'h0;
+                    alu_a = src1;
+                    alu_b = imm;
                 end else if (opcode == 7'b1100111) begin
                     alu_a       = src1;
                     alu_b       = imm;
