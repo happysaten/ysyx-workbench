@@ -338,23 +338,23 @@ module exu (
                     jump_target = {alu_result[31:1], 1'b0};
                     jump_en     = 1'b1;
                 end else if (opcode == 7'b1110011 && funct3 == 3'b000) begin
-                    unique case (imm)
-                        // 32'h0: begin
-                        //     // ECALL
-                        //     jump_target = csr_rdata[0];
-                        //     jump_en     = 1'b1;
-                        // end
-                        32'h1: begin
-                            // EBREAK
-                            NPCTRAP();
-                        end
-                        // 32'h302: begin
-                        //     // MRET
-                        //     jump_target = csr_rdata[1];
-                        //     jump_en     = 1'b1;
-                        // end
-                        default: NPCINV(pc);
-                    endcase
+                    // unique case (imm)
+                    // 32'h0: begin
+                    //     // ECALL
+                    //     jump_target = csr_rdata[0];
+                    //     jump_en     = 1'b1;
+                    // end
+                    // 32'h1: begin
+                    //     // EBREAK
+                    //     NPCTRAP();
+                    // end
+                    // 32'h302: begin
+                    //     // MRET
+                    //     jump_target = csr_rdata[1];
+                    //     jump_en     = 1'b1;
+                    // end
+                    // default: NPCINV(pc);
+                    // endcase
                 end
             end
             TYPE_R: begin
@@ -416,51 +416,54 @@ module exu (
     end
 
 
-    // wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
-    // logic [31:0] mstatus_ecall;
-    // logic [31:0] mstatus_mret;
-    // always_comb begin
-    //     csr_we        = '0;
-    //     csr_wdata     = '0;
-    //     csr_read_data = 32'h0;
+    wire  [ 1:0] csr_idx = csr_addr_to_idx(imm[11:0]);
+    logic [31:0] mstatus_ecall;
+    logic [31:0] mstatus_mret;
+    always_comb begin
+        csr_we        = '0;
+        csr_wdata     = '0;
+        csr_read_data = 32'h0;
 
-    //     mstatus_ecall = csr_rdata[2];
-    //     mstatus_mret  = csr_rdata[2];
-    //     if (inst_type == TYPE_I && opcode == 7'b1110011) begin
-    //         // CSR指令执行
-    //         unique case (funct3)
-    //             3'b000: begin
-    //                 if (imm == 32'h0) begin
-    //                     // ECALL
-    //                     csr_we               = 4'b1110;
-    //                     csr_wdata[1]         = pc;
-    //                     csr_wdata[3]         = 32'd11;
-    //                     mstatus_ecall[7]     = mstatus_ecall[3];
-    //                     mstatus_ecall[3]     = 1'b0;
-    //                     mstatus_ecall[12:11] = 2'b11;
-    //                     csr_wdata[2]         = mstatus_ecall;
-    //                 end else if (imm == 32'h302) begin
-    //                     // MRET
-    //                     csr_we[2]           = 1'b1;
-    //                     mstatus_mret[3]     = mstatus_mret[7];
-    //                     mstatus_mret[7]     = 1'b1;
-    //                     mstatus_mret[12:11] = 2'b00;
-    //                     csr_wdata[2]        = mstatus_mret;
-    //                 end
-    //             end
-    //             3'b001: begin
-    //                 // CSRRW
-    //                 csr_we[csr_idx]    = 1'b1;
-    //                 csr_wdata[csr_idx] = src1;
-    //             end
-    //             3'b010: begin
-    //                 // CSRRR
-    //                 csr_read_data = csr_rdata[csr_idx];
-    //             end
-    //             default: NPCINV(pc);
-    //         endcase
-    //     end
-    // end
+        mstatus_ecall = csr_rdata[2];
+        mstatus_mret  = csr_rdata[2];
+        if (inst_type == TYPE_I && opcode == 7'b1110011) begin
+            // CSR指令执行
+            unique case (funct3)
+                3'b000: begin
+                    if (imm == 32'h0) begin
+                        // ECALL
+                        csr_we               = 4'b1110;
+                        csr_wdata[1]         = pc;
+                        csr_wdata[3]         = 32'd11;
+                        mstatus_ecall[7]     = mstatus_ecall[3];
+                        mstatus_ecall[3]     = 1'b0;
+                        mstatus_ecall[12:11] = 2'b11;
+                        csr_wdata[2]         = mstatus_ecall;
+                    end else if (imm == 32'h302) begin
+                        // MRET
+                        csr_we[2]           = 1'b1;
+                        mstatus_mret[3]     = mstatus_mret[7];
+                        mstatus_mret[7]     = 1'b1;
+                        mstatus_mret[12:11] = 2'b00;
+                        csr_wdata[2]        = mstatus_mret;
+                    end else if (imm == 32'h1) begin
+                        // EBREAK
+                        NPCTRAP();
+                    end
+                end
+                3'b001: begin
+                    // CSRRW
+                    csr_we[csr_idx]    = 1'b1;
+                    csr_wdata[csr_idx] = src1;
+                end
+                3'b010: begin
+                    // CSRRR
+                    csr_read_data = csr_rdata[csr_idx];
+                end
+                default: NPCINV(pc);
+            endcase
+        end
+    end
 
 endmodule
 
