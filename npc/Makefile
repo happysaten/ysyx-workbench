@@ -13,6 +13,7 @@ verilator:
 	# 提交git
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 	@echo "Generating Verilator sources..."
+	@echo "VSRCS: $(VSRCS)"
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
