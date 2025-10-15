@@ -45,26 +45,27 @@ $(OBJ_DIR)/%.o: %.cc
 # Depencies
 -include $(OBJS:.o=.d)
 
-# Verilator sources and rules
-ifdef CONFIG_ISA_npc
-VSRCS = $(shell find $(abspath $(NPC_HOME)/vsrc) -name "*.sv" -o -name "*.vlt")
+# # Verilator sources and rules
+# ifdef CONFIG_ISA_npc
+# VSRCS = $(shell find $(abspath $(NPC_HOME)/vsrc) -name "*.sv" -o -name "*.vlt")
 
-verilator:
-	# 提交git
-	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	@echo "Generating Verilator sources..."
-	verilator --cc --build \
-		--top-module top \
-		--trace-fst \
-		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
-		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
-		$(VSRCS) \
-		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
-endif
+# verilator:
+# 	# 提交git
+# 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+# 	@echo "Generating Verilator sources..."
+# 	verilator --cc --build \
+# 		--top-module top \
+# 		--trace-fst \
+# 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
+# 		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
+# 		$(VSRCS) \
+# 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
+# endif
 
 app: $(BINARY)
 ifdef CONFIG_ISA_npc
-$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS) verilator
+$(BINARY):: $(OBJS) $(ARCHIVES) $(CVSRCS)
+	@$(MAKE) -C $(NPC_HOME) CVCFLAGS="$(CVCFLAGS)" verilator
 	@echo + LD $@
 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) `find $(NSIM_HOME)/src/verilator/obj_dir -name "*.a"` $(LIBS) -lz
 else

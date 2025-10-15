@@ -10,11 +10,13 @@ WORK_DIR = $(abspath .)
 CVCFLAGS ?=
 
 verilator:
+	# 提交git
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	@echo "Generating Verilator sources..."
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
-		-I$(NSIM_HOME)/vsrc/include \
 		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
 		$(VSRCS) \
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
