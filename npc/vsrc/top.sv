@@ -522,7 +522,7 @@ module LSU (
     end
 
     // 存储逻辑移至时序逻辑
-    always @(posedge clk) begin
+    always_comb begin
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
                 3'b000:  pmem_write_npc(addr, store_data, 8'h1);  // SB
