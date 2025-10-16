@@ -105,6 +105,7 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
+        .clk       (clk),
         .inst_type (inst_type),
         .opcode    (opcode),
         .funct3    (funct3),
@@ -481,6 +482,7 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
+    input  logic         clk,
     input  inst_t        inst_type,
     input  logic  [ 6:0] opcode,
     input  logic  [ 2:0] funct3,
@@ -499,6 +501,7 @@ module LSU (
 
     int mem_rdata_raw;
 
+    // 加载逻辑保持在组合逻辑中
     always_comb begin
         load_data     = 32'h0;
         mem_rdata_raw = 0;
@@ -516,7 +519,10 @@ module LSU (
                 end
             endcase
         end
+    end
 
+    // 存储逻辑移至时序逻辑
+    always @(posedge clk) begin
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
                 3'b000:  pmem_write_npc(addr, store_data, 8'h1);  // SB
