@@ -58,6 +58,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
+        .reset(reset),
         .we(gpr_we && (|rd)),
         .waddr(rd),
         .wdata(wdata),
@@ -71,9 +72,10 @@ module top (
     logic [3:0][31:0] csr_wdata, csr_rdata;  // CSR写数据，读数据
     logic [3:0] csr_we;
     CSR u_csr (
-        .clk (clk),
-        .we  (csr_we),
-        .din (csr_wdata),
+        .clk(clk),
+        .reset(reset),
+        .we(csr_we),
+        .din(csr_wdata),
         .dout(csr_rdata)
     );
 
@@ -221,6 +223,7 @@ endmodule
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
     input clk,  // 时钟信号
+    input reset,  // 复位信号
     input we,  // 写使能信号
     input [4:0] waddr,  // 写寄存器地址
     input [31:0] wdata,  // 写数据
@@ -235,7 +238,11 @@ module GPR (
     // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
 
     always_ff @(posedge clk) begin
-        if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
+        if (reset) begin
+            for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
+        end else if (we) begin
+            regfile[waddr] <= wdata;  // 写入数据到指定寄存器
+        end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
@@ -259,12 +266,16 @@ module CSR #(
     localparam int N = 4  // CSR寄存器数量
 ) (
     input clk,  // 时钟信号
+    input reset,  // 复位信号
     input [N-1:0] we,  // 写使能信号
     input [N-1:0][31:0] din,  // CSR寄存器地址
     output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
 );
-    always @(posedge clk) begin
-        for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
+    always_ff @(posedge clk) begin
+        if (reset) dout <= '0;  // 复位时清零所有CSR寄存器
+        else begin
+            for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
+        end
     end
 
     import "DPI-C" function void write_csr_npc(
