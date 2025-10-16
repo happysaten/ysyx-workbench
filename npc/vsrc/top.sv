@@ -133,10 +133,10 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
 module IFU (
-    input  logic        clk,
-    input  logic        reset,
-    input  logic [31:0] jump_target,
-    input  logic        jump_en,
+    input         clk,
+    input         reset,
+    input  [31:0] jump_target,
+    input         jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] inst
@@ -309,7 +309,7 @@ module EXU (
     input         [31:0]       pc,
     input         [31:0]       snpc,
     input  inst_t              inst_type,
-    input  logic  [ 3:0][31:0] csr_rdata,
+    input   [ 3:0][31:0] csr_rdata,
     output logic  [31:0]       alu_result,
     output logic  [31:0]       jump_target,
     output logic               jump_en,
@@ -482,13 +482,13 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input  logic         clk,
+    input          clk,
     input  inst_t        inst_type,
-    input  logic  [ 6:0] opcode,
-    input  logic  [ 2:0] funct3,
-    input  logic  [31:0] pc,
-    input  logic  [31:0] addr,
-    input  logic  [31:0] store_data,
+    input   [ 6:0] opcode,
+    input   [ 2:0] funct3,
+    input   [31:0] pc,
+    input   [31:0] addr,
+    input   [31:0] store_data,
     output logic  [31:0] load_data
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -501,7 +501,7 @@ module LSU (
 
     int mem_rdata_raw;
 
-    // 加载逻辑保持在组合逻辑中
+    // 加载逻辑
     always_comb begin
         load_data     = 32'h0;
         mem_rdata_raw = 0;
@@ -521,8 +521,8 @@ module LSU (
         end
     end
 
-    // 存储逻辑移至时序逻辑
-    always @(posedge clk) begin
+    // 存储逻辑
+    always_comb begin
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
                 3'b000:  pmem_write_npc(addr, store_data, 8'h1);  // SB
@@ -537,13 +537,13 @@ endmodule
 // WBU(WriteBack Unit): 将数据写入寄存器
 module WBU (
     input  inst_t        inst_type,
-    input  logic  [ 6:0] opcode,
-    input  logic  [ 2:0] funct3,
-    input  logic  [31:0] pc,
-    input  logic  [31:0] snpc,
-    input  logic  [31:0] alu_result,
-    input  logic  [31:0] load_data,
-    input  logic  [31:0] csr_read_data,
+    input   [ 6:0] opcode,
+    input   [ 2:0] funct3,
+    input   [31:0] pc,
+    input   [31:0] snpc,
+    input   [31:0] alu_result,
+    input   [31:0] load_data,
+    input   [31:0] csr_read_data,
     output logic  [31:0] wdata,
     output logic         gpr_we
 );
