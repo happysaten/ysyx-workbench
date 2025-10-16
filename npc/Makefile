@@ -26,4 +26,5 @@ clean:
 	rm -rf $(OBJ_DIR)
 
 include ../Makefile
+include sta.mk
 .PHONY: all clean verilator
