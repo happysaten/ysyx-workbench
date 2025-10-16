@@ -1,4 +1,5 @@
-VSRCS = $(shell find $(abspath ./vsrc) -name "*.sv" -o -name "*.vlt")
+VSRCS = $(shell find $(abspath .)/vsrc -name "*.sv" -o -name "*.svh")
+LINTSRC = $(shell find $(abspath .)/vsrc -name "*.vlt")
 IMG ?=
 all:
 	# 提交git
@@ -8,18 +9,24 @@ all:
 
 WORK_DIR = $(abspath .)
 CVCFLAGS ?=
+OBJ_DIR = $(NSIM_HOME)/src/verilator/obj_dir
 
 verilator:
+	# 提交git
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	@echo "Generating Verilator sources..."
 	verilator --cc --build \
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
-		--Mdir $(NSIM_HOME)/src/verilator/obj_dir \
-		$(VSRCS) \
+		--Mdir $(OBJ_DIR) \
+		$(VSRCS) $(LINTSRC) \
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
 
 clean:
-	rm -rf $(NSIM_HOME)/src/verilator/obj_dir
+	rm -rf $(OBJ_DIR)
+	rm -rf result
 
 include ../Makefile
+include sta.mk
 .PHONY: all clean verilator

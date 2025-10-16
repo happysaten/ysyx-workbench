@@ -3,3 +3,4 @@ lint_off -rule WIDTHEXPAND
 lint_off -rule WIDTHTRUNC
 lint_off -rule PINCONNECTEMPTY
 lint_off -rule UNUSEDSIGNAL
+// lint_off -rule UNOPTFLAT

@@ -58,7 +58,6 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset),
         .we(gpr_we && (|rd)),
         .waddr(rd),
         .wdata(wdata),
@@ -72,10 +71,9 @@ module top (
     logic [3:0][31:0] csr_wdata, csr_rdata;  // CSR写数据，读数据
     logic [3:0] csr_we;
     CSR u_csr (
-        .clk(clk),
-        .reset(reset),
-        .we(csr_we),
-        .din(csr_wdata),
+        .clk (clk),
+        .we  (csr_we),
+        .din (csr_wdata),
         .dout(csr_rdata)
     );
 
@@ -105,7 +103,6 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk       (clk),
         .inst_type (inst_type),
         .opcode    (opcode),
         .funct3    (funct3),
@@ -133,10 +130,10 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
 module IFU (
-    input         clk,
-    input         reset,
-    input  [31:0] jump_target,
-    input         jump_en,
+    input  logic        clk,
+    input  logic        reset,
+    input  logic [31:0] jump_target,
+    input  logic        jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] inst
@@ -224,7 +221,6 @@ endmodule
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
     input clk,  // 时钟信号
-    input reset,  // 复位信号
     input we,  // 写使能信号
     input [4:0] waddr,  // 写寄存器地址
     input [31:0] wdata,  // 写数据
@@ -239,11 +235,7 @@ module GPR (
     // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
 
     always_ff @(posedge clk) begin
-        if (reset) begin
-            for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (we) begin
-            regfile[waddr] <= wdata;  // 写入数据到指定寄存器
-        end
+        if (we) regfile[waddr] <= wdata;  // 写入数据到指定寄存器
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
@@ -267,16 +259,12 @@ module CSR #(
     localparam int N = 4  // CSR寄存器数量
 ) (
     input clk,  // 时钟信号
-    input reset,  // 复位信号
     input [N-1:0] we,  // 写使能信号
     input [N-1:0][31:0] din,  // CSR寄存器地址
     output logic [N-1:0][31:0] dout  // CSR寄存器数据输出
 );
-    always_ff @(posedge clk) begin
-        if (reset) dout <= '0;  // 复位时清零所有CSR寄存器
-        else begin
-            for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
-        end
+    always @(posedge clk) begin
+        for (int i = 0; i < N; i++) if (we[i]) dout[i] <= din[i];
     end
 
     import "DPI-C" function void write_csr_npc(
@@ -309,7 +297,7 @@ module EXU (
     input         [31:0]       pc,
     input         [31:0]       snpc,
     input  inst_t              inst_type,
-    input   [ 3:0][31:0] csr_rdata,
+    input  logic  [ 3:0][31:0] csr_rdata,
     output logic  [31:0]       alu_result,
     output logic  [31:0]       jump_target,
     output logic               jump_en,
@@ -482,13 +470,12 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input          clk,
     input  inst_t        inst_type,
-    input   [ 6:0] opcode,
-    input   [ 2:0] funct3,
-    input   [31:0] pc,
-    input   [31:0] addr,
-    input   [31:0] store_data,
+    input  logic  [ 6:0] opcode,
+    input  logic  [ 2:0] funct3,
+    input  logic  [31:0] pc,
+    input  logic  [31:0] addr,
+    input  logic  [31:0] store_data,
     output logic  [31:0] load_data
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -501,7 +488,6 @@ module LSU (
 
     int mem_rdata_raw;
 
-    // 加载逻辑
     always_comb begin
         load_data     = 32'h0;
         mem_rdata_raw = 0;
@@ -519,10 +505,7 @@ module LSU (
                 end
             endcase
         end
-    end
 
-    // 存储逻辑
-    always_comb begin
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
                 3'b000:  pmem_write_npc(addr, store_data, 8'h1);  // SB
@@ -537,13 +520,13 @@ endmodule
 // WBU(WriteBack Unit): 将数据写入寄存器
 module WBU (
     input  inst_t        inst_type,
-    input   [ 6:0] opcode,
-    input   [ 2:0] funct3,
-    input   [31:0] pc,
-    input   [31:0] snpc,
-    input   [31:0] alu_result,
-    input   [31:0] load_data,
-    input   [31:0] csr_read_data,
+    input  logic  [ 6:0] opcode,
+    input  logic  [ 2:0] funct3,
+    input  logic  [31:0] pc,
+    input  logic  [31:0] snpc,
+    input  logic  [31:0] alu_result,
+    input  logic  [31:0] load_data,
+    input  logic  [31:0] csr_read_data,
     output logic  [31:0] wdata,
     output logic         gpr_we
 );
