@@ -10,7 +10,7 @@ SDC_FILE ?= /home/saten/MyBuild/yosys-sta/scripts/default.sdc
 # # 定义 RTL 文件路径，查找 example 目录下的所有 .v 文件
 RTL_FILES ?= $(VSRCS)
 # 导出时钟频率（单位 MHz），默认为 500 MHz
-export CLK_FREQ_MHZ ?= 500
+export CLK_FREQ_MHZ ?= 50
 # 导出时钟端口名称，默认为 clk
 export CLK_PORT_NAME ?= clk
 # 定义使用的工艺库，默认为 nangate45

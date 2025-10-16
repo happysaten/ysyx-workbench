@@ -1,4 +1,5 @@
-VSRCS = $(shell find $(abspath .)/vsrc -name "*.sv" -o -name "*.svh" -o -name "*.vlt")
+VSRCS = $(shell find $(abspath .)/vsrc -name "*.sv" -o -name "*.svh")
+LINTSRC = $(shell find $(abspath .)/vsrc -name "*.vlt")
 IMG ?=
 all:
 	# 提交git
@@ -19,11 +20,12 @@ verilator:
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
 		--Mdir $(OBJ_DIR) \
-		$(VSRCS) \
+		$(VSRCS) $(LINTSRC) \
 		`find $(NSIM_HOME)/src/verilator -name "*.cpp" | grep -Ev 'obj_dir' | tr '\n' ' '`
 
 clean:
 	rm -rf $(OBJ_DIR)
+	rm -rf result
 
 include ../Makefile
 include sta.mk
