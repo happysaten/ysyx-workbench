@@ -556,11 +556,11 @@ module LSU (
     logic pmem_ren, pmem_wen;
     // always @(posedge clk) pmem_rdata <= pmem_ren ? pmem_read_npc(pmem_addr) : 32'b0;
     always_comb pmem_rdata = pmem_ren ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb if (pmem_wen) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+    always_comb if (pmem_wen && lsu_req_valid) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011) && lsu_req_valid;
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
     assign pmem_addr  = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
