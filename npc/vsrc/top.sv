@@ -323,6 +323,9 @@ module GPR (
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
+
+    always @(posedge clk) gpr_resp_valid <= gpr_req_valid;
+
 endmodule
 
 // CSR(Control and Status Register) 负责控制和状态寄存器的读写
