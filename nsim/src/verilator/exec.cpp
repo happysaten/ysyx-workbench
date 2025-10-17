@@ -54,9 +54,7 @@ extern "C" void exec_one_cpu() {
         count++;
         step(); // 等待指令获取完成
         if (count > 1000000) {
-            printf("Timeout waiting for instruction fetch at pc = " FMT_WORD
-                   "\n",
-                   top->pc);
+            printf("Timeout");
             break;
         }
     }
