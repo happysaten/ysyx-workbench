@@ -59,7 +59,8 @@ extern "C" void exec_one_cpu() {
             break;
         }
         // printf("%d\n", top->npc_resp_valid);
-        step();
+        if (!context->gotFinish())
+            step();
         // printf("%d\n", top->npc_resp_valid);
     } while (top->npc_resp_valid != 1);
 }
