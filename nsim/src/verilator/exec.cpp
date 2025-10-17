@@ -46,7 +46,7 @@ static void step() {
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // top->inst = paddr_read(top->pc, 4); // 从PC地址获取指令
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < 2; i++) {
         step(); // 仿真两个周期以完成指令执行
     }
     // int count = 0;
