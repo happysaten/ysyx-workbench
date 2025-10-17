@@ -324,7 +324,8 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    always @(posedge clk) gpr_resp_valid <= gpr_req_valid;
+    always @(posedge clk) if (reset) gpr_resp_valid <= 1'b1;
+    else gpr_resp_valid <= gpr_req_valid;
 
 endmodule
 
