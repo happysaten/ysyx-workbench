@@ -75,7 +75,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset_sync),
+        .reset(reset),
         .gpr_we(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
@@ -91,7 +91,7 @@ module top (
     logic [3:0] csr_we;
     CSR u_csr (
         .clk(clk),
-        .reset(reset_sync),
+        .reset(reset),
         .csr_we(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
