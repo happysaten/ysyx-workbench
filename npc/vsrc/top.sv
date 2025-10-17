@@ -577,6 +577,18 @@ module LSU (
         endcase
     end
 
+    always_comb begin
+        unique case (funct3)
+            3'b000: pmem_wmask = 8'h1;  // SB
+            3'b001: pmem_wmask = 8'h3;  // SH
+            3'b010: pmem_wmask = 8'hF;  // SW
+            default: begin
+                pmem_wmask = 8'h0;
+                if (pmem_wen) NPCINV(pc);
+            end
+        endcase
+    end
+
     logic lsu_req_valid_q;
     always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     // assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
