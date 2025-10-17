@@ -273,7 +273,7 @@ module CSR #(
     output logic [N-1:0][31:0] csr_rdata  // CSR寄存器数据输出, dout renamed
 );
     always_ff @(posedge clk) begin
-        if (reset) dout <= '0;  // 复位时清零所有CSR寄存器
+        if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];  // we, din, dout renamed
         end
@@ -443,7 +443,7 @@ module EXU (
                     if (imm == 32'h0) begin
                         // ECALL
                         csr_we               = 4'b1110;
-                        csr_wdata[1]         = pc;
+                        csr_wdata[1]         = ifu_raddr;
                         csr_wdata[3]         = 32'd11;
                         mstatus_ecall[7]     = mstatus_ecall[3];
                         mstatus_ecall[3]     = 1'b0;
