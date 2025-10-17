@@ -26,12 +26,12 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
 
     logic        reset_sync;
-    // // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
-    assign reset_sync = reset;
+    // 同步复位信号
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+    // assign reset_sync = reset;
 
     logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid;
     assign npc_resp_valid = gpr_resp_valid;
@@ -174,15 +174,6 @@ module IFU (
         input int dnpc
     );
 
-    logic reset_sync;
-
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
-    // assign reset_sync = reset;
-
     localparam int RESET_PC = 32'h80000000;
     typedef enum logic {
         IDLE,
@@ -194,7 +185,7 @@ module IFU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;
+        if (reset) pc <= RESET_PC;
         else if (ifu_resp_valid) pc <= dnpc;
     end
 
@@ -203,7 +194,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     always @(posedge clk) begin
-        if (reset_sync) state <= IDLE;
+        if (reset) state <= IDLE;
         else state <= next_state;
     end
 
