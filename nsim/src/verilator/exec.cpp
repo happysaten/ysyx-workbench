@@ -49,8 +49,16 @@ extern "C" void exec_one_cpu() {
     // for (int i = 0; i < 2; i++) {
     //     step(); // 仿真两个周期以完成指令执行
     // }
+    int count = 0;
     while (top->ifu_resp_valid == 0) {
+        count++;
         step(); // 等待指令获取完成
+        if (count > 1000000) {
+            printf("Timeout waiting for instruction fetch at pc = " FMT_WORD
+                   "\n",
+                   top->pc);
+            break;
+        }
     }
     // update_inst(top->inst, top->pc);
 }
