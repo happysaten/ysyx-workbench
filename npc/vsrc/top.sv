@@ -549,45 +549,33 @@ module LSU (
     );
     import "DPI-C" function void NPCINV(input int pc);
 
-    int mem_rdata_raw;
 
-    // 加载逻辑
+    // 内存接口信号
+    logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
+    logic [7:0] pmem_wmask;
+    logic pmem_wen;
+    always @(posedge clk) pmem_rdata <= pmem_wen ? pmem_read_npc(pmem_addr) : 32'b0;
+    always_comb if (pmem_wen) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+
+    // 指令逻辑
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_addr  = alu_result;
+    assign pmem_wdata = gpr_rdata2;
     always_comb begin
-        lsu_rdata     = 32'h0;
-        mem_rdata_raw = 0;
-        if (inst_type == TYPE_I && opcode == 7'b0000011) begin
-            mem_rdata_raw = pmem_read_npc(alu_result);
-            unique case (funct3)
-                3'b000: lsu_rdata = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
-                3'b010: lsu_rdata = mem_rdata_raw;  // LW
-                3'b001: lsu_rdata = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};  // LH
-                3'b101: lsu_rdata = {16'b0, mem_rdata_raw[15:0]};  // LHU
-                3'b100: lsu_rdata = {24'b0, mem_rdata_raw[7:0]};  // LBU
-                default: begin
-                    lsu_rdata = 32'h0;
-                    NPCINV(pc);
-                end
-            endcase
-        end
+        unique case (funct3)
+            3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
+            3'b010: lsu_rdata = pmem_rdata;  // LW
+            3'b001: lsu_rdata = {{16{pmem_rdata[15]}}, pmem_rdata[15:0]};  // LH
+            3'b101: lsu_rdata = {16'b0, pmem_rdata[15:0]};  // LHU
+            3'b100: lsu_rdata = {24'b0, pmem_rdata[7:0]};  // LBU
+            default: begin
+                lsu_rdata = 32'h0;
+                NPCINV(pc);
+            end
+        endcase
     end
 
-    logic wen;
-    assign wen = (inst_type == TYPE_S && opcode == 7'b0100011);
-    // 存储逻辑
-    always_comb begin
-        if (lsu_req_valid && wen) begin  // 修改：添加valid条件
-            unique case (funct3)
-                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
-                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
-                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
-                default: ;  // 不支持的 store 类型保持兼容旧行为
-            endcase
-        end
-    end
-
-    logic lsu_req_valid_q;
-    always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
-    assign lsu_resp_valid = wen ? lsu_req_valid_q : lsu_req_valid;
+    always @(posedge clk) lsu_resp_valid <= lsu_req_valid;
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
