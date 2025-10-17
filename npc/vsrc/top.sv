@@ -198,8 +198,7 @@ module IFU (
 
     assign ifu_resp_valid = (state == WAIT);
 
-    // DPI通知（在wait时）
-    always_comb if (state == WAIT) update_inst_npc(ifu_rdata, dnpc);
+    always_comb if (state == IDLE) update_inst_npc(ifu_rdata, dnpc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
