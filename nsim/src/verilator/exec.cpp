@@ -46,11 +46,11 @@ static void step() {
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // top->inst = paddr_read(top->pc, 4); // 从PC地址获取指令
-    for (int i = 0; i < 2; i++) {
-        printf("%d\n", top->ifu_resp_valid);
-        step(); // 仿真两个周期以完成指令执行
-    }
-    // int count = 0;
+    // for (int i = 0; i < 2; i++) {
+    //     printf("%d\n", top->ifu_resp_valid);
+    //     step(); // 仿真两个周期以完成指令执行
+    // }
+    int count = 0;
     // while (top->ifu_resp_valid == 1) {
     //     count++;
     //     step(); // 等待指令获取完成
@@ -59,6 +59,14 @@ extern "C" void exec_one_cpu() {
     //         break;
     //     }
     // }
+    do {
+        count++;
+        step(); // 等待指令获取完成
+        if (count > 10) {
+            printf("Timeout");
+            break;
+        }
+    } while (top->ifu_resp_valid != 0);
     // update_inst(top->inst, top->pc);
 }
 
