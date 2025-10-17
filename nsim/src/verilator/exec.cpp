@@ -86,7 +86,8 @@ void NPCTRAP() {
     ebreak();     // 调用ebreak处理函数
     tfp->close(); // 关闭波形文件
     top->final(); // 结束仿真
-    printf("%d", context->gotFinish());
+    context->gotFinish(true);
+    printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
 }
 
