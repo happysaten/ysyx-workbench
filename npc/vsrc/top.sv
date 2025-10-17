@@ -349,7 +349,7 @@ module CSR #(
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++)
-            if (gpr_req_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
+            if (csr_rsq_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -360,7 +360,7 @@ module CSR #(
 
     always_comb begin
         for (int i = 0; i < N; i++)
-        if (gpr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        if (csr_rsq_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
     always @(posedge clk) begin
