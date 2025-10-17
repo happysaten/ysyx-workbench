@@ -45,21 +45,21 @@ static void step() {
 
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
-    // for (int i = 0; i < 2; i++) {
-    //     printf("%d\n", top->ifu_resp_valid);
-    //     step(); // 仿真两个周期以完成指令执行
-    // }
-    // 等待 IFU 响应有效，带超时保护
-    constexpr int kTimeoutCycles = 10;
-    int cycles = 0;
-    do {
-        if (++cycles > kTimeoutCycles) {
-            fprintf(stderr,
-                    "exec_one_cpu: timeout waiting for ifu_resp_valid\n");
-            break;
-        }
-        step();
-    } while (top->ifu_resp_valid != 0);
+    for (int i = 0; i < 2; i++) {
+        printf("%d\n", top->ifu_resp_valid);
+        step(); // 仿真两个周期以完成指令执行
+    }
+    // // 等待 IFU 响应有效，带超时保护
+    // constexpr int kTimeoutCycles = 10;
+    // int cycles = 0;
+    // do {
+    //     if (++cycles > kTimeoutCycles) {
+    //         fprintf(stderr,
+    //                 "exec_one_cpu: timeout waiting for ifu_resp_valid\n");
+    //         break;
+    //     }
+    //     step();
+    // } while (top->npc_resp_valid != 0);
 }
 
 bool DPI_EN = false; // 定义并初始化

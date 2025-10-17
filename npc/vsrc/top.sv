@@ -14,9 +14,9 @@ typedef enum logic [2:0] {
 /* verilator lint_off DECLFILENAME */
 
 module top (
-    input clk,   // 时钟信号
+    input clk,  // 时钟信号
     input reset,  // 复位信号
-    output logic ifu_resp_valid  // 指令响应有效输出
+    output logic npc_resp_valid  // 指令响应有效输出
 );
 
     // IFU：负责 PC 和取指
@@ -32,6 +32,9 @@ module top (
     //     else reset_sync <= 1'b0;
     // end
     assign reset_sync = reset;
+
+    logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid;
+    assign npc_resp_valid = gpr_resp_valid;
 
     IFU u_ifu (
         .clk(clk),
@@ -81,7 +84,8 @@ module top (
         .gpr_raddr2(rs2),
         .gpr_rdata1(gpr_rdata1),
         .gpr_rdata2(gpr_rdata2),
-        .gpr_req_valid(ifu_resp_valid)  // 新增输入
+        .gpr_req_valid(lsu_resp_valid),
+        .gpr_resp_valid(gpr_resp_valid)
     );
 
     // CSR：控制状态寄存器
@@ -121,15 +125,16 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk          (clk),
-        .inst_type    (inst_type),
-        .opcode       (opcode),
-        .funct3       (funct3),
-        .pc           (pc),
-        .alu_result   (alu_result),
-        .gpr_rdata2   (gpr_rdata2),
-        .load_data    (load_data),
-        .lsu_req_valid(ifu_resp_valid)  // 新增输入
+        .clk           (clk),
+        .inst_type     (inst_type),
+        .opcode        (opcode),
+        .funct3        (funct3),
+        .pc            (pc),
+        .alu_result    (alu_result),
+        .gpr_rdata2    (gpr_rdata2),
+        .load_data     (load_data),
+        .lsu_req_valid (ifu_resp_valid),
+        .lsu_resp_valid(lsu_resp_valid)
     );
 
     // WBU：负责写回GPR
@@ -286,7 +291,8 @@ module GPR (
     input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
     input               gpr_req_valid,  // 新增输入，指令响应有效性
     output logic [31:0] gpr_rdata1,     // 读寄存器1数据
-    output logic [31:0] gpr_rdata2      // 读寄存器2数据
+    output logic [31:0] gpr_rdata2,     // 读寄存器2数据
+    output logic        gpr_resp_valid  // 新增输出，寄存器响应有效性
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -296,9 +302,11 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
+            gpr_resp_valid <= 1'b0;
         end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
-        end
+            gpr_resp_valid <= 1'b1;
+        end else gpr_resp_valid <= 1'b0;
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
@@ -524,7 +532,8 @@ module LSU (
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
     input                lsu_req_valid,  // 新增输入，指令响应有效性
-    output logic  [31:0] load_data
+    output logic  [31:0] load_data,
+    output logic         lsu_resp_valid
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -533,6 +542,37 @@ module LSU (
         input byte wmask
     );
     import "DPI-C" function void NPCINV(input int pc);
+
+
+    // // 读写过程
+    // always @(posedge clk) begin
+    //     lsu_rdata <= (!lsu_wen) ? pmem_read_npc(lsu_addr) : 32'b0;
+    //     if (lsu_wen) begin
+    //         pmem_write(lsu_addr, lsu_wdata, lsu_wmask);
+    //     end
+    // end
+
+    // typedef enum logic {
+    //     IDLE,
+    //     WAIT
+    // } state_t;
+    // state_t state, next_state;
+    // assign lsu_resp_valid = (state == WAIT);
+
+    // always @(posedge clk) begin
+    //     if (reset) state <= IDLE;
+    //     else state <= next_state;
+    // end
+
+    // always_comb begin
+    //     unique case (state)
+    //         IDLE: next_state = WAIT;
+    //         WAIT: next_state = IDLE;
+    //         default: next_state = IDLE;
+    //     endcase
+    // end
+
+    assign lsu_resp_valid = lsu_req_valid;
 
     int mem_rdata_raw;
 
