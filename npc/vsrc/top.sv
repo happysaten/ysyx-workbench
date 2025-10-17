@@ -27,24 +27,22 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
-    logic        reset_sync;
-    // // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
-    assign reset_sync = reset;
-
-    IFU u_ifu (
+    // PCU：负责PC更新
+    PCU u_pcu (
         .clk(clk),
-        .reset(reset_sync),
+        .reset(reset),
         .jump_target(jump_target),
         .jump_en(jump_en),
         .pc(pc),
         .snpc(snpc),
+        .dnpc(dnpc)
+    );
+
+    IFU u_ifu (
+        .ifu_raddr(pc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_resp_valid(ifu_resp_valid)
+        .ifu_resp_valid(ifu_resp_valid)  // 新增输出
     );
 
     // IDU：负责指令解码
@@ -75,7 +73,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset_sync),
+        .reset(reset),
         .gpr_we(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
@@ -91,7 +89,7 @@ module top (
     logic [3:0] csr_we;
     CSR u_csr (
         .clk(clk),
-        .reset(reset_sync),
+        .reset(reset),
         .csr_we(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
@@ -123,15 +121,15 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk          (clk),
-        .inst_type    (inst_type),
-        .opcode       (opcode),
-        .funct3       (funct3),
-        .pc           (pc),
-        .alu_result   (alu_result),
-        .gpr_rdata2   (gpr_rdata2),
-        .load_data    (load_data),
-        .lsu_req_valid(ifu_resp_valid)  // 新增输入
+        .clk       (clk),
+        .inst_type (inst_type),
+        .opcode    (opcode),
+        .funct3    (funct3),
+        .pc        (pc),
+        .alu_result(alu_result),
+        .gpr_rdata2(gpr_rdata2),
+        .load_data (load_data),
+        .lsu_req_valid     (ifu_resp_valid)  // 新增输入
     );
 
     // WBU：负责写回GPR
@@ -150,17 +148,42 @@ module top (
 
 endmodule
 
-// IFU(Instruction Fetch Unit) 负责PC管理和取指
-module IFU (
+// PCU(Program Counter Unit) 负责PC寄存器的更新
+module PCU (
     input               clk,
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
-    output logic [31:0] dnpc,
-    output logic [31:0] ifu_rdata,
-    output logic        ifu_resp_valid
+    output logic [31:0] dnpc
+);
+    localparam int RESET_PC = 32'h80000000;
+    logic reset_sync;
+
+    // 同步复位信号
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+
+    // PC 寄存器更新
+    always_ff @(posedge clk) begin
+        if (reset_sync) pc <= RESET_PC;
+        else pc <= dnpc;
+    end
+
+    // snpc / dnpc 选择逻辑
+    assign snpc = pc + 4;
+    assign dnpc = jump_en ? jump_target : snpc;
+endmodule
+
+// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
+module IFU (
+    input        [31:0] ifu_raddr,  // 输入PC
+    input        [31:0] dnpc,       // 输入下一个PC，用于DPI
+    output logic [31:0] ifu_rdata,  // 输出指令
+    output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
 );
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -169,43 +192,10 @@ module IFU (
         input int dnpc
     );
 
-    localparam int RESET_PC = 32'h80000000;
-    typedef enum logic {
-        IDLE,
-        WAIT
-    } state_t;
-    state_t state, next_state;
-
-    assign ifu_resp_valid = (state == WAIT);
-
-    // PC 寄存器更新
-    always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC;
-        else if (ifu_resp_valid) pc <= dnpc;
-    end
-
-    // snpc / dnpc 选择逻辑
-    assign snpc = pc + 4;
-    assign dnpc = jump_en ? jump_target : snpc;
-
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
-
-    always_comb begin
-        unique case (state)
-            IDLE: next_state = WAIT;
-            WAIT: next_state = IDLE;
-            default: next_state = IDLE;
-        endcase
-    end
-
-    always @(posedge clk) begin
-        if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
-    end
-
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+    // 读取当前 PC 指令并通知 DPI
+    always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
+    always_comb update_inst_npc(ifu_rdata, dnpc);
+    always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -279,16 +269,16 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input               clk,            // 时钟信号
-    input               reset,          // 复位信号
-    input               gpr_we,         // 写使能信号
-    input        [ 4:0] gpr_waddr,      // 写寄存器地址
-    input        [31:0] gpr_wdata,      // 写数据
-    input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
-    input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
-    input               gpr_req_valid,  // 新增输入，指令响应有效性
-    output logic [31:0] gpr_rdata1,     // 读寄存器1数据
-    output logic [31:0] gpr_rdata2      // 读寄存器2数据
+    input clk,  // 时钟信号
+    input reset,  // 复位信号
+    input gpr_we,  // 写使能信号
+    input [4:0] gpr_waddr,  // 写寄存器地址
+    input [31:0] gpr_wdata,  // 写数据
+    input [4:0] gpr_raddr1,  // 读寄存器1地址
+    input [4:0] gpr_raddr2,  // 读寄存器2地址
+    input        gpr_req_valid,  // 新增输入，指令响应有效性
+    output logic [31:0] gpr_rdata1,  // 读寄存器1数据
+    output logic [31:0] gpr_rdata2  // 读寄存器2数据
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -310,7 +300,7 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
