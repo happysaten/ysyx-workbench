@@ -27,23 +27,16 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
-    // PCU：负责PC更新
-    PCU u_pcu (
+    IFU u_ifu (
         .clk(clk),
         .reset(reset),
         .jump_target(jump_target),
         .jump_en(jump_en),
         .pc(pc),
         .snpc(snpc),
-        .dnpc(dnpc)
-    );
-
-    IFU u_ifu (
-        .clk(clk),  // 新增输入
-        .ifu_raddr(pc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_resp_valid(ifu_resp_valid)  // 新增输出
+        .ifu_resp_valid(ifu_resp_valid)
     );
 
     // IDU：负责指令解码
@@ -149,18 +142,29 @@ module top (
 
 endmodule
 
-// PCU(Program Counter Unit) 负责PC寄存器的更新
-module PCU (
+// IFU(Instruction Fetch Unit) 负责PC管理和取指
+module IFU (
     input               clk,
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
-    output logic [31:0] dnpc
+    output logic [31:0] dnpc,
+    output logic [31:0] ifu_rdata,
+    output logic        ifu_resp_valid
 );
+    // DPI 接口：从内存读取指令并上报 instruction + next pc
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void update_inst_npc(
+        input int inst,
+        input int dnpc
+    );
+
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
+    typedef enum logic {IDLE, WAIT} state_t;
+    state_t state;
 
     // 同步复位信号
     always_ff @(posedge clk) begin
@@ -171,37 +175,18 @@ module PCU (
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset_sync) pc <= RESET_PC;
-        else pc <= dnpc;
+        else if (state == IDLE) pc <= dnpc;  // 在idle时更新PC
     end
 
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
-endmodule
 
-// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
-module IFU (
-    input               clk,          // 新增时钟输入
-    input        [31:0] ifu_raddr,    // 输入PC
-    input        [31:0] dnpc,         // 输入下一个PC，用于DPI
-    output logic [31:0] ifu_rdata,    // 输出指令
-    output logic        ifu_resp_valid  // 输出，表示指令响应有效
-);
-    // DPI 接口：从内存读取指令并上报 instruction + next pc
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
-
-    typedef enum logic {IDLE, WAIT} state_t;
-    state_t state;
-
-    // 状态机
+    // 状态机和取指
     always_ff @(posedge clk) begin
         case (state)
             IDLE: begin
-                ifu_rdata <= pmem_read_npc(ifu_raddr);
+                ifu_rdata <= pmem_read_npc(pc);
                 state <= WAIT;
             end
             WAIT: begin
@@ -210,6 +195,7 @@ module IFU (
             default: state <= IDLE;
         endcase
     end
+
     assign ifu_resp_valid = (state == WAIT);
 
     // DPI通知（在wait时）
