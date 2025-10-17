@@ -55,11 +55,12 @@ extern "C" void exec_one_cpu() {
     do {
         if (++cycles > kTimeoutCycles) {
             fprintf(stderr,
-                    "exec_one_cpu: timeout waiting for ifu_resp_valid\n");
+                    "exec_one_cpu: timeout waiting for npc_resp_valid\n");
             break;
         }
-        step();
         printf("%d\n", top->npc_resp_valid);
+        step();
+        // printf("%d\n", top->npc_resp_valid);
     } while (top->npc_resp_valid != 1);
 }
 
