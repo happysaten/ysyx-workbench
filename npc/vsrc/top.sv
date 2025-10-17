@@ -49,17 +49,18 @@ module top (
     logic [ 2:0] funct3;
     logic [31:0] imm;
     logic [4:0] rs1, rs2, rd;
-    inst_t inst_type;
+    inst_t   inst_type;
+    alu_op_t alu_op;  // 新增alu_op信号
     IDU u_idu (
         .inst(inst),
         .opcode(opcode),
         .funct3(funct3),
-        .funct7(funct7),
         .rd(rd),
         .rs1(rs1),
         .rs2(rs2),
         .imm(imm),
-        .inst_type(inst_type)
+        .inst_type(inst_type),
+        .alu_op(alu_op)  // 新增输出
     );
 
     // GPR：通用寄存器组
@@ -98,14 +99,14 @@ module top (
     EXU u_exu (
         .opcode       (opcode),
         .funct3       (funct3),
-        .funct7       (funct7),
         .gpr_rdata1   (gpr_rdata1),
         .gpr_rdata2   (gpr_rdata2),
         .imm          (imm),
-        .pc    (pc),
+        .pc           (pc),
         .snpc         (snpc),
         .inst_type    (inst_type),
         .csr_rdata    (csr_rdata),
+        .alu_op       (alu_op),        // 新增输入
         .alu_result   (alu_result),
         .jump_target  (jump_target),
         .jump_en      (jump_en),
@@ -121,7 +122,7 @@ module top (
         .inst_type (inst_type),
         .opcode    (opcode),
         .funct3    (funct3),
-        .pc (pc),
+        .pc        (pc),
         .alu_result(alu_result),
         .gpr_rdata2(gpr_rdata2),
         .load_data (load_data)
@@ -132,7 +133,7 @@ module top (
         .inst_type    (inst_type),
         .opcode       (opcode),
         .funct3       (funct3),
-        .pc    (pc),
+        .pc           (pc),
         .snpc         (snpc),
         .alu_result   (alu_result),
         .load_data    (load_data),
@@ -145,10 +146,10 @@ endmodule
 
 // PCU(Program Counter Unit) 负责PC寄存器的更新
 module PCU (
-    input         clk,
-    input         reset,
-    input  [31:0] jump_target,
-    input         jump_en,
+    input               clk,
+    input               reset,
+    input        [31:0] jump_target,
+    input               jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc
@@ -175,9 +176,9 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
 module IFU (
-    input  [31:0] ifu_raddr,  // 输入PC
-    input  [31:0] dnpc,       // 输入下一个PC，用于DPI
-    output logic [31:0] ifu_rdata  // 输出指令
+    input        [31:0] ifu_raddr,  // 输入PC
+    input        [31:0] dnpc,       // 输入下一个PC，用于DPI
+    output logic [31:0] ifu_rdata   // 输出指令
 );
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -196,13 +197,14 @@ module IDU (
     input [31:0] inst,  // 输入指令
     output [6:0] opcode,  // 操作码
     output [2:0] funct3,  // 功能码
-    output [6:0] funct7,  // 功能码扩展
     output [4:0] rd,  // 目的寄存器编号
     output [4:0] rs1,  // 源寄存器1编号
     output [4:0] rs2,  // 源寄存器2编号
     output logic [31:0] imm,  // 立即数
-    output inst_t inst_type  // 指令类型输出
+    output inst_t inst_type,  // 指令类型输出
+    output alu_op_t alu_op  // 新增输出ALU操作码
 );
+    logic [6:0] funct7;  // 功能码扩展
     assign opcode = inst[6:0];
     assign funct3 = inst[14:12];
     assign funct7 = inst[31:25];
@@ -224,31 +226,38 @@ module IDU (
     always_comb begin
         unique case (inst_type)
             TYPE_I: imm = {{20{inst[31]}}, inst[31:20]};  // 符号扩展I型立即数
-            TYPE_S:
-            imm = {
-                {20{inst[31]}}, inst[31:25], inst[11:7]
-            };  // 符号扩展S型立即数
+            TYPE_S: imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};  // 符号扩展S型立即数
             TYPE_B:
             imm = {
-                {19{inst[31]}},
-                inst[31],
-                inst[7],
-                inst[30:25],
-                inst[11:8],
-                1'b0
+                {19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0
             };  // 符号扩展B型立即数
             TYPE_U: imm = {inst[31:12], 12'b0};  // U型立即数（高20位）
             TYPE_J:
             imm = {
-                {11{inst[31]}},
-                inst[31],
-                inst[19:12],
-                inst[20],
-                inst[30:21],
-                1'b0
+                {11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0
             };  // 符号扩展J型立即数
             default: imm = 32'h0;
         endcase
+    end
+
+    // 新增alu_op解析（从EXU移来）
+    always_comb begin
+        alu_op = ALU_ADD;
+        if (opcode == 7'b0010011 || opcode == 7'b0110011) begin
+            unique case (funct3)
+                3'b000: begin  // ADD/ADDI 或 SUB
+                    if (inst_type == TYPE_R && funct7 == 7'b0100000) alu_op = ALU_SUB;
+                end
+                3'b001:  alu_op = ALU_SLL;  // SLLI/SLL
+                3'b010:  alu_op = ALU_SLT;  // SLTI/SLT
+                3'b011:  alu_op = ALU_SLTU;  // SLTIU/SLTU
+                3'b100:  alu_op = ALU_XOR;  // XORI/XOR
+                3'b101:  alu_op = (funct7[5] == 1'b1) ? ALU_SRA : ALU_SRL;  // SRAI/SRA 或 SRLI/SRL
+                3'b110:  alu_op = ALU_OR;  // ORI/OR
+                3'b111:  alu_op = ALU_AND;  // ANDI/AND
+                default: alu_op = ALU_ADD;
+            endcase
+        end
     end
 endmodule
 
@@ -330,35 +339,34 @@ endmodule
 
 // EXU(Execute Unit) 负责根据控制信号控制ALU, 对数据进行计算
 module EXU (
-    input         [ 6:0]       opcode,
-    input         [ 2:0]       funct3,
-    input         [ 6:0]       funct7,
-    input         [31:0]       gpr_rdata1,
-    input         [31:0]       gpr_rdata2,
-    input         [31:0]       imm,
-    input         [31:0]       pc,
-    input         [31:0]       snpc,
-    input  inst_t              inst_type,
-    input         [ 3:0][31:0] csr_rdata,
-    output logic  [31:0]       alu_result,
-    output logic  [31:0]       jump_target,
-    output logic               jump_en,
-    output logic  [ 3:0]       csr_we,
-    output logic  [ 3:0][31:0] csr_wdata,
-    output logic  [31:0]       csr_read_data
+    input           [ 6:0]       opcode,
+    input           [ 2:0]       funct3,
+    input           [31:0]       gpr_rdata1,
+    input           [31:0]       gpr_rdata2,
+    input           [31:0]       imm,
+    input           [31:0]       pc,
+    input           [31:0]       snpc,
+    input  inst_t                inst_type,
+    input           [ 3:0][31:0] csr_rdata,
+    input  alu_op_t              alu_op,        // 新增输入ALU操作码
+    output logic    [31:0]       alu_result,
+    output logic    [31:0]       jump_target,
+    output logic                 jump_en,
+    output logic    [ 3:0]       csr_we,
+    output logic    [ 3:0][31:0] csr_wdata,
+    output logic    [31:0]       csr_read_data
 );
     import "DPI-C" function void NPCINV(input int pc);
     import "DPI-C" function void NPCTRAP();
 
     logic [31:0] alu_a, alu_b;
-    alu_op_t alu_op;
 
     alu #(
         .WIDTH(32)
     ) u_alu (
         .A(alu_a),
         .B(alu_b),
-        .ALUop(alu_op),
+        .ALUop(alu_op),  // 使用输入
         .Result(alu_result)
     );
 
@@ -435,25 +443,6 @@ module EXU (
                 alu_b = gpr_rdata2;
             end
         endcase
-    end
-
-    always_comb begin
-        alu_op = ALU_ADD;
-        if (opcode == 7'b0010011 || opcode == 7'b0110011) begin
-            unique case (funct3)
-                3'b000: begin  // ADD/ADDI 或 SUB
-                    if (inst_type == TYPE_R && funct7 == 7'b0100000) alu_op = ALU_SUB;
-                end
-                3'b001:  alu_op = ALU_SLL;  // SLLI/SLL
-                3'b010:  alu_op = ALU_SLT;  // SLTI/SLT
-                3'b011:  alu_op = ALU_SLTU;  // SLTIU/SLTU
-                3'b100:  alu_op = ALU_XOR;  // XORI/XOR
-                3'b101:  alu_op = (funct7[5] == 1'b1) ? ALU_SRA : ALU_SRL;  // SRAI/SRA 或 SRLI/SRL
-                3'b110:  alu_op = ALU_OR;  // ORI/OR
-                3'b111:  alu_op = ALU_AND;  // ANDI/AND
-                default: alu_op = ALU_ADD;
-            endcase
-        end
     end
 
 
