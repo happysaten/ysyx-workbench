@@ -177,7 +177,7 @@ module IFU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC;
+        if (reset_sync) pc <= RESET_PC;
         else if (state == IDLE) pc <= dnpc;
     end
 
@@ -187,7 +187,7 @@ module IFU (
 
     // 状态机
     always_ff @(posedge clk) begin
-        if (reset) state <= IDLE;
+        if (reset_sync) state <= IDLE;
         else begin
             unique case (state)
                 IDLE: state <= WAIT;
