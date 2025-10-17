@@ -241,11 +241,11 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     always_comb begin
-        if (ifu_resp_valid) ifu_rdata = pmem_read_npc(pc);
+        ifu_rdata = pmem_read_npc(pc);
     end
 
     always_comb begin
-        if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+        update_inst_npc(ifu_rdata, dnpc);
     end
 endmodule
 
