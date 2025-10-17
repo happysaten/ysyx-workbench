@@ -303,7 +303,7 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_we && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
