@@ -27,7 +27,7 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
-    logic reset_sync;
+    logic        reset_sync;
     // // 同步复位信号
     // always_ff @(posedge clk) begin
     //     if (reset) reset_sync <= 1'b1;
@@ -150,7 +150,65 @@ module top (
 
 endmodule
 
-// IFU(Instruction Fetch Unit) 负责PC管理和取指
+// // IFU(Instruction Fetch Unit) 负责PC管理和取指
+// module IFU (
+//     input               clk,
+//     input               reset,
+//     input        [31:0] jump_target,
+//     input               jump_en,
+//     output logic [31:0] pc,
+//     output logic [31:0] snpc,
+//     output logic [31:0] dnpc,
+//     output logic [31:0] ifu_rdata,
+//     output logic        ifu_resp_valid
+// );
+//     // DPI 接口：从内存读取指令并上报 instruction + next pc
+//     import "DPI-C" function int pmem_read_npc(input int raddr);
+//     import "DPI-C" function void update_inst_npc(
+//         input int inst,
+//         input int dnpc
+//     );
+
+//     localparam int RESET_PC = 32'h80000000;
+//     typedef enum logic {
+//         IDLE,
+//         WAIT
+//     } state_t;
+//     state_t state, next_state;
+
+//     assign ifu_resp_valid = (state == WAIT);
+
+//     // PC 寄存器更新
+//     always_ff @(posedge clk) begin
+//         if (reset) pc <= RESET_PC;
+//         else if (ifu_resp_valid) pc <= dnpc;
+//     end
+
+//     // snpc / dnpc 选择逻辑
+//     assign snpc = pc + 4;
+//     assign dnpc = jump_en ? jump_target : snpc;
+
+//     always @(posedge clk) begin
+//         if (reset) state <= IDLE;
+//         else state <= next_state;
+//     end
+
+//     always_comb begin
+//         unique case (state)
+//             IDLE: next_state = WAIT;
+//             WAIT: next_state = IDLE;
+//             default: next_state = IDLE;
+//         endcase
+//     end
+
+//     always @(posedge clk) begin
+//         if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
+//     end
+
+//     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+// endmodule
+
+// IFU(Instruction Fetch Unit) 负责PC管理和取指（单周期版本）
 module IFU (
     input               clk,
     input               reset,
@@ -170,13 +228,7 @@ module IFU (
     );
 
     localparam int RESET_PC = 32'h80000000;
-    typedef enum logic {
-        IDLE,
-        WAIT
-    } state_t;
-    state_t state, next_state;
-
-    assign ifu_resp_valid = (state == WAIT);
+    assign ifu_resp_valid = 1'b1;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -188,21 +240,8 @@ module IFU (
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
-
     always_comb begin
-        unique case (state)
-            IDLE: next_state = WAIT;
-            WAIT: next_state = IDLE;
-            default: next_state = IDLE;
-        endcase
-    end
-
-    always @(posedge clk) begin
-        if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
+        ifu_rdata = pmem_read_npc(pc);
     end
 
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
