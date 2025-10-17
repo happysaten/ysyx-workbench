@@ -117,6 +117,7 @@ module top (
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
         .clk          (clk),
+        .reset        (reset),
         .inst_type    (inst_type),
         .opcode       (opcode),
         .funct3       (funct3),
@@ -490,6 +491,7 @@ endmodule
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
     input                clk,
+    input                reset,
     input  inst_t        inst_type,
     input         [ 6:0] opcode,
     input         [ 2:0] funct3,
@@ -530,14 +532,16 @@ module LSU (
     end
 
     // 存储逻辑
-    always_comb begin
-        if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
-            unique case (funct3)
-                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
-                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
-                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
-                default: ;  // 不支持的 store 类型保持兼容旧行为
-            endcase
+    always @(posedge clk) begin
+        if (!reset) begin
+            if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
+                unique case (funct3)
+                    3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
+                    3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
+                    3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
+                    default: ;  // 不支持的 store 类型保持兼容旧行为
+                endcase
+            end
         end
     end
 endmodule
