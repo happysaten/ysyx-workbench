@@ -33,15 +33,15 @@ module top (
     // end
     assign reset_sync = reset;
 
-    logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid;
-    assign npc_resp_valid = gpr_resp_valid;
+    logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid, csr_resp_valid;
+    assign npc_resp_valid = gpr_resp_valid || csr_resp_valid;
 
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
-        .ifu_rsq_valid(gpr_resp_valid),
+        .ifu_rsq_valid(npc_resp_valid),
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
@@ -78,7 +78,7 @@ module top (
     GPR u_gpr (
         .clk(clk),
         .reset(reset_sync),
-        .gpr_we(gpr_we && (|rd)),
+        .gpr_wen(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
         .gpr_raddr1(rs1),
@@ -95,9 +95,11 @@ module top (
     CSR u_csr (
         .clk(clk),
         .reset(reset_sync),
-        .csr_we(csr_we),
+        .csr_wen(csr_we),
         .csr_wdata(csr_wdata),
-        .csr_rdata(csr_rdata)
+        .csr_rdata(csr_rdata),
+        .csr_rsq_valid(lsu_resp_valid),
+        .csr_resp_valid(csr_resp_valid)
     );
 
 
@@ -286,15 +288,15 @@ endmodule
 module GPR (
     input               clk,            // 时钟信号
     input               reset,          // 复位信号
-    input               gpr_we,         // 写使能信号
+    input               gpr_wen,        // 写使能信号
     input        [ 4:0] gpr_waddr,      // 写寄存器地址
     input        [31:0] gpr_wdata,      // 写数据
     input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
     input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
-    input               gpr_req_valid,  // 指令响应有效性
+    input               gpr_req_valid,  // 请求有效信号
     output logic [31:0] gpr_rdata1,     // 读寄存器1数据
     output logic [31:0] gpr_rdata2,     // 读寄存器2数据
-    output logic        gpr_resp_valid  // 寄存器响应有效性
+    output logic        gpr_resp_valid  // 响应有效信号
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -304,7 +306,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
+        end else if (gpr_wen && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -316,7 +318,7 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_wen && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
@@ -337,14 +339,17 @@ module CSR #(
 ) (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    input [N-1:0] csr_we,
-    input [N-1:0][31:0] csr_wdata,
-    output logic [N-1:0][31:0] csr_rdata
+    input [N-1:0] csr_wen,  // 写使能信号
+    input [N-1:0][31:0] csr_wdata,  // 写数据
+    input csr_rsq_valid,  // 读请求有效信号
+    output logic [N-1:0][31:0] csr_rdata,  // 读数据
+    output logic csr_resp_valid  // 读响应有效信号
 );
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
-            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];
+            for (int i = 0; i < N; i++)
+            if (gpr_req_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -354,7 +359,13 @@ module CSR #(
     );
 
     always_comb begin
-        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        for (int i = 0; i < N; i++)
+        if (gpr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+    end
+
+    always @(posedge clk) begin
+        if (reset) csr_resp_valid <= 1'b1;
+        else csr_resp_valid <= csr_rsq_valid;
     end
 
 endmodule
@@ -537,7 +548,7 @@ module LSU (
     input         [31:0] pc,
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
-    input                lsu_req_valid,  // 新增输入，指令响应有效性
+    input                lsu_req_valid,
     output logic  [31:0] lsu_rdata,
     output logic         lsu_resp_valid
 );

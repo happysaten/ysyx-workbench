@@ -78,7 +78,7 @@ module top (
     GPR u_gpr (
         .clk(clk),
         .reset(reset_sync),
-        .gpr_we(gpr_we && (|rd)),
+        .gpr_wen(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
         .gpr_raddr1(rs1),
@@ -95,7 +95,7 @@ module top (
     CSR u_csr (
         .clk(clk),
         .reset(reset_sync),
-        .csr_we(csr_we),
+        .csr_wen(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
     );
@@ -286,7 +286,7 @@ endmodule
 module GPR (
     input               clk,            // 时钟信号
     input               reset,          // 复位信号
-    input               gpr_we,         // 写使能信号
+    input               gpr_wen,         // 写使能信号
     input        [ 4:0] gpr_waddr,      // 写寄存器地址
     input        [31:0] gpr_wdata,      // 写数据
     input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
@@ -304,7 +304,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
+        end else if (gpr_wen && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -316,7 +316,7 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_wen && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
@@ -337,14 +337,14 @@ module CSR #(
 ) (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    input [N-1:0] csr_we,
+    input [N-1:0] csr_wen,
     input [N-1:0][31:0] csr_wdata,
     output logic [N-1:0][31:0] csr_rdata
 );
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
-            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];
+            for (int i = 0; i < N; i++) if (csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -354,7 +354,7 @@ module CSR #(
     );
 
     always_comb begin
-        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        for (int i = 0; i < N; i++) if (csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
 endmodule
