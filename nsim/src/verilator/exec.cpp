@@ -1,5 +1,5 @@
-#include "../include/verilator.h"
 #include "../include/npc_callback.h"
+#include "../include/verilator.h"
 #include <Vtop__Dpi.h>
 #include <common.h>
 #include <cpu/cpu.h>
