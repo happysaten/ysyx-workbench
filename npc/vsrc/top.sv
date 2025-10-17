@@ -21,17 +21,26 @@ module top (
 );
 
     // IFU：负责 PC 和取指
-    logic [31:0] ifu_raddr, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
+    logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
     logic        jump_en;
-    logic [31:0] ifu_rdata;  // 当前指令, inst renamed to ifu_rdata
-    IFU u_ifu (
+    logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
+    logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
+
+    // PCU：负责PC更新
+    PCU u_pcu (
         .clk(clk),
         .reset(reset),
         .jump_target(jump_target),
         .jump_en(jump_en),
-        .ifu_raddr(ifu_raddr),  // pc renamed
+        .pc(pc),
         .snpc(snpc),
-        .ifu_rdata(ifu_rdata)  // inst renamed
+        .dnpc(dnpc)
+    );
+
+    IFU u_ifu (
+        .ifu_raddr(pc),  // 新增输入
+        .dnpc(dnpc),  // 新增输入
+        .ifu_rdata(inst)  // 输出
     );
 
     // IDU：负责指令解码
@@ -42,7 +51,7 @@ module top (
     logic [4:0] rs1, rs2, rd;
     inst_t inst_type;
     IDU u_idu (
-        .ifu_rdata(ifu_rdata),  // inst renamed
+        .inst(inst),
         .opcode(opcode),
         .funct3(funct3),
         .funct7(funct7),
@@ -54,18 +63,21 @@ module top (
     );
 
     // GPR：通用寄存器组
-    logic [31:0] gpr_rdata1, gpr_rdata2, gpr_wdata;  // 读寄存器组数据1、2，写寄存器数据, renamed
+    logic [31:0]
+        gpr_rdata1,
+        gpr_rdata2,
+        gpr_wdata;  // 读寄存器组数据1、2(src1, src2)，写寄存器数据
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
         .reset(reset),
-        .gpr_we(gpr_we && (|rd)),  // we renamed
-        .gpr_waddr(rd),  // waddr renamed
-        .gpr_wdata(gpr_wdata),  // wdata renamed
-        .gpr_raddr1(rs1),  // raddr1 renamed
-        .gpr_raddr2(rs2),  // raddr2 renamed
-        .gpr_rdata1(gpr_rdata1),  // rdata1 renamed
-        .gpr_rdata2(gpr_rdata2)  // rdata2 renamed
+        .gpr_we(gpr_we && (|rd)),
+        .gpr_waddr(rd),
+        .gpr_wdata(gpr_wdata),
+        .gpr_raddr1(rs1),
+        .gpr_raddr2(rs2),
+        .gpr_rdata1(gpr_rdata1),
+        .gpr_rdata2(gpr_rdata2)
     );
 
     // CSR：控制状态寄存器
@@ -74,9 +86,9 @@ module top (
     CSR u_csr (
         .clk(clk),
         .reset(reset),
-        .csr_we(csr_we),  // we renamed
-        .csr_wdata(csr_wdata),  // din renamed
-        .csr_rdata(csr_rdata)  // dout renamed
+        .csr_we(csr_we),
+        .csr_wdata(csr_wdata),
+        .csr_rdata(csr_rdata)
     );
 
 
@@ -87,10 +99,10 @@ module top (
         .opcode       (opcode),
         .funct3       (funct3),
         .funct7       (funct7),
-        .gpr_rdata1   (gpr_rdata1),  // src1 renamed
-        .gpr_rdata2   (gpr_rdata2),  // src2 renamed
+        .gpr_rdata1   (gpr_rdata1),
+        .gpr_rdata2   (gpr_rdata2),
         .imm          (imm),
-        .ifu_raddr    (ifu_raddr),  // pc renamed
+        .pc    (pc),
         .snpc         (snpc),
         .inst_type    (inst_type),
         .csr_rdata    (csr_rdata),
@@ -109,9 +121,9 @@ module top (
         .inst_type (inst_type),
         .opcode    (opcode),
         .funct3    (funct3),
-        .ifu_raddr (ifu_raddr),  // pc renamed
-        .alu_result(alu_result),  // addr renamed
-        .gpr_rdata2(gpr_rdata2),  // store_data renamed
+        .pc (pc),
+        .alu_result(alu_result),
+        .gpr_rdata2(gpr_rdata2),
         .load_data (load_data)
     );
 
@@ -120,31 +132,53 @@ module top (
         .inst_type    (inst_type),
         .opcode       (opcode),
         .funct3       (funct3),
-        .ifu_raddr    (ifu_raddr),  // pc renamed
+        .pc    (pc),
         .snpc         (snpc),
         .alu_result   (alu_result),
         .load_data    (load_data),
         .csr_read_data(csr_read_data),
-        .gpr_wdata    (gpr_wdata),  // wdata renamed
+        .gpr_wdata    (gpr_wdata),
         .gpr_we       (gpr_we)
     );
 
 endmodule
 
-// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
-module IFU (
+// PCU(Program Counter Unit) 负责PC寄存器的更新
+module PCU (
     input         clk,
     input         reset,
     input  [31:0] jump_target,
     input         jump_en,
-    output logic [31:0] ifu_raddr,  // pc renamed
+    output logic [31:0] pc,
     output logic [31:0] snpc,
-    output logic [31:0] ifu_rdata  // inst renamed
+    output logic [31:0] dnpc
 );
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
-    logic [31:0] dnpc;
 
+    // 同步复位信号
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+
+    // PC 寄存器更新
+    always_ff @(posedge clk) begin
+        if (reset_sync) pc <= RESET_PC;
+        else pc <= dnpc;
+    end
+
+    // snpc / dnpc 选择逻辑
+    assign snpc = pc + 4;
+    assign dnpc = jump_en ? jump_target : snpc;
+endmodule
+
+// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
+module IFU (
+    input  [31:0] ifu_raddr,  // 输入PC
+    input  [31:0] dnpc,       // 输入下一个PC，用于DPI
+    output logic [31:0] ifu_rdata  // 输出指令
+);
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void update_inst_npc(
@@ -152,30 +186,14 @@ module IFU (
         input int dnpc
     );
 
-    // 同步复位信号（保留原逻辑）
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
-
     // 读取当前 PC 指令并通知 DPI
-    always_comb ifu_rdata = pmem_read_npc(ifu_raddr);  // inst and pc renamed
-    always_comb update_inst_npc(ifu_rdata, dnpc);  // inst renamed
-
-    // PC 寄存器更新
-    always_ff @(posedge clk) begin
-        if (reset_sync) ifu_raddr <= RESET_PC;  // pc renamed
-        else ifu_raddr <= dnpc;  // pc renamed
-    end
-
-    // snpc / dnpc 选择逻辑
-    assign snpc = ifu_raddr + 4;  // pc renamed
-    assign dnpc = jump_en ? jump_target : snpc;
+    always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
+    always_comb update_inst_npc(ifu_rdata, dnpc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
 module IDU (
-    input [31:0] ifu_rdata,  // 输入指令, inst renamed
+    input [31:0] inst,  // 输入指令
     output [6:0] opcode,  // 操作码
     output [2:0] funct3,  // 功能码
     output [6:0] funct7,  // 功能码扩展
@@ -185,12 +203,12 @@ module IDU (
     output logic [31:0] imm,  // 立即数
     output inst_t inst_type  // 指令类型输出
 );
-    assign opcode = ifu_rdata[6:0];  // inst renamed
-    assign funct3 = ifu_rdata[14:12];  // inst renamed
-    assign funct7 = ifu_rdata[31:25];  // inst renamed
-    assign rd = ifu_rdata[11:7];  // inst renamed
-    assign rs1 = ifu_rdata[19:15];  // inst renamed
-    assign rs2 = ifu_rdata[24:20];  // inst renamed
+    assign opcode = inst[6:0];
+    assign funct3 = inst[14:12];
+    assign funct7 = inst[31:25];
+    assign rd = inst[11:7];
+    assign rs1 = inst[19:15];
+    assign rs2 = inst[24:20];
 
     always_comb begin
         unique case (opcode)
@@ -205,17 +223,30 @@ module IDU (
     end
     always_comb begin
         unique case (inst_type)
-            TYPE_I: imm = {{20{ifu_rdata[31]}}, ifu_rdata[31:20]};  // 符号扩展I型立即数, inst renamed
-            TYPE_S: imm = {{20{ifu_rdata[31]}}, ifu_rdata[31:25], ifu_rdata[11:7]};  // 符号扩展S型立即数, inst renamed
+            TYPE_I: imm = {{20{inst[31]}}, inst[31:20]};  // 符号扩展I型立即数
+            TYPE_S:
+            imm = {
+                {20{inst[31]}}, inst[31:25], inst[11:7]
+            };  // 符号扩展S型立即数
             TYPE_B:
             imm = {
-                {19{ifu_rdata[31]}}, ifu_rdata[31], ifu_rdata[7], ifu_rdata[30:25], ifu_rdata[11:8], 1'b0
-            };  // 符号扩展B型立即数, inst renamed
-            TYPE_U: imm = {ifu_rdata[31:12], 12'b0};  // U型立即数（高20位）, inst renamed
+                {19{inst[31]}},
+                inst[31],
+                inst[7],
+                inst[30:25],
+                inst[11:8],
+                1'b0
+            };  // 符号扩展B型立即数
+            TYPE_U: imm = {inst[31:12], 12'b0};  // U型立即数（高20位）
             TYPE_J:
             imm = {
-                {11{ifu_rdata[31]}}, ifu_rdata[31], ifu_rdata[19:12], ifu_rdata[20], ifu_rdata[30:21], 1'b0
-            };  // 符号扩展J型立即数, inst renamed
+                {11{inst[31]}},
+                inst[31],
+                inst[19:12],
+                inst[20],
+                inst[30:21],
+                1'b0
+            };  // 符号扩展J型立即数
             default: imm = 32'h0;
         endcase
     end
@@ -225,13 +256,13 @@ endmodule
 module GPR (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    input gpr_we,  // 写使能信号, we renamed
-    input [4:0] gpr_waddr,  // 写寄存器地址, waddr renamed
-    input [31:0] gpr_wdata,  // 写数据, wdata renamed
-    input [4:0] gpr_raddr1,  // 读寄存器1地址, raddr1 renamed
-    input [4:0] gpr_raddr2,  // 读寄存器2地址, raddr2 renamed
-    output logic [31:0] gpr_rdata1,  // 读寄存器1数据, rdata1 renamed
-    output logic [31:0] gpr_rdata2  // 读寄存器2数据, rdata2 renamed
+    input gpr_we,  // 写使能信号
+    input [4:0] gpr_waddr,  // 写寄存器地址
+    input [31:0] gpr_wdata,  // 写数据
+    input [4:0] gpr_raddr1,  // 读寄存器1地址
+    input [4:0] gpr_raddr2,  // 读寄存器2地址
+    output logic [31:0] gpr_rdata1,  // 读寄存器1数据
+    output logic [31:0] gpr_rdata2  // 读寄存器2数据
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -241,8 +272,8 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_we) begin  // we renamed
-            regfile[gpr_waddr] <= gpr_wdata;  // waddr and wdata renamed
+        end else if (gpr_we) begin
+            regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
@@ -253,12 +284,12 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);  // we, waddr, wdata renamed
+        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
-        gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];  // rdata1 and raddr1 renamed
-        gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];  // rdata2 and raddr2 renamed
+        gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
+        gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 endmodule
 
@@ -268,14 +299,14 @@ module CSR #(
 ) (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    input [N-1:0] csr_we,  // 写使能信号, we renamed
-    input [N-1:0][31:0] csr_wdata,  // CSR寄存器地址, din renamed
-    output logic [N-1:0][31:0] csr_rdata  // CSR寄存器数据输出, dout renamed
+    input [N-1:0] csr_we,
+    input [N-1:0][31:0] csr_wdata,
+    output logic [N-1:0][31:0] csr_rdata
 );
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
-            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];  // we, din, dout renamed
+            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -285,8 +316,7 @@ module CSR #(
     );
 
     always_comb begin
-        for (int i = 0; i < N; i++)
-        if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);  // we and din renamed
+        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
 endmodule
@@ -303,13 +333,13 @@ module EXU (
     input         [ 6:0]       opcode,
     input         [ 2:0]       funct3,
     input         [ 6:0]       funct7,
-    input         [31:0]       gpr_rdata1,  // src1 renamed
-    input         [31:0]       gpr_rdata2,  // src2 renamed
+    input         [31:0]       gpr_rdata1,
+    input         [31:0]       gpr_rdata2,
     input         [31:0]       imm,
-    input         [31:0]       ifu_raddr,  // pc renamed
+    input         [31:0]       pc,
     input         [31:0]       snpc,
     input  inst_t              inst_type,
-    input   [ 3:0][31:0] csr_rdata,
+    input         [ 3:0][31:0] csr_rdata,
     output logic  [31:0]       alu_result,
     output logic  [31:0]       jump_target,
     output logic               jump_en,
@@ -347,7 +377,7 @@ module EXU (
         jump_en     = 1'b0;
         unique case (inst_type)
             TYPE_I: begin
-                alu_a = gpr_rdata1;  // src1 renamed
+                alu_a = gpr_rdata1;
                 alu_b = imm;
                 if (opcode == 7'b1100111) begin  // JALR
                     jump_target = {alu_result[31:1], 1'b0};
@@ -369,40 +399,40 @@ module EXU (
                 end
             end
             TYPE_R: begin
-                alu_a = gpr_rdata1;  // src1 renamed
-                alu_b = gpr_rdata2;  // src2 renamed
+                alu_a = gpr_rdata1;
+                alu_b = gpr_rdata2;
             end
             TYPE_U: begin
-                alu_a = (opcode == 7'b0110111) ? 32'h0 : ifu_raddr;  // pc renamed
+                alu_a = (opcode == 7'b0110111) ? 32'h0 : pc;
                 alu_b = imm;
             end
             TYPE_J: begin
-                alu_a       = ifu_raddr;  // pc renamed
+                alu_a       = pc;
                 alu_b       = imm;
                 jump_target = alu_result;
                 jump_en     = 1'b1;
             end
             TYPE_B: begin
-                alu_a = ifu_raddr;  // pc renamed
+                alu_a = pc;
                 alu_b = imm;
                 jump_target = alu_result;
                 unique case (funct3)
-                    3'b000:  jump_en = (gpr_rdata1 == gpr_rdata2);  // src1 and src2 renamed
-                    3'b001:  jump_en = (gpr_rdata1 != gpr_rdata2);  // src1 and src2 renamed
-                    3'b100:  jump_en = ($signed(gpr_rdata1) < $signed(gpr_rdata2));  // src1 and src2 renamed
-                    3'b101:  jump_en = ($signed(gpr_rdata1) >= $signed(gpr_rdata2));  // src1 and src2 renamed
-                    3'b110:  jump_en = (gpr_rdata1 < gpr_rdata2);  // src1 and src2 renamed
-                    3'b111:  jump_en = (gpr_rdata1 >= gpr_rdata2);  // src1 and src2 renamed
+                    3'b000:  jump_en = (gpr_rdata1 == gpr_rdata2);
+                    3'b001:  jump_en = (gpr_rdata1 != gpr_rdata2);
+                    3'b100:  jump_en = ($signed(gpr_rdata1) < $signed(gpr_rdata2));
+                    3'b101:  jump_en = ($signed(gpr_rdata1) >= $signed(gpr_rdata2));
+                    3'b110:  jump_en = (gpr_rdata1 < gpr_rdata2);
+                    3'b111:  jump_en = (gpr_rdata1 >= gpr_rdata2);
                     default: jump_en = 1'b0;
                 endcase
             end
             TYPE_S: begin
-                alu_a = gpr_rdata1;  // src1 renamed
+                alu_a = gpr_rdata1;
                 alu_b = imm;
             end
             default: begin
-                alu_a = gpr_rdata1;  // src1 renamed
-                alu_b = gpr_rdata2;  // src2 renamed
+                alu_a = gpr_rdata1;
+                alu_b = gpr_rdata2;
             end
         endcase
     end
@@ -443,7 +473,7 @@ module EXU (
                     if (imm == 32'h0) begin
                         // ECALL
                         csr_we               = 4'b1110;
-                        csr_wdata[1]         = ifu_raddr;
+                        csr_wdata[1]         = pc;
                         csr_wdata[3]         = 32'd11;
                         mstatus_ecall[7]     = mstatus_ecall[3];
                         mstatus_ecall[3]     = 1'b0;
@@ -461,19 +491,19 @@ module EXU (
                         NPCTRAP();
                     end else begin
                         // 不支持的系统指令保持兼容旧行为
-                        NPCINV(ifu_raddr);
+                        NPCINV(pc);
                     end
                 end
                 3'b001: begin
                     // CSRRW
                     csr_we[csr_idx]    = 1'b1;
-                    csr_wdata[csr_idx] = gpr_rdata1;  // src1 renamed
+                    csr_wdata[csr_idx] = gpr_rdata1;
                 end
                 3'b010: begin
                     // CSRRR
                     csr_read_data = csr_rdata[csr_idx];
                 end
-                default: NPCINV(ifu_raddr);  // pc renamed
+                default: NPCINV(pc);
             endcase
         end
     end
@@ -482,13 +512,13 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input          clk,
+    input                clk,
     input  inst_t        inst_type,
-    input   [ 6:0] opcode,
-    input   [ 2:0] funct3,
-    input   [31:0] ifu_raddr,  // pc renamed
-    input   [31:0] alu_result,  // addr renamed
-    input   [31:0] gpr_rdata2,  // store_data renamed
+    input         [ 6:0] opcode,
+    input         [ 2:0] funct3,
+    input         [31:0] pc,
+    input         [31:0] alu_result,
+    input         [31:0] gpr_rdata2,
     output logic  [31:0] load_data
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -506,7 +536,7 @@ module LSU (
         load_data     = 32'h0;
         mem_rdata_raw = 0;
         if (inst_type == TYPE_I && opcode == 7'b0000011) begin
-            mem_rdata_raw = pmem_read_npc(alu_result);  // addr renamed
+            mem_rdata_raw = pmem_read_npc(alu_result);
             unique case (funct3)
                 3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
                 3'b010: load_data = mem_rdata_raw;  // LW
@@ -515,7 +545,7 @@ module LSU (
                 3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};  // LBU
                 default: begin
                     load_data = 32'h0;
-                    NPCINV(ifu_raddr);  // pc renamed
+                    NPCINV(pc);
                 end
             endcase
         end
@@ -525,9 +555,9 @@ module LSU (
     always_comb begin
         if (inst_type == TYPE_S && opcode == 7'b0100011) begin
             unique case (funct3)
-                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);  // addr and store_data renamed
-                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);  // addr and store_data renamed
-                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);  // addr and store_data renamed
+                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
+                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
+                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
                 default: ;  // 不支持的 store 类型保持兼容旧行为
             endcase
         end
@@ -537,65 +567,65 @@ endmodule
 // WBU(WriteBack Unit): 将数据写入寄存器
 module WBU (
     input  inst_t        inst_type,
-    input   [ 6:0] opcode,
-    input   [ 2:0] funct3,
-    input   [31:0] ifu_raddr,  // pc renamed
-    input   [31:0] snpc,
-    input   [31:0] alu_result,
-    input   [31:0] load_data,
-    input   [31:0] csr_read_data,
-    output logic  [31:0] gpr_wdata,  // wdata renamed
+    input         [ 6:0] opcode,
+    input         [ 2:0] funct3,
+    input         [31:0] pc,
+    input         [31:0] snpc,
+    input         [31:0] alu_result,
+    input         [31:0] load_data,
+    input         [31:0] csr_read_data,
+    output logic  [31:0] gpr_wdata,
     output logic         gpr_we
 );
     import "DPI-C" function void NPCINV(input int pc);
 
     always_comb begin
-        gpr_wdata  = 32'h0;  // wdata renamed
+        gpr_wdata = 32'h0;
         gpr_we = 1'b0;
 
         unique case (inst_type)
             TYPE_I: begin
                 if (opcode == 7'b1100111) begin
                     // JALR
-                    gpr_wdata  = snpc;
+                    gpr_wdata = snpc;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b0000011) begin
                     // Load指令: 写回内存数据
-                    gpr_wdata  = load_data;
+                    gpr_wdata = load_data;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b1110011) begin
                     // CSR指令: 写回CSR读值
                     if (funct3 == 3'b010) begin
-                        gpr_wdata  = csr_read_data;
+                        gpr_wdata = csr_read_data;
                         gpr_we = 1'b1;
                     end
                 end else begin
                     // 其他I型指令(算术/逻辑): 写回ALU结果
                     unique case (funct3)
                         3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111: begin
-                            gpr_wdata  = alu_result;  // wdata renamed
+                            gpr_wdata = alu_result;
                             gpr_we = 1'b1;
                         end
-                        default: NPCINV(ifu_raddr);  // pc renamed
+                        default: NPCINV(pc);
                     endcase
                 end
             end
             TYPE_R: begin
                 unique case (funct3)
                     3'b000, 3'b001, 3'b010, 3'b011, 3'b100, 3'b101, 3'b110, 3'b111: begin
-                        gpr_wdata  = alu_result;  // wdata renamed
+                        gpr_wdata = alu_result;
                         gpr_we = 1'b1;
                     end
-                    default: NPCINV(ifu_raddr);  // pc renamed
+                    default: NPCINV(pc);
                 endcase
             end
             TYPE_U: begin
-                gpr_wdata  = alu_result;  // wdata renamed
+                gpr_wdata = alu_result;
                 gpr_we = 1'b1;
             end
             TYPE_J: begin
                 // JAL
-                gpr_wdata  = snpc;
+                gpr_wdata = snpc;
                 gpr_we = 1'b1;
             end
             default: ;  // TYPE_B / TYPE_S / TYPE_N 不写回寄存器
