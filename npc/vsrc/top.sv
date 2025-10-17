@@ -159,6 +159,7 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
+    input               ifu_rsq_valid,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
@@ -198,14 +199,14 @@ module IFU (
 
     always_comb begin
         unique case (state)
-            IDLE: next_state = WAIT;
+            IDLE: next_state = ifu_rsq_valid ? WAIT : IDLE;
             WAIT: next_state = IDLE;
             default: next_state = IDLE;
         endcase
     end
 
     always @(posedge clk) begin
-        if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
+        if (state == IDLE && ifu_rsq_valid) ifu_rdata <= pmem_read_npc(pc);
     end
 
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
