@@ -178,7 +178,7 @@ module IFU (
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset_sync) pc <= RESET_PC;
-        else if (state == IDLE) pc <= dnpc;
+        else if (state == WAIT) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
