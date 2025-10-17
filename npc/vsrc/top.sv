@@ -194,7 +194,7 @@ module IFU (
 
     // 读取当前 PC 指令并通知 DPI
     always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
-    always_comb update_inst_npc(ifu_rdata, dnpc);
+    always_comb update_inst_npc(ifu_rdata, pc);
     always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
 endmodule
 
