@@ -553,7 +553,7 @@ module delay_line #(
     logic [N-1:0][WIDTH-1:0] shift_reg;
 
     always_ff @(posedge clk) begin
-        if (reset) shift_reg[i] <= '0;
+        if (reset) shift_reg <= '0;
         else shift_reg <= {shift_reg[N-2:0], din};
     end
 
