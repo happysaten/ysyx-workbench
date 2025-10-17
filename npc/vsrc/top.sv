@@ -461,7 +461,7 @@ module EXU (
                         NPCTRAP();
                     end else begin
                         // 不支持的系统指令保持兼容旧行为
-                        NPCINV(pc);
+                        NPCINV(ifu_raddr);
                     end
                 end
                 3'b001: begin
