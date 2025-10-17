@@ -563,19 +563,17 @@ module LSU (
     assign pmem_addr  = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
-        if (pmem_ren) begin
-            unique case (funct3)
-                3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
-                3'b010: lsu_rdata = pmem_rdata;  // LW
-                3'b001: lsu_rdata = {{16{pmem_rdata[15]}}, pmem_rdata[15:0]};  // LH
-                3'b101: lsu_rdata = {16'b0, pmem_rdata[15:0]};  // LHU
-                3'b100: lsu_rdata = {24'b0, pmem_rdata[7:0]};  // LBU
-                default: begin
-                    lsu_rdata = 32'h0;
-                    NPCINV(pc);
-                end
-            endcase
-        end
+        unique case (funct3)
+            3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
+            3'b010: lsu_rdata = pmem_rdata;  // LW
+            3'b001: lsu_rdata = {{16{pmem_rdata[15]}}, pmem_rdata[15:0]};  // LH
+            3'b101: lsu_rdata = {16'b0, pmem_rdata[15:0]};  // LHU
+            3'b100: lsu_rdata = {24'b0, pmem_rdata[7:0]};  // LBU
+            default: begin
+                lsu_rdata = 32'h0;
+                if (pmem_ren) NPCINV(pc);
+            end
+        endcase
     end
 
     logic lsu_req_valid_q;
