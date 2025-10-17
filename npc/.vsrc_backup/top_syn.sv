@@ -1,3 +1,12 @@
+// 此代码仅为yosys可综合使用
+
+// 为了yosys可综合，请作出如下修改：
+// 1. IFU例化一个256x32的ROM作为数据存储器(初始化一些指令)
+// 2. LSU例化一个256x32的packed array触发器作为数据存储器
+// 3. 删除所有DPI-C接口
+// 4.增加一些输出端口以免顶层模块无输出被优化掉
+
+
 // import alu_pkg::*;
 
 // 指令类型枚举
@@ -14,18 +23,20 @@ typedef enum logic [2:0] {
 /* verilator lint_off DECLFILENAME */
 
 module top (
-    input clk,   // 时钟信号
-    input reset  // 复位信号
-    // input [31:0] inst,  // 输入指令
-    // output logic [31:0] pc  // 程序计数器输出
+    input clk,  // 时钟信号
+    input reset,  // 复位信号
+    // input [31:0] inst,  // 移除外部inst输入端口
+    output logic [31:0] pc_out,  // 新增输出端口：程序计数器
+    output logic [31:0] alu_result_out,  // 新增输出端口：ALU结果
+    output logic [31:0] load_data_out  // 新增输出端口：加载数据
 );
 
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
     logic        jump_en;
-    logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
+    logic [31:0] ifu_rdata;  // 新增ifu_rdata信号
 
     IFU u_ifu (
         .clk(clk),
@@ -35,7 +46,7 @@ module top (
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
-        .ifu_rdata(inst),
+        .ifu_rdata(ifu_rdata),  // 新增输出连接
         .ifu_resp_valid(ifu_resp_valid)  // 新增输出
     );
 
@@ -48,7 +59,7 @@ module top (
     inst_t   inst_type;
     alu_op_t alu_op;  // 新增alu_op信号
     IDU u_idu (
-        .inst(inst),
+        .inst(ifu_rdata),  // 修改为使用ifu_rdata
         .opcode(opcode),
         .funct3(funct3),
         .rd(rd),
@@ -115,15 +126,16 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk       (clk),
-        .inst_type (inst_type),
-        .opcode    (opcode),
-        .funct3    (funct3),
-        .pc        (pc),
-        .alu_result(alu_result),
-        .gpr_rdata2(gpr_rdata2),
-        .load_data (load_data),
-        .lsu_req_valid     (ifu_resp_valid)  // 新增输入
+        .clk          (clk),
+        .reset        (reset),
+        .inst_type    (inst_type),
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .pc           (pc),
+        .alu_result   (alu_result),
+        .gpr_rdata2   (gpr_rdata2),
+        .load_data    (load_data),
+        .lsu_req_valid(ifu_resp_valid)  // 新增输入
     );
 
     // WBU：负责写回GPR
@@ -140,6 +152,11 @@ module top (
         .gpr_we       (gpr_we)
     );
 
+    // 新增输出连接
+    assign pc_out = pc;
+    assign alu_result_out = alu_result;
+    assign load_data_out = load_data;
+
 endmodule
 
 // IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令，并管理PC更新
@@ -148,12 +165,28 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
+    // input        [31:0] inst,           // 移除外部inst输入端口
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
-    output logic [31:0] ifu_rdata,  // 输出指令
+    output logic [31:0] ifu_rdata,      // 输出指令
     output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
 );
+    // 例化256x32的ROM作为inst来源
+    logic [31:0] rom[256];  // ROM存储器
+
+    // ✅ 在 initial 块中直接写内容
+    initial begin
+        rom[0] = 32'h00000093;  // addi x1, x0, 0
+        rom[1] = 32'h00100113;  // addi x2, x0, 1
+        rom[2] = 32'h002081B3;  // add  x3, x1, x2
+        rom[3] = 32'h00310233;  // add  x4, x2, x3
+        rom[4] = 32'h0000006F;  // jal  x0, 0
+        // 其余可设为 0
+        integer i;
+        for (i = 5; i < 256; i = i + 1) rom[i] = 32'h00000000;
+    end
+
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
 
@@ -162,6 +195,7 @@ module IFU (
         if (reset) reset_sync <= 1'b1;
         else reset_sync <= 1'b0;
     end
+    // assign reset_sync = reset;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -173,17 +207,9 @@ module IFU (
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    // DPI 接口：从内存读取指令并上报 instruction + next pc
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
-
-    // 读取当前 PC 指令并通知 DPI
-    always_comb ifu_rdata = pmem_read_npc(pc);
-    always_comb update_inst_npc(ifu_rdata, dnpc);
-    always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
+    // 从ROM读取指令
+    assign ifu_rdata = rom[pc[9:2]];
+    assign ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -257,16 +283,16 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input clk,  // 时钟信号
-    input reset,  // 复位信号
-    input gpr_we,  // 写使能信号
-    input [4:0] gpr_waddr,  // 写寄存器地址
-    input [31:0] gpr_wdata,  // 写数据
-    input [4:0] gpr_raddr1,  // 读寄存器1地址
-    input [4:0] gpr_raddr2,  // 读寄存器2地址
-    input        gpr_req_valid,  // 新增输入，指令响应有效性
-    output logic [31:0] gpr_rdata1,  // 读寄存器1数据
-    output logic [31:0] gpr_rdata2  // 读寄存器2数据
+    input               clk,            // 时钟信号
+    input               reset,          // 复位信号
+    input               gpr_we,         // 写使能信号
+    input        [ 4:0] gpr_waddr,      // 写寄存器地址
+    input        [31:0] gpr_wdata,      // 写数据
+    input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
+    input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
+    input               gpr_req_valid,  // 新增输入，指令响应有效性
+    output logic [31:0] gpr_rdata1,     // 读寄存器1数据
+    output logic [31:0] gpr_rdata2      // 读寄存器2数据
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -283,13 +309,7 @@ module GPR (
     end
 
 
-    import "DPI-C" function void write_gpr_npc(
-        input logic [ 4:0] idx,
-        input logic [31:0] data
-    );
-    always_comb begin
-        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
-    end
+    // 移除DPI接口
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
@@ -314,14 +334,7 @@ module CSR #(
         end
     end
 
-    import "DPI-C" function void write_csr_npc(
-        input logic [ 1:0] idx,
-        input logic [31:0] data
-    );
-
-    always_comb begin
-        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
-    end
+    // 移除DPI接口
 
 endmodule
 
@@ -351,8 +364,7 @@ module EXU (
     output logic    [ 3:0][31:0] csr_wdata,
     output logic    [31:0]       csr_read_data
 );
-    import "DPI-C" function void NPCINV(input int pc);
-    import "DPI-C" function void NPCTRAP();
+    // 移除DPI接口
 
     logic [31:0] alu_a, alu_b;
 
@@ -367,11 +379,11 @@ module EXU (
 
     function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
         unique case (addr)
-            12'h305: return 2'd0;
-            12'h341: return 2'd1;
-            12'h300: return 2'd2;
-            12'h342: return 2'd3;
-            default: return 2'd0;
+            12'h305: csr_addr_to_idx = 2'd0;
+            12'h341: csr_addr_to_idx = 2'd1;
+            12'h300: csr_addr_to_idx = 2'd2;
+            12'h342: csr_addr_to_idx = 2'd3;
+            default: csr_addr_to_idx = 2'd0;
         endcase
     endfunction
 
@@ -472,10 +484,10 @@ module EXU (
                         csr_wdata[2]        = mstatus_mret;
                     end else if (imm == 32'h1) begin
                         // EBREAK
-                        NPCTRAP();
+                        // 移除NPCTRAP调用
                     end else begin
                         // 不支持的系统指令保持兼容旧行为
-                        NPCINV(pc);
+                        // 移除NPCINV调用
                     end
                 end
                 3'b001: begin
@@ -487,7 +499,7 @@ module EXU (
                     // CSRRR
                     csr_read_data = csr_rdata[csr_idx];
                 end
-                default: NPCINV(pc);
+                default: ;  // 移除NPCINV调用
             endcase
         end
     end
@@ -497,6 +509,7 @@ endmodule
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
     input                clk,
+    input                reset,
     input  inst_t        inst_type,
     input         [ 6:0] opcode,
     input         [ 2:0] funct3,
@@ -506,13 +519,25 @@ module LSU (
     input                lsu_req_valid,  // 新增输入，指令响应有效性
     output logic  [31:0] load_data
 );
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void pmem_write_npc(
-        input int  waddr,
-        input int  wdata,
-        input byte wmask
-    );
-    import "DPI-C" function void NPCINV(input int pc);
+    // 移除DPI接口
+
+    // 例化256x32的packed array触发器作为数据存储器
+    logic [255:0][31:0] pmem;
+
+    // 初始化存储器（复位时清零）
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            for (int i = 0; i < 256; i++) pmem[i] <= 32'h0;
+        end else if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin
+            // 存储逻辑：写入mem（假设地址对齐，alu_result[9:2]作为索引）
+            unique case (funct3)
+                3'b000:  pmem[alu_result[9:2]][7:0] <= gpr_rdata2[7:0];  // SB
+                3'b001:  pmem[alu_result[9:2]][15:0] <= gpr_rdata2[15:0];  // SH
+                3'b010:  pmem[alu_result[9:2]] <= gpr_rdata2;  // SW
+                default: ;  // 不支持的 store 类型保持兼容旧行为
+            endcase
+        end
+    end
 
     int mem_rdata_raw;
 
@@ -521,7 +546,7 @@ module LSU (
         load_data     = 32'h0;
         mem_rdata_raw = 0;
         if (inst_type == TYPE_I && opcode == 7'b0000011) begin
-            mem_rdata_raw = pmem_read_npc(alu_result);
+            mem_rdata_raw = pmem[alu_result[9:2]];  // 修复：从mem改为pmem
             unique case (funct3)
                 3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
                 3'b010: load_data = mem_rdata_raw;  // LW
@@ -530,23 +555,12 @@ module LSU (
                 3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};  // LBU
                 default: begin
                     load_data = 32'h0;
-                    NPCINV(pc);
+                    // 移除NPCINV调用
                 end
             endcase
         end
     end
 
-    // 存储逻辑
-    always_comb begin
-        if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
-            unique case (funct3)
-                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
-                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
-                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
-                default: ;  // 不支持的 store 类型保持兼容旧行为
-            endcase
-        end
-    end
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
@@ -562,7 +576,7 @@ module WBU (
     output logic  [31:0] gpr_wdata,
     output logic         gpr_we
 );
-    import "DPI-C" function void NPCINV(input int pc);
+    // 移除DPI接口
 
     always_comb begin
         gpr_wdata = 32'h0;
@@ -591,7 +605,7 @@ module WBU (
                             gpr_wdata = alu_result;
                             gpr_we = 1'b1;
                         end
-                        default: NPCINV(pc);
+                        default: ;  // 移除NPCINV调用
                     endcase
                 end
             end
@@ -601,7 +615,7 @@ module WBU (
                         gpr_wdata = alu_result;
                         gpr_we = 1'b1;
                     end
-                    default: NPCINV(pc);
+                    default: ;  // 移除NPCINV调用
                 endcase
             end
             TYPE_U: begin
