@@ -187,7 +187,7 @@ module IFU (
 
     // 状态机
     always_ff @(posedge clk) begin
-        if (reset_sync) state <= IDLE;
+        if (reset) state <= IDLE;
         else begin
             unique case (state)
                 IDLE: state <= WAIT;
