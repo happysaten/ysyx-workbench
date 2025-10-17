@@ -203,7 +203,7 @@ module IFU (
     always_comb begin
         unique case (state)
             IDLE: next_state = ifu_rsq_valid ? WAIT : IDLE;
-            WAIT: next_state = IDLE;
+            WAIT: next_state = ifu_resp_valid ? IDLE : WAIT;
             default: next_state = IDLE;
         endcase
     end
@@ -542,6 +542,7 @@ endmodule
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
     input                clk,
+    input                reset,
     input  inst_t        inst_type,
     input         [ 6:0] opcode,
     input         [ 2:0] funct3,
@@ -571,6 +572,25 @@ module LSU (
         ) : 32'b0;
     // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
     always_comb if (pmem_wen && lsu_req_valid) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+
+    typedef enum logic {
+        IDLE,
+        WAIT
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = lsu_req_valid && (pmem_ren || pmem_wen) ? WAIT : IDLE;
+            WAIT: next_state = lsu_resp_valid ? IDLE : WAIT;
+            default: next_state = IDLE;
+        endcase
+    end
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
