@@ -14,7 +14,7 @@ typedef enum logic [2:0] {
 /* verilator lint_off DECLFILENAME */
 
 module top (
-    input clk,   // 时钟信号
+    input clk,  // 时钟信号
     input reset,  // 复位信号
     output logic npc_resp_valid  // 指令响应有效输出
 );
@@ -24,23 +24,24 @@ module top (
     logic        jump_en;
     logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
-    logic ifu_resp_valid; // 指令响应有效信号
-
-    assign npc_resp_valid = ifu_resp_valid;
 
     logic        reset_sync;
-    // // 同步复位信号
+    // 同步复位信号
     // always_ff @(posedge clk) begin
     //     if (reset) reset_sync <= 1'b1;
     //     else reset_sync <= 1'b0;
     // end
     assign reset_sync = reset;
 
+    logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid;
+    assign npc_resp_valid = gpr_resp_valid;
+
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
+        .ifu_rsq_valid(gpr_resp_valid),
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
@@ -77,14 +78,15 @@ module top (
     GPR u_gpr (
         .clk(clk),
         .reset(reset_sync),
-        .gpr_we(gpr_we && (|rd)),
+        .gpr_wen(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
         .gpr_raddr1(rs1),
         .gpr_raddr2(rs2),
         .gpr_rdata1(gpr_rdata1),
         .gpr_rdata2(gpr_rdata2),
-        .gpr_req_valid(ifu_resp_valid)  // 新增输入
+        .gpr_req_valid(lsu_resp_valid),
+        .gpr_resp_valid(gpr_resp_valid)
     );
 
     // CSR：控制状态寄存器
@@ -93,7 +95,7 @@ module top (
     CSR u_csr (
         .clk(clk),
         .reset(reset_sync),
-        .csr_we(csr_we),
+        .csr_wen(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
     );
@@ -122,17 +124,18 @@ module top (
     );
 
     // LSU：负责加载和存储指令的内存访问
-    logic [31:0] load_data;  // 加载数据
+    logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
-        .clk          (clk),
-        .inst_type    (inst_type),
-        .opcode       (opcode),
-        .funct3       (funct3),
-        .pc           (pc),
-        .alu_result   (alu_result),
-        .gpr_rdata2   (gpr_rdata2),
-        .load_data    (load_data),
-        .lsu_req_valid(ifu_resp_valid)  // 新增输入
+        .clk           (clk),
+        .inst_type     (inst_type),
+        .opcode        (opcode),
+        .funct3        (funct3),
+        .pc            (pc),
+        .alu_result    (alu_result),
+        .gpr_rdata2    (gpr_rdata2),
+        .lsu_rdata     (lsu_rdata),
+        .lsu_req_valid (ifu_resp_valid),
+        .lsu_resp_valid(lsu_resp_valid)
     );
 
     // WBU：负责写回GPR
@@ -143,7 +146,7 @@ module top (
         .pc           (pc),
         .snpc         (snpc),
         .alu_result   (alu_result),
-        .load_data    (load_data),
+        .lsu_rdata    (lsu_rdata),
         .csr_read_data(csr_read_data),
         .gpr_wdata    (gpr_wdata),
         .gpr_we       (gpr_we)
@@ -157,6 +160,7 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
+    input               ifu_rsq_valid,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
@@ -196,14 +200,14 @@ module IFU (
 
     always_comb begin
         unique case (state)
-            IDLE: next_state = WAIT;
+            IDLE: next_state = ifu_rsq_valid ? WAIT : IDLE;
             WAIT: next_state = IDLE;
             default: next_state = IDLE;
         endcase
     end
 
     always @(posedge clk) begin
-        if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
+        if (state == IDLE && ifu_rsq_valid) ifu_rdata <= pmem_read_npc(pc);
     end
 
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
@@ -282,14 +286,15 @@ endmodule
 module GPR (
     input               clk,            // 时钟信号
     input               reset,          // 复位信号
-    input               gpr_we,         // 写使能信号
+    input               gpr_wen,         // 写使能信号
     input        [ 4:0] gpr_waddr,      // 写寄存器地址
     input        [31:0] gpr_wdata,      // 写数据
     input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
     input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
-    input               gpr_req_valid,  // 新增输入，指令响应有效性
+    input               gpr_req_valid,  // 指令响应有效性
     output logic [31:0] gpr_rdata1,     // 读寄存器1数据
-    output logic [31:0] gpr_rdata2      // 读寄存器2数据
+    output logic [31:0] gpr_rdata2,     // 读寄存器2数据
+    output logic        gpr_resp_valid  // 寄存器响应有效性
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -299,7 +304,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
+        end else if (gpr_wen && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -311,13 +316,19 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_we && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_wen && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
+
+    always @(posedge clk) begin
+        if (reset) gpr_resp_valid <= 1'b1;
+        else gpr_resp_valid <= gpr_req_valid;
+    end
+
 endmodule
 
 // CSR(Control and Status Register) 负责控制和状态寄存器的读写
@@ -326,14 +337,14 @@ module CSR #(
 ) (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    input [N-1:0] csr_we,
+    input [N-1:0] csr_wen,
     input [N-1:0][31:0] csr_wdata,
     output logic [N-1:0][31:0] csr_rdata
 );
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
-            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];
+            for (int i = 0; i < N; i++) if (csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -343,7 +354,7 @@ module CSR #(
     );
 
     always_comb begin
-        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        for (int i = 0; i < N; i++) if (csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
 endmodule
@@ -502,12 +513,12 @@ module EXU (
                     end
                 end
                 3'b001: begin
-                    // CSRRW
+                    // CSRW
                     csr_we[csr_idx]    = 1'b1;
                     csr_wdata[csr_idx] = gpr_rdata1;
                 end
                 3'b010: begin
-                    // CSRRR
+                    // CSRR
                     csr_read_data = csr_rdata[csr_idx];
                 end
                 default: NPCINV(pc);
@@ -527,7 +538,8 @@ module LSU (
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
     input                lsu_req_valid,  // 新增输入，指令响应有效性
-    output logic  [31:0] load_data
+    output logic  [31:0] lsu_rdata,
+    output logic         lsu_resp_valid
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -537,39 +549,53 @@ module LSU (
     );
     import "DPI-C" function void NPCINV(input int pc);
 
-    int mem_rdata_raw;
 
-    // 加载逻辑
+    // 内存接口信号
+    logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
+    logic [7:0] pmem_wmask;
+    logic pmem_ren, pmem_wen;
+    always @(posedge clk)
+        pmem_rdata <= (pmem_ren && lsu_req_valid) ? pmem_read_npc(
+            pmem_addr
+        ) : 32'b0;
+    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
+    always_comb if (pmem_wen && lsu_req_valid) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+
+    // 指令逻辑
+    assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_addr  = alu_result;
+    assign pmem_wdata = gpr_rdata2;
     always_comb begin
-        load_data     = 32'h0;
-        mem_rdata_raw = 0;
-        if (inst_type == TYPE_I && opcode == 7'b0000011) begin
-            mem_rdata_raw = pmem_read_npc(alu_result);
-            unique case (funct3)
-                3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
-                3'b010: load_data = mem_rdata_raw;  // LW
-                3'b001: load_data = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};  // LH
-                3'b101: load_data = {16'b0, mem_rdata_raw[15:0]};  // LHU
-                3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};  // LBU
-                default: begin
-                    load_data = 32'h0;
-                    NPCINV(pc);
-                end
-            endcase
-        end
+        unique case (funct3)
+            3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
+            3'b010: lsu_rdata = pmem_rdata;  // LW
+            3'b001: lsu_rdata = {{16{pmem_rdata[15]}}, pmem_rdata[15:0]};  // LH
+            3'b101: lsu_rdata = {16'b0, pmem_rdata[15:0]};  // LHU
+            3'b100: lsu_rdata = {24'b0, pmem_rdata[7:0]};  // LBU
+            default: begin
+                lsu_rdata = 32'h0;
+                if (pmem_ren) NPCINV(pc);
+            end
+        endcase
     end
 
-    // 存储逻辑
     always_comb begin
-        if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
-            unique case (funct3)
-                3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
-                3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
-                3'b010:  pmem_write_npc(alu_result, gpr_rdata2, 8'hf);
-                default: ;  // 不支持的 store 类型保持兼容旧行为
-            endcase
-        end
+        unique case (funct3)
+            3'b000: pmem_wmask = 8'h1;  // SB
+            3'b001: pmem_wmask = 8'h3;  // SH
+            3'b010: pmem_wmask = 8'hF;  // SW
+            default: begin
+                pmem_wmask = 8'h0;
+                if (pmem_wen) NPCINV(pc);
+            end
+        endcase
     end
+
+    logic lsu_req_valid_q;
+    always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
+    // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
@@ -580,7 +606,7 @@ module WBU (
     input         [31:0] pc,
     input         [31:0] snpc,
     input         [31:0] alu_result,
-    input         [31:0] load_data,
+    input         [31:0] lsu_rdata,
     input         [31:0] csr_read_data,
     output logic  [31:0] gpr_wdata,
     output logic         gpr_we
@@ -599,7 +625,7 @@ module WBU (
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b0000011) begin
                     // Load指令: 写回内存数据
-                    gpr_wdata = load_data;
+                    gpr_wdata = lsu_rdata;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b1110011) begin
                     // CSR指令: 写回CSR读值

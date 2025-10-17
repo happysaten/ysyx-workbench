@@ -46,20 +46,23 @@ static void step() {
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // for (int i = 0; i < 2; i++) {
-    //     printf("%d\n", top->npc_resp_valid);
     //     step(); // 仿真两个周期以完成指令执行
+    //     printf("%d\n", top->npc_resp_valid);
     // }
     // 等待 IFU 响应有效，带超时保护
     constexpr int kTimeoutCycles = 10;
     int cycles = 0;
     do {
-        if (++cycles > kTimeoutCycles) {
-            fprintf(stderr,
-                    "exec_one_cpu: timeout waiting for ifu_resp_valid\n");
-            break;
-        }
         // printf("%d\n", top->npc_resp_valid);
         step();
+        // printf("%d\n", top->npc_resp_valid);
+        if (context->gotFinish())
+            break;
+        if (++cycles > kTimeoutCycles) {
+            fprintf(stderr,
+                    "exec_one_cpu: timeout waiting for npc_resp_valid\n");
+            break;
+        }
     } while (top->npc_resp_valid != 1);
 }
 
@@ -84,6 +87,8 @@ void NPCTRAP() {
     ebreak();     // 调用ebreak处理函数
     tfp->close(); // 关闭波形文件
     top->final(); // 结束仿真
+    context->gotFinish(true);
+    // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
 }
 
