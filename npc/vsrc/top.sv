@@ -554,8 +554,11 @@ module LSU (
     logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
     logic [7:0] pmem_wmask;
     logic pmem_ren, pmem_wen;
-    // always @(posedge clk) pmem_rdata <= pmem_ren ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
+    always @(posedge clk)
+        pmem_rdata <= (pmem_ren && lsu_req_valid) ? pmem_read_npc(
+            pmem_addr
+        ) : 32'b0;
+    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
     always_comb if (pmem_wen && lsu_req_valid) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
@@ -591,8 +594,8 @@ module LSU (
 
     logic lsu_req_valid_q;
     always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
-    // assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
-    assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
+    assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
+    // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
