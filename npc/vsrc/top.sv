@@ -124,7 +124,7 @@ module top (
     );
 
     // LSU：负责加载和存储指令的内存访问
-    logic [31:0] load_data;  // 加载数据
+    logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
         .clk           (clk),
         .inst_type     (inst_type),
@@ -133,7 +133,7 @@ module top (
         .pc            (pc),
         .alu_result    (alu_result),
         .gpr_rdata2    (gpr_rdata2),
-        .load_data     (load_data),
+        .lsu_rdata     (lsu_rdata),
         .lsu_req_valid (ifu_resp_valid),
         .lsu_resp_valid(lsu_resp_valid)
     );
@@ -146,7 +146,7 @@ module top (
         .pc           (pc),
         .snpc         (snpc),
         .alu_result   (alu_result),
-        .load_data    (load_data),
+        .lsu_rdata    (lsu_rdata),
         .csr_read_data(csr_read_data),
         .gpr_wdata    (gpr_wdata),
         .gpr_we       (gpr_we)
@@ -291,10 +291,10 @@ module GPR (
     input        [31:0] gpr_wdata,      // 写数据
     input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
     input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
-    input               gpr_req_valid,  // 新增输入，指令响应有效性
+    input               gpr_req_valid,  // 指令响应有效性
     output logic [31:0] gpr_rdata1,     // 读寄存器1数据
     output logic [31:0] gpr_rdata2,     // 读寄存器2数据
-    output logic        gpr_resp_valid  // 新增输出，寄存器响应有效性
+    output logic        gpr_resp_valid  // 寄存器响应有效性
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -324,8 +324,10 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    always @(posedge clk) if (reset) gpr_resp_valid <= 1'b1;
-    else gpr_resp_valid <= gpr_req_valid;
+    always @(posedge clk) begin
+        if (reset) gpr_resp_valid <= 1'b1;
+        else gpr_resp_valid <= gpr_req_valid;
+    end
 
 endmodule
 
@@ -536,7 +538,7 @@ module LSU (
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
     input                lsu_req_valid,  // 新增输入，指令响应有效性
-    output logic  [31:0] load_data,
+    output logic  [31:0] lsu_rdata,
     output logic         lsu_resp_valid
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -547,51 +549,22 @@ module LSU (
     );
     import "DPI-C" function void NPCINV(input int pc);
 
-
-    // // 读写过程
-    // always @(posedge clk) begin
-    //     lsu_rdata <= (!lsu_wen) ? pmem_read_npc(lsu_addr) : 32'b0;
-    //     if (lsu_wen) begin
-    //         pmem_write(lsu_addr, lsu_wdata, lsu_wmask);
-    //     end
-    // end
-
-    // typedef enum logic {
-    //     IDLE,
-    //     WAIT
-    // } state_t;
-    // state_t state, next_state;
-    // assign lsu_resp_valid = (state == WAIT);
-
-    // always @(posedge clk) begin
-    //     if (reset) state <= IDLE;
-    //     else state <= next_state;
-    // end
-
-    // always_comb begin
-    //     unique case (state)
-    //         IDLE: next_state = WAIT;
-    //         WAIT: next_state = IDLE;
-    //         default: next_state = IDLE;
-    //     endcase
-    // end
-
     int mem_rdata_raw;
 
     // 加载逻辑
     always_comb begin
-        load_data     = 32'h0;
+        lsu_rdata     = 32'h0;
         mem_rdata_raw = 0;
         if (inst_type == TYPE_I && opcode == 7'b0000011) begin
             mem_rdata_raw = pmem_read_npc(alu_result);
             unique case (funct3)
-                3'b000: load_data = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
-                3'b010: load_data = mem_rdata_raw;  // LW
-                3'b001: load_data = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};  // LH
-                3'b101: load_data = {16'b0, mem_rdata_raw[15:0]};  // LHU
-                3'b100: load_data = {24'b0, mem_rdata_raw[7:0]};  // LBU
+                3'b000: lsu_rdata = {{24{mem_rdata_raw[7]}}, mem_rdata_raw[7:0]};  // LB
+                3'b010: lsu_rdata = mem_rdata_raw;  // LW
+                3'b001: lsu_rdata = {{16{mem_rdata_raw[15]}}, mem_rdata_raw[15:0]};  // LH
+                3'b101: lsu_rdata = {16'b0, mem_rdata_raw[15:0]};  // LHU
+                3'b100: lsu_rdata = {24'b0, mem_rdata_raw[7:0]};  // LBU
                 default: begin
-                    load_data = 32'h0;
+                    lsu_rdata = 32'h0;
                     NPCINV(pc);
                 end
             endcase
@@ -625,7 +598,7 @@ module WBU (
     input         [31:0] pc,
     input         [31:0] snpc,
     input         [31:0] alu_result,
-    input         [31:0] load_data,
+    input         [31:0] lsu_rdata,
     input         [31:0] csr_read_data,
     output logic  [31:0] gpr_wdata,
     output logic         gpr_we
@@ -644,7 +617,7 @@ module WBU (
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b0000011) begin
                     // Load指令: 写回内存数据
-                    gpr_wdata = load_data;
+                    gpr_wdata = lsu_rdata;
                     gpr_we = 1'b1;
                 end else if (opcode == 7'b1110011) begin
                     // CSR指令: 写回CSR读值
