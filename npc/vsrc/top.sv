@@ -560,7 +560,7 @@ module LSU (
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011) && lsu_req_valid;
     assign pmem_addr  = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
