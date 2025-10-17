@@ -241,7 +241,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     always_comb begin
-        ifu_rdata = pmem_read_npc(pc);
+        if (ifu_resp_valid) ifu_rdata = pmem_read_npc(pc);
     end
 
     always_comb begin
