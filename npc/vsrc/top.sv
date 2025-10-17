@@ -169,7 +169,7 @@ module PCU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;
+        if (reset) pc <= RESET_PC;
         else pc <= dnpc;
     end
 
