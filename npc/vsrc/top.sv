@@ -27,9 +27,16 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
+    logic reset_sync;
+    // 同步复位信号
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+
     IFU u_ifu (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
         .pc(pc),
@@ -67,7 +74,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .gpr_we(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
@@ -83,7 +90,7 @@ module top (
     logic [3:0] csr_we;
     CSR u_csr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .csr_we(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
@@ -162,23 +169,18 @@ module IFU (
     );
 
     localparam int RESET_PC = 32'h80000000;
-    logic reset_sync;
     typedef enum logic {
         IDLE,
         WAIT
     } state_t;
     state_t state, next_state;
 
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
+    assign ifu_resp_valid = (state == WAIT);
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;
-        else if (state == IDLE) pc <= dnpc;
+        if (reset) pc <= RESET_PC;
+        else if (ifu_resp_valid) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
@@ -202,9 +204,7 @@ module IFU (
         if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
     end
 
-    assign ifu_resp_valid = (state == WAIT);
-
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, pc);
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
