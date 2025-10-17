@@ -15,9 +15,8 @@ typedef enum logic [2:0] {
 
 module top (
     input clk,   // 时钟信号
-    input reset  // 复位信号
-    // input [31:0] inst,  // 输入指令
-    // output logic [31:0] pc  // 程序计数器输出
+    input reset,  // 复位信号
+    output logic ifu_resp_valid  // 指令响应有效输出
 );
 
     // IFU：负责 PC 和取指
@@ -25,7 +24,6 @@ module top (
     logic        jump_en;
     logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
-    logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
     logic        reset_sync;
     // // 同步复位信号
