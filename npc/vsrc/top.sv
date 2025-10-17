@@ -299,7 +299,7 @@ module GPR (
         input logic [ 4:0] idx,
         input logic [31:0] data
     );
-    always_comb begin
+    always_ff @(posedge clk) begin
         if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
