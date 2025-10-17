@@ -513,12 +513,12 @@ module EXU (
                     end
                 end
                 3'b001: begin
-                    // CSRRW
+                    // CSRW
                     csr_we[csr_idx]    = 1'b1;
                     csr_wdata[csr_idx] = gpr_rdata1;
                 end
                 3'b010: begin
-                    // CSRRR
+                    // CSRR
                     csr_read_data = csr_rdata[csr_idx];
                 end
                 default: NPCINV(pc);
