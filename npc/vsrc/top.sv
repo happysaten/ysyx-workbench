@@ -157,11 +157,12 @@ module IFU (
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
 
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
+    // // 同步复位信号
+    // always_ff @(posedge clk) begin
+    //     if (reset) reset_sync <= 1'b1;
+    //     else reset_sync <= 1'b0;
+    // end
+    assign reset_sync = reset;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
