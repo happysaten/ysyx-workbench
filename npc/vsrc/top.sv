@@ -188,7 +188,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     always @(posedge clk) begin
-        if (reset_sync) state <= IDLE;
+        if (reset) state <= IDLE;
         else state <= next_state;
     end
 
