@@ -53,7 +53,7 @@ extern "C" void exec_one_cpu() {
     while (top->ifu_resp_valid == 0) {
         count++;
         step(); // 等待指令获取完成
-        if (count > 1000000) {
+        if (count > 10) {
             printf("Timeout");
             break;
         }
