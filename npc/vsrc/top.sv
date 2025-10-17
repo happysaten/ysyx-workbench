@@ -175,7 +175,7 @@ module IFU (
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset_sync) pc <= RESET_PC;
-        else if (state == WAIT) pc <= dnpc;
+        else if (state == IDLE) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
@@ -198,7 +198,7 @@ module IFU (
 
     assign ifu_resp_valid = (state == WAIT);
 
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, pc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
