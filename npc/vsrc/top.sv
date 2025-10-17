@@ -27,22 +27,17 @@ module top (
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
-    // PCU：负责PC更新
-    PCU u_pcu (
+    // IFU：负责PC更新和指令取指
+    IFU u_ifu (
         .clk(clk),
         .reset(reset),
         .jump_target(jump_target),
         .jump_en(jump_en),
         .pc(pc),
         .snpc(snpc),
-        .dnpc(dnpc)
-    );
-
-    IFU u_ifu (
-        .ifu_raddr(pc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_resp_valid(ifu_resp_valid)  // 新增输出
+        .ifu_resp_valid(ifu_resp_valid)
     );
 
     // IDU：负责指令解码
@@ -148,24 +143,26 @@ module top (
 
 endmodule
 
-// PCU(Program Counter Unit) 负责PC寄存器的更新
-module PCU (
+// IFU(Instruction Fetch Unit) 负责程序计数器(PC)的更新和指令的取出
+module IFU (
     input               clk,
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
     output logic [31:0] pc,
     output logic [31:0] snpc,
-    output logic [31:0] dnpc
+    output logic [31:0] dnpc,
+    output logic [31:0] ifu_rdata,  // 输出指令
+    output logic        ifu_resp_valid  // 输出，表示指令响应有效
 );
     localparam int RESET_PC = 32'h80000000;
-    logic reset_sync;
+    // logic reset_sync;
 
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
+    // // 同步复位信号
+    // always_ff @(posedge clk) begin
+    //     if (reset) reset_sync <= 1'b1;
+    //     else reset_sync <= 1'b0;
+    // end
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -176,15 +173,7 @@ module PCU (
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
-endmodule
 
-// IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
-module IFU (
-    input        [31:0] ifu_raddr,  // 输入PC
-    input        [31:0] dnpc,       // 输入下一个PC，用于DPI
-    output logic [31:0] ifu_rdata,  // 输出指令
-    output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
-);
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void update_inst_npc(
@@ -193,7 +182,7 @@ module IFU (
     );
 
     // 读取当前 PC 指令并通知 DPI
-    always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
+    always_comb ifu_rdata = pmem_read_npc(pc);
     always_comb update_inst_npc(ifu_rdata, pc);
     always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
 endmodule
