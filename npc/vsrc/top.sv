@@ -199,7 +199,7 @@ module IFU (
 
     assign ifu_resp_valid = (state == WAIT);
 
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, pc);
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
