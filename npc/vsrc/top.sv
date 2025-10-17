@@ -20,6 +20,15 @@ module top (
     // output logic [31:0] pc  // 程序计数器输出
 );
 
+    logic reset_sync;
+
+    // 同步复位信号
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+    // assign reset_sync = reset;
+
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
     logic        jump_en;
@@ -29,7 +38,7 @@ module top (
 
     IFU u_ifu (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
         .pc(pc),
@@ -67,7 +76,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .gpr_we(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
@@ -83,7 +92,7 @@ module top (
     logic [3:0] csr_we;
     CSR u_csr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .csr_we(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
@@ -155,18 +164,10 @@ module IFU (
     output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
 );
     localparam int RESET_PC = 32'h80000000;
-    logic reset_sync;
-
-    // // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
-    assign reset_sync = reset;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;
+        if (reset) pc <= RESET_PC;
         else pc <= dnpc;
     end
 
