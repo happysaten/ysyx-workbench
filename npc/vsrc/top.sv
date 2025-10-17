@@ -540,6 +540,28 @@ module EXU (
 
 endmodule
 
+module delay_line #(
+    parameter int N     = 4,  // 延迟周期数
+    parameter int WIDTH = 8   // 信号位宽
+) (
+    input logic clk,
+    input logic reset,
+    input logic [WIDTH-1:0] din,
+    output logic [WIDTH-1:0] dout
+);
+
+    logic [N-1:0][WIDTH-1:0] shift_reg;
+
+    always_ff @(posedge clk) begin
+        if (reset) shift_reg[i] <= '0;
+        else shift_reg <= {shift_reg[N-2:0], din};
+    end
+
+    assign dout = shift_reg[N-1];
+
+endmodule
+
+
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
     input                clk,
@@ -625,7 +647,16 @@ module LSU (
     end
 
     logic lsu_req_valid_q;
-    always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    delay_line #(
+        .N(1),
+        .WIDTH(1)
+    ) u_delay_line (
+        .clk(clk),
+        .reset(reset),
+        .din(lsu_req_valid),
+        .dout(lsu_req_valid_q)
+    );
     assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
