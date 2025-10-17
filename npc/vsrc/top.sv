@@ -115,15 +115,15 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk       (clk),
-        .inst_type (inst_type),
-        .opcode    (opcode),
-        .funct3    (funct3),
-        .pc        (pc),
-        .alu_result(alu_result),
-        .gpr_rdata2(gpr_rdata2),
-        .load_data (load_data),
-        .lsu_req_valid     (ifu_resp_valid)  // 新增输入
+        .clk          (clk),
+        .inst_type    (inst_type),
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .pc           (pc),
+        .alu_result   (alu_result),
+        .gpr_rdata2   (gpr_rdata2),
+        .load_data    (load_data),
+        .lsu_req_valid(ifu_resp_valid)  // 新增输入
     );
 
     // WBU：负责写回GPR
@@ -163,7 +163,10 @@ module IFU (
 
     localparam int RESET_PC = 32'h80000000;
     logic reset_sync;
-    typedef enum logic {IDLE, WAIT} state_t;
+    typedef enum logic {
+        IDLE,
+        WAIT
+    } state_t;
     state_t state;
 
     // 同步复位信号
@@ -174,7 +177,7 @@ module IFU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset_sync) pc <= RESET_PC;
+        if (reset) pc <= RESET_PC;
         else if (state == IDLE) pc <= dnpc;
     end
 
@@ -182,18 +185,16 @@ module IFU (
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    // 状态机和取指
+    // 状态机
     always_ff @(posedge clk) begin
-        case (state)
-            IDLE: begin
-                ifu_rdata <= pmem_read_npc(pc);
-                state <= WAIT;
-            end
-            WAIT: begin
-                state <= IDLE;
-            end
-            default: state <= IDLE;
-        endcase
+        if (reset) state <= IDLE;
+        else begin
+            unique case (state)
+                IDLE: state <= WAIT;
+                WAIT: state <= IDLE;
+                default: state <= IDLE;
+            endcase
+        end
     end
 
     assign ifu_resp_valid = (state == WAIT);
@@ -272,16 +273,16 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input clk,  // 时钟信号
-    input reset,  // 复位信号
-    input gpr_we,  // 写使能信号
-    input [4:0] gpr_waddr,  // 写寄存器地址
-    input [31:0] gpr_wdata,  // 写数据
-    input [4:0] gpr_raddr1,  // 读寄存器1地址
-    input [4:0] gpr_raddr2,  // 读寄存器2地址
-    input        gpr_req_valid,  // 新增输入，指令响应有效性
-    output logic [31:0] gpr_rdata1,  // 读寄存器1数据
-    output logic [31:0] gpr_rdata2  // 读寄存器2数据
+    input               clk,            // 时钟信号
+    input               reset,          // 复位信号
+    input               gpr_we,         // 写使能信号
+    input        [ 4:0] gpr_waddr,      // 写寄存器地址
+    input        [31:0] gpr_wdata,      // 写数据
+    input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
+    input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
+    input               gpr_req_valid,  // 新增输入，指令响应有效性
+    output logic [31:0] gpr_rdata1,     // 读寄存器1数据
+    output logic [31:0] gpr_rdata2      // 读寄存器2数据
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
