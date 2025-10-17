@@ -1,5 +1,5 @@
-#include "../include/verilator.h"
 #include "../include/npc_callback.h"
+#include "../include/verilator.h"
 #include <Vtop__Dpi.h>
 #include <common.h>
 #include <cpu/cpu.h>
@@ -45,9 +45,22 @@ static void step() {
 
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
-    // top->inst = paddr_read(top->pc, 4); // 从PC地址获取指令
-    step(); // 仿真一个周期
-    // update_inst(top->inst, top->pc);
+    // for (int i = 0; i < 2; i++) {
+    //     printf("%d\n", top->npc_resp_valid);
+    //     step(); // 仿真两个周期以完成指令执行
+    // }
+    // 等待 IFU 响应有效，带超时保护
+    constexpr int kTimeoutCycles = 10;
+    int cycles = 0;
+    do {
+        if (++cycles > kTimeoutCycles) {
+            fprintf(stderr,
+                    "exec_one_cpu: timeout waiting for ifu_resp_valid\n");
+            break;
+        }
+        // printf("%d\n", top->npc_resp_valid);
+        step();
+    } while (top->npc_resp_valid != 1);
 }
 
 bool DPI_EN = false; // 定义并初始化
