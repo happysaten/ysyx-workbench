@@ -25,6 +25,7 @@ module top (
     logic        jump_en;
     logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
     logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
+    logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
     // PCU：负责PC更新
     PCU u_pcu (
@@ -38,14 +39,15 @@ module top (
     );
 
     IFU u_ifu (
-        .ifu_raddr(pc),  // 新增输入
-        .dnpc(dnpc),  // 新增输入
-        .ifu_rdata(inst)  // 输出
+        .ifu_raddr(pc),
+        .dnpc(dnpc),
+        .ifu_rdata(inst),
+        .ifu_resp_valid(ifu_resp_valid)  // 新增输出
     );
 
     // IDU：负责指令解码
     // 解码信号
-    logic [6:0] opcode, funct7;
+    logic [ 6:0] opcode;
     logic [ 2:0] funct3;
     logic [31:0] imm;
     logic [4:0] rs1, rs2, rd;
@@ -60,7 +62,7 @@ module top (
         .rs2(rs2),
         .imm(imm),
         .inst_type(inst_type),
-        .alu_op(alu_op)  // 新增输出
+        .alu_op(alu_op)
     );
 
     // GPR：通用寄存器组
@@ -78,7 +80,8 @@ module top (
         .gpr_raddr1(rs1),
         .gpr_raddr2(rs2),
         .gpr_rdata1(gpr_rdata1),
-        .gpr_rdata2(gpr_rdata2)
+        .gpr_rdata2(gpr_rdata2),
+        .gpr_req_valid(ifu_resp_valid)  // 新增输入
     );
 
     // CSR：控制状态寄存器
@@ -106,7 +109,7 @@ module top (
         .snpc         (snpc),
         .inst_type    (inst_type),
         .csr_rdata    (csr_rdata),
-        .alu_op       (alu_op),        // 新增输入
+        .alu_op       (alu_op),
         .alu_result   (alu_result),
         .jump_target  (jump_target),
         .jump_en      (jump_en),
@@ -125,7 +128,8 @@ module top (
         .pc        (pc),
         .alu_result(alu_result),
         .gpr_rdata2(gpr_rdata2),
-        .load_data (load_data)
+        .load_data (load_data),
+        .lsu_req_valid     (ifu_resp_valid)  // 新增输入
     );
 
     // WBU：负责写回GPR
@@ -178,7 +182,8 @@ endmodule
 module IFU (
     input        [31:0] ifu_raddr,  // 输入PC
     input        [31:0] dnpc,       // 输入下一个PC，用于DPI
-    output logic [31:0] ifu_rdata   // 输出指令
+    output logic [31:0] ifu_rdata,  // 输出指令
+    output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
 );
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -190,6 +195,7 @@ module IFU (
     // 读取当前 PC 指令并通知 DPI
     always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
     always_comb update_inst_npc(ifu_rdata, dnpc);
+    always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -270,6 +276,7 @@ module GPR (
     input [31:0] gpr_wdata,  // 写数据
     input [4:0] gpr_raddr1,  // 读寄存器1地址
     input [4:0] gpr_raddr2,  // 读寄存器2地址
+    input        gpr_req_valid,  // 新增输入，指令响应有效性
     output logic [31:0] gpr_rdata1,  // 读寄存器1数据
     output logic [31:0] gpr_rdata2  // 读寄存器2数据
 );
@@ -281,7 +288,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_we) begin
+        end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -348,7 +355,7 @@ module EXU (
     input           [31:0]       snpc,
     input  inst_t                inst_type,
     input           [ 3:0][31:0] csr_rdata,
-    input  alu_op_t              alu_op,        // 新增输入ALU操作码
+    input  alu_op_t              alu_op,
     output logic    [31:0]       alu_result,
     output logic    [31:0]       jump_target,
     output logic                 jump_en,
@@ -366,7 +373,7 @@ module EXU (
     ) u_alu (
         .A(alu_a),
         .B(alu_b),
-        .ALUop(alu_op),  // 使用输入
+        .ALUop(alu_op),
         .Result(alu_result)
     );
 
@@ -508,6 +515,7 @@ module LSU (
     input         [31:0] pc,
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
+    input                lsu_req_valid,  // 新增输入，指令响应有效性
     output logic  [31:0] load_data
 );
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -542,7 +550,7 @@ module LSU (
 
     // 存储逻辑
     always_comb begin
-        if (inst_type == TYPE_S && opcode == 7'b0100011) begin
+        if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
             unique case (funct3)
                 3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
                 3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
