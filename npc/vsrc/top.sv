@@ -129,6 +129,7 @@ module top (
     logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
         .clk           (clk),
+        .reset         (reset_sync),
         .inst_type     (inst_type),
         .opcode        (opcode),
         .funct3        (funct3),
