@@ -41,6 +41,7 @@ module top (
         .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
+        .ifu_rsq_valid(gpr_resp_valid),
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
