@@ -304,7 +304,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-            gpr_resp_valid <= 1'b0;
+            gpr_resp_valid <= 1'b1;
         end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
             gpr_resp_valid <= 1'b1;
