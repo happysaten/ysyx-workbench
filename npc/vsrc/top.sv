@@ -28,12 +28,12 @@ module top (
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
     logic        reset_sync;
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
-    // assign reset_sync = reset;
+    // // 同步复位信号
+    // always_ff @(posedge clk) begin
+    //     if (reset) reset_sync <= 1'b1;
+    //     else reset_sync <= 1'b0;
+    // end
+    assign reset_sync = reset;
 
     IFU u_ifu (
         .clk(clk),
@@ -75,7 +75,7 @@ module top (
     logic gpr_we;
     GPR u_gpr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .gpr_we(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
@@ -91,7 +91,7 @@ module top (
     logic [3:0] csr_we;
     CSR u_csr (
         .clk(clk),
-        .reset(reset),
+        .reset(reset_sync),
         .csr_we(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata)
