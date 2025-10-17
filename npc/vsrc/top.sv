@@ -228,7 +228,7 @@ module IFU (
     );
 
     localparam int RESET_PC = 32'h80000000;
-    assign ifu_resp_valid = 1'b1;
+    assign ifu_resp_valid = !reset;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -245,9 +245,7 @@ module IFU (
     end
 
     always_comb begin
-        if (!reset) begin
-            if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
-        end
+        if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
     end
 endmodule
 
