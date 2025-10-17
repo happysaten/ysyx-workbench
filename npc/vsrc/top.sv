@@ -304,11 +304,9 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-            gpr_resp_valid <= 1'b0;
         end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
-            gpr_resp_valid <= 1'b1;
-        end else gpr_resp_valid <= 1'b0;
+        end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
@@ -574,8 +572,6 @@ module LSU (
     //     endcase
     // end
 
-    assign lsu_resp_valid = lsu_req_valid;
-
     int mem_rdata_raw;
 
     // 加载逻辑
@@ -598,9 +594,11 @@ module LSU (
         end
     end
 
+    logic wen;
+    assign wen = (inst_type == TYPE_S && opcode == 7'b0100011);
     // 存储逻辑
     always_comb begin
-        if (inst_type == TYPE_S && opcode == 7'b0100011 && lsu_req_valid) begin  // 修改：添加valid条件
+        if (lsu_req_valid && wen) begin  // 修改：添加valid条件
             unique case (funct3)
                 3'b000:  pmem_write_npc(alu_result, gpr_rdata2, 8'h1);
                 3'b001:  pmem_write_npc(alu_result, gpr_rdata2, 8'h3);
@@ -609,6 +607,10 @@ module LSU (
             endcase
         end
     end
+
+    logic lsu_req_valid_q;
+    always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    assign lsu_resp_valid = wen ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
