@@ -116,15 +116,15 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] load_data;  // 加载数据
     LSU u_lsu (
-        .clk       (clk),
-        .inst_type (inst_type),
-        .opcode    (opcode),
-        .funct3    (funct3),
-        .pc        (pc),
-        .alu_result(alu_result),
-        .gpr_rdata2(gpr_rdata2),
-        .load_data (load_data),
-        .lsu_req_valid     (ifu_resp_valid)  // 新增输入
+        .clk          (clk),
+        .inst_type    (inst_type),
+        .opcode       (opcode),
+        .funct3       (funct3),
+        .pc           (pc),
+        .alu_result   (alu_result),
+        .gpr_rdata2   (gpr_rdata2),
+        .load_data    (load_data),
+        .lsu_req_valid(ifu_resp_valid)  // 新增输入
     );
 
     // WBU：负责写回GPR
@@ -152,17 +152,10 @@ module IFU (
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
-    output logic [31:0] ifu_rdata,  // 输出指令
+    output logic [31:0] ifu_rdata,      // 输出指令
     output logic        ifu_resp_valid  // 输出，表示指令响应有效
 );
     localparam int RESET_PC = 32'h80000000;
-    // logic reset_sync;
-
-    // // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -258,39 +251,37 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input clk,  // 时钟信号
-    input reset,  // 复位信号
-    input gpr_we,  // 写使能信号
-    input [4:0] gpr_waddr,  // 写寄存器地址
-    input [31:0] gpr_wdata,  // 写数据
-    input [4:0] gpr_raddr1,  // 读寄存器1地址
-    input [4:0] gpr_raddr2,  // 读寄存器2地址
-    input        gpr_req_valid,  // 新增输入，指令响应有效性
-    output logic [31:0] gpr_rdata1,  // 读寄存器1数据
-    output logic [31:0] gpr_rdata2  // 读寄存器2数据
+    input               clk,            // 时钟信号
+    input               reset,          // 复位信号
+    input               gpr_we,         // 写使能信号
+    input        [ 4:0] gpr_waddr,      // 写寄存器地址
+    input        [31:0] gpr_wdata,      // 写数据
+    input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
+    input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
+    input               gpr_req_valid,  // 新增输入，指令响应有效性
+    output logic [31:0] gpr_rdata1,     // 读寄存器1数据
+    output logic [31:0] gpr_rdata2      // 读寄存器2数据
 );
     logic [31:0] regfile[32];  // 寄存器文件
 
     // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
     // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
 
+    import "DPI-C" function void write_gpr_npc(
+        input logic [ 4:0] idx,
+        input logic [31:0] data
+    );
+
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
         end else if (gpr_we && gpr_req_valid) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
+            write_gpr_npc(gpr_waddr, gpr_wdata);
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
-
-    import "DPI-C" function void write_gpr_npc(
-        input logic [ 4:0] idx,
-        input logic [31:0] data
-    );
-    always_ff @(posedge clk) begin
-        if (gpr_we) write_gpr_npc(gpr_waddr, gpr_wdata);
-    end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
