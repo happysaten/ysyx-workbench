@@ -167,7 +167,7 @@ module IFU (
         IDLE,
         WAIT
     } state_t;
-    state_t state;
+    state_t state, next_state;
 
     // 同步复位信号
     always_ff @(posedge clk) begin
@@ -185,16 +185,21 @@ module IFU (
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    // 状态机
-    always_ff @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else begin
-            unique case (state)
-                IDLE: state <= WAIT;
-                WAIT: state <= IDLE;
-                default: state <= IDLE;
-            endcase
-        end
+    always @(posedge clk) begin
+        if (reset_sync) state <= IDLE;
+        else state <= next_state;
+    end
+
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = WAIT;
+            WAIT: next_state = IDLE;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    always @(posedge clk) begin
+        if (state == IDLE) ifu_rdata <= pmem_read_npc(pc);
     end
 
     assign ifu_resp_valid = (state == WAIT);
