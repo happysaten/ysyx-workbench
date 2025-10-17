@@ -299,21 +299,22 @@ module CSR #(
     input [N-1:0][31:0] csr_wdata,
     output logic [N-1:0][31:0] csr_rdata
 );
-    always_ff @(posedge clk) begin
-        if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
-        else begin
-            for (int i = 0; i < N; i++) if (csr_we[i]) csr_rdata[i] <= csr_wdata[i];
-        end
-    end
-
     import "DPI-C" function void write_csr_npc(
         input logic [ 1:0] idx,
         input logic [31:0] data
     );
 
-    always_comb begin
-        for (int i = 0; i < N; i++) if (csr_we[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+    always_ff @(posedge clk) begin
+        if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
+        else begin
+            for (int i = 0; i < N; i++)
+            if (csr_we[i]) begin
+                csr_rdata[i] <= csr_wdata[i];
+                write_csr_npc(i[1:0], csr_wdata[i]);
+            end
+        end
     end
+
 
 endmodule
 
