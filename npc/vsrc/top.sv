@@ -39,6 +39,7 @@ module top (
     );
 
     IFU u_ifu (
+        .clk(clk),  // 新增输入
         .ifu_raddr(pc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
@@ -180,10 +181,11 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责根据当前PC从存储器中取出一条指令
 module IFU (
-    input        [31:0] ifu_raddr,  // 输入PC
-    input        [31:0] dnpc,       // 输入下一个PC，用于DPI
-    output logic [31:0] ifu_rdata,  // 输出指令
-    output logic        ifu_resp_valid  // 新增输出，表示指令响应有效
+    input               clk,          // 新增时钟输入
+    input        [31:0] ifu_raddr,    // 输入PC
+    input        [31:0] dnpc,         // 输入下一个PC，用于DPI
+    output logic [31:0] ifu_rdata,    // 输出指令
+    output logic        ifu_resp_valid  // 输出，表示指令响应有效
 );
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -192,10 +194,26 @@ module IFU (
         input int dnpc
     );
 
-    // 读取当前 PC 指令并通知 DPI
-    always_comb ifu_rdata = pmem_read_npc(ifu_raddr);
-    always_comb update_inst_npc(ifu_rdata, dnpc);
-    always_comb ifu_resp_valid = 1'b1;  // 假设当前所有指令响应有效
+    typedef enum logic {IDLE, WAIT} state_t;
+    state_t state;
+
+    // 状态机
+    always_ff @(posedge clk) begin
+        case (state)
+            IDLE: begin
+                ifu_rdata <= pmem_read_npc(ifu_raddr);
+                state <= WAIT;
+            end
+            WAIT: begin
+                state <= IDLE;
+            end
+            default: state <= IDLE;
+        endcase
+    end
+    assign ifu_resp_valid = (state == WAIT);
+
+    // DPI通知（在wait时）
+    always_comb if (state == WAIT) update_inst_npc(ifu_rdata, dnpc);
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
