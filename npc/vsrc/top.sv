@@ -28,11 +28,12 @@ module top (
     logic        ifu_resp_valid;  // 新增ifu_resp_valid信号，表示指令响应有效
 
     logic reset_sync;
-    // 同步复位信号
-    always_ff @(posedge clk) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
+    // // 同步复位信号
+    // always_ff @(posedge clk) begin
+    //     if (reset) reset_sync <= 1'b1;
+    //     else reset_sync <= 1'b0;
+    // end
+    assign reset_sync = reset;
 
     IFU u_ifu (
         .clk(clk),
