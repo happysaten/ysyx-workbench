@@ -213,25 +213,25 @@ module IFU (
     always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    logic lfsr_out;
-    lfsr8 #(
-        .TAPS(8'b10111010)
-    ) ifu_lfsr8 (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (lfsr_out)
-    );
-    assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid)) && !reset;
-    // delay_line #(
-    //     .N(0),
-    //     .WIDTH(1)
-    // ) u_delay_line (
+    // logic lfsr_out;
+    // lfsr8 #(
+    //     .TAPS(8'b10111010)
+    // ) ifu_lfsr8 (
     //     .clk  (clk),
     //     .reset(reset),
-    //     .din  (state == IDLE && ifu_req_valid),
-    //     .dout (ifu_resp_valid_d)
+    //     .en   (1'b1),
+    //     .out  (lfsr_out)
     // );
+    // assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid)) && !reset;
+    delay_line #(
+        .N(0),
+        .WIDTH(1)
+    ) u_delay_line (
+        .clk  (clk),
+        .reset(reset),
+        .din  (state == IDLE && ifu_req_valid),
+        .dout (ifu_resp_valid_d)
+    );
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
