@@ -214,24 +214,23 @@ module IFU (
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
     logic ifu_req_valid_q;
-    // lfsr8 #(
-    //     .TAPS(8'b10111010)
-    // ) ifu_lfsr8 (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .en   (1'b1),
-    //     .out  (lfsr_out)
-    // );
-    // assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid)) && !reset;
-    delay_line #(
-        .N(3),
-        .WIDTH(1)
-    ) u_delay_line (
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) ifu_lfsr8 (
         .clk  (clk),
         .reset(reset),
-        .din  (ifu_req_valid),
-        .dout (ifu_req_valid_q)
+        .en   (1'b1),
+        .out  (ifu_req_valid_q)
     );
+    // delay_line #(
+    //     .N(3),
+    //     .WIDTH(1)
+    // ) u_delay_line (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .din  (ifu_req_valid),
+    //     .dout (ifu_req_valid_q)
+    // );
     assign ifu_resp_valid_d = ifu_req_valid_q && (next_state == WAIT) && !reset;
     // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
