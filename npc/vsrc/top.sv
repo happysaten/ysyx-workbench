@@ -235,7 +235,7 @@ module IFU (
     //     .out  (ifu_req_ready_rand)
     // );
     delay_line #(
-        .N(1),
+        .N(0),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
