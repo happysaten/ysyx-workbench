@@ -400,11 +400,10 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    // always_ff @(posedge clk) begin
-    //     if (reset) gpr_resp_valid <= 1'b1;
-    //     else gpr_resp_valid <= gpr_req_valid;
-    // end
-    assign gpr_resp_valid = state == WAIT && !reset;
+    always_ff @(posedge clk) begin
+        if (reset) gpr_resp_valid <= 1'b1;
+        else gpr_resp_valid <= gpr_req_valid && gpr_req_ready;
+    end
 
 endmodule
 
@@ -461,11 +460,10 @@ module CSR #(
         if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
-    // always_ff @(posedge clk) begin
-    //     if (reset) csr_resp_valid <= 1'b1;
-    //     else csr_resp_valid <= csr_req_valid;
-    // end
-    assign csr_resp_valid = state == WAIT && !reset;
+        always_ff @(posedge clk) begin
+            if (reset) csr_resp_valid <= 1'b1;
+            else csr_resp_valid <= csr_req_valid && csr_req_ready;
+        end
 
 endmodule
 
