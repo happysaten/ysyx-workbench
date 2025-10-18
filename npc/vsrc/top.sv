@@ -224,7 +224,7 @@ module IFU (
         .en   (1'b1),
         .out  (lfsr8_out)
     );
-    assign ifu_req_valid_q = lfsr8_out && ~pmem_idle;
+    assign ifu_req_valid_q = lfsr8_out && state == WAIT;
     assign ifu_resp_valid  = ifu_req_valid_q;
 endmodule
 
