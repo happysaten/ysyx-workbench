@@ -27,11 +27,11 @@ module top (
 
     logic        reset_sync;
     // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
-    assign reset_sync = reset;
+    always_ff @(posedge clk) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+    // assign reset_sync = reset;
 
     logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid, csr_resp_valid;
     logic ifu_req_ready, lsu_req_ready, gpr_req_ready, csr_req_ready;
@@ -366,7 +366,7 @@ module GPR (
         unique case (state)
             IDLE: next_state = gpr_req_valid && gpr_req_ready ? WAIT : IDLE;
             WAIT: next_state = gpr_resp_valid && gpr_resp_ready ? IDLE : WAIT;
-            // default: next_state = IDLE;
+            default: next_state = IDLE;
         endcase
     end
 
@@ -436,7 +436,7 @@ module CSR #(
         unique case (state)
             IDLE: next_state = csr_req_valid && csr_req_ready ? WAIT : IDLE;
             WAIT: next_state = csr_resp_valid && csr_resp_ready ? IDLE : WAIT;
-            // default: next_state = IDLE;
+            default: next_state = IDLE;
         endcase
     end
 
