@@ -366,7 +366,7 @@ module GPR (
         unique case (state)
             IDLE: next_state = gpr_req_valid && gpr_req_ready ? WAIT : IDLE;
             WAIT: next_state = gpr_resp_valid && gpr_resp_ready ? IDLE : WAIT;
-            default: next_state = IDLE;
+            // default: next_state = IDLE;
         endcase
     end
 
@@ -436,7 +436,7 @@ module CSR #(
         unique case (state)
             IDLE: next_state = csr_req_valid && csr_req_ready ? WAIT : IDLE;
             WAIT: next_state = csr_resp_valid && csr_resp_ready ? IDLE : WAIT;
-            default: next_state = IDLE;
+            // default: next_state = IDLE;
         endcase
     end
 
