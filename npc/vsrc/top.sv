@@ -224,7 +224,7 @@ module IFU (
     // );
     // assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid)) && !reset;
     delay_line #(
-        .N(1),
+        .N(2),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
