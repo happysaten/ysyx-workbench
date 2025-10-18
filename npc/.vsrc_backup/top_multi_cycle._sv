@@ -27,7 +27,7 @@ module top (
 
     logic        reset_sync;
     // 同步复位信号
-    // always_ff @(posedge clk) begin
+    // always_ff @(posedge clk or posedge reset) begin
     //     if (reset) reset_sync <= 1'b1;
     //     else reset_sync <= 1'b0;
     // end
