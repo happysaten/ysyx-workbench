@@ -666,11 +666,11 @@ module LSU (
         .WIDTH(2)
     ) u_delay_line (
         .clk  (clk),
-        .reset(!pmem_req),
-        .din  (lsu_req_valid),
+        .reset(reset),
+        .din  (lsu_req_valid && pmem_req),
         .dout (lsu_req_valid_q)
     );
-    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q: lsu_req_valid;
+    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
