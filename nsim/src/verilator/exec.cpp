@@ -79,16 +79,15 @@ bool DPI_EN = false; // 定义并初始化
 // 复位CPU
 extern "C" void reset_cpu() {
     DPI_EN = false;    // 禁用DPI-C接口
-    // top->reset = HIGH; // 复位信号拉高
+    top->reset = HIGH; // 复位信号拉高
 
     for (int i = 0; i < 6; i++) {
         step(); // 仿真3个周期，保证复位信号有效
-        top->reset = HIGH;
     }
 
-    step();
-    top->reset = LOW; // 复位信号拉低
     DPI_EN = true;    // 启用DPI-C接口
+    top->reset = LOW; // 复位信号拉低
+    step();
 }
 
 void NPCTRAP() {
