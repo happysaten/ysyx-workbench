@@ -225,7 +225,7 @@ module IFU (
         .out  (lfsr8_out)
     );
     assign ifu_req_valid_q = lfsr8_out && ~pmem_idle;
-    assign ifu_resp_valid  = pmem_req ? ifu_req_valid_q : ifu_req_valid;
+    assign ifu_resp_valid  = ifu_req_valid_q;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
