@@ -207,10 +207,12 @@ module IFU (
         endcase
     end
 
-    always @(posedge clk) if (state == IDLE && ifu_req_valid) ifu_rdata <= pmem_read_npc(pc);
+    logic ifu_resp_valid_d, lfsr8_out;
+
+    always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
+    always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
     always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    logic ifu_req_valid_q, lfsr8_out;
     // lfsr8 #(
     //     .TAPS(8'b10111010)
     // ) ifu_lfsr8 (
@@ -221,15 +223,14 @@ module IFU (
     // );
     // assign ifu_req_valid_q = lfsr8_out && state == WAIT;
     delay_line #(
-        .N(1),
+        .N(0),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
         .reset(reset),
         .din  (state == IDLE && ifu_req_valid),
-        .dout (ifu_req_valid_q)
+        .dout (ifu_resp_valid_d)
     );
-    assign ifu_resp_valid = ifu_req_valid_q;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -557,7 +558,7 @@ module EXU (
 endmodule
 
 module delay_line #(
-    parameter int N     = 4,  // 延迟周期数
+    parameter int N     = 4,  // 延迟周期数，可为0
     parameter int WIDTH = 8   // 信号位宽
 ) (
     input logic clk,
@@ -566,19 +567,27 @@ module delay_line #(
     output logic [WIDTH-1:0] dout
 );
 
-    logic [N-1:0][WIDTH-1:0] shift_reg;
-
-    always_ff @(posedge clk) begin
-        if (reset) shift_reg <= '0;
-        else begin
-            shift_reg[0] <= din;
-            for (int i = 1; i < N; i++) shift_reg[i] <= shift_reg[i-1];
+    generate
+        if (N == 0) begin : gen_no_delay
+            // N=0时直接透传输入
+            assign dout = din;
+        end else begin : gen_with_delay
+            logic [N-1:0][WIDTH-1:0] shift_reg;
+            always_ff @(posedge clk) begin
+                if (reset) shift_reg <= '0;
+                else begin
+                    shift_reg[0] <= din;
+                    for (int i = 1; i < N; i++) begin
+                        shift_reg[i] <= shift_reg[i-1];
+                    end
+                end
+            end
+            assign dout = shift_reg[N-1];
         end
-    end
-
-    assign dout = shift_reg[N-1];
+    endgenerate
 
 endmodule
+
 
 module lfsr8 #(
     parameter logic [7:0] TAPS = 8'b10111000 // 默认抽头：位7,5,4,3，对应x^8 + x^6 + x^5 + x^4 + 1
