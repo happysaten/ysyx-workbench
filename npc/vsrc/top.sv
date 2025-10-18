@@ -41,7 +41,7 @@ module top (
         .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
-        .ifu_rsq_valid(npc_resp_valid),
+        .ifu_req_valid(npc_resp_valid),
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
@@ -98,7 +98,7 @@ module top (
         .csr_wen(csr_we),
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata),
-        .csr_rsq_valid(lsu_resp_valid),
+        .csr_req_valid(lsu_resp_valid),
         .csr_resp_valid(csr_resp_valid)
     );
 
@@ -163,7 +163,7 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
-    input               ifu_rsq_valid,
+    input               ifu_req_valid,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
@@ -201,14 +201,14 @@ module IFU (
 
     always_comb begin
         unique case (state)
-            IDLE: next_state = ifu_rsq_valid ? WAIT : IDLE;
+            IDLE: next_state = ifu_req_valid ? WAIT : IDLE;
             WAIT: next_state = ifu_resp_valid ? IDLE : WAIT;
             default: next_state = IDLE;
         endcase
     end
 
     always @(posedge clk) begin
-        if (state == IDLE && ifu_rsq_valid) ifu_rdata <= pmem_read_npc(pc);
+        if (state == IDLE && ifu_req_valid) ifu_rdata <= pmem_read_npc(pc);
     end
 
     always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
@@ -354,7 +354,7 @@ module CSR #(
     input reset,  // 复位信号
     input [N-1:0] csr_wen,  // 写使能信号
     input [N-1:0][31:0] csr_wdata,  // 写数据
-    input csr_rsq_valid,  // 读请求有效信号
+    input csr_req_valid,  // 读请求有效信号
     output logic [N-1:0][31:0] csr_rdata,  // 读数据
     output logic csr_resp_valid  // 读响应有效信号
 );
@@ -362,7 +362,7 @@ module CSR #(
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++)
-            if (csr_rsq_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
+            if (csr_req_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -373,12 +373,12 @@ module CSR #(
 
     always_comb begin
         for (int i = 0; i < N; i++)
-        if (csr_rsq_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
     always @(posedge clk) begin
         if (reset) csr_resp_valid <= 1'b1;
-        else csr_resp_valid <= csr_rsq_valid;
+        else csr_resp_valid <= csr_req_valid;
     end
 
 endmodule
