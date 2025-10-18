@@ -349,7 +349,7 @@ module GPR (
     state_t state, next_state;
 
     always @(posedge clk) begin
-        if (reset) state <= IDLE;
+        if (reset) state <= WAIT;
         else state <= next_state;
     end
 
@@ -391,10 +391,7 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    always @(posedge clk) begin
-        if (reset) gpr_resp_valid <= 1'b1;
-        else gpr_resp_valid <= (next_state == WAIT);
-    end
+    assign gpr_resp_valid = (state == WAIT) && !reset;
 
 endmodule
 
@@ -419,7 +416,7 @@ module CSR #(
     state_t state, next_state;
 
     always @(posedge clk) begin
-        if (reset) state <= IDLE;
+        if (reset) state <= WAIT;
         else state <= next_state;
     end
 
@@ -451,10 +448,7 @@ module CSR #(
         if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
-    always @(posedge clk) begin
-        if (reset) csr_resp_valid <= 1'b1;
-        else csr_resp_valid <= (next_state == WAIT);
-    end
+    assign csr_resp_valid = (state == WAIT) && !reset;
 
 endmodule
 
