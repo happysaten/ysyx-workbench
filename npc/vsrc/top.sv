@@ -224,7 +224,7 @@ module IFU (
     // );
     // assign ifu_req_valid_q = lfsr8_out && state == WAIT;
     delay_line #(
-        .N(5),
+        .N(1),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
