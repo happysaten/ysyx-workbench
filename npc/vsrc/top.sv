@@ -591,7 +591,8 @@ module LSU (
     // 内存接口信号
     logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
     logic [7:0] pmem_wmask;
-    logic pmem_ren, pmem_wen;
+    logic pmem_ren, pmem_wen, pmem_req;
+    assign pmem_req = pmem_ren || pmem_wen;
     always @(posedge clk)
         pmem_rdata <= (pmem_ren && lsu_req_valid) ? pmem_read_npc(
             pmem_addr
@@ -612,7 +613,7 @@ module LSU (
 
     always_comb begin
         unique case (state)
-            IDLE: next_state = lsu_req_valid && (pmem_ren || pmem_wen) ? WAIT : IDLE;
+            IDLE: next_state = lsu_req_valid && pmem_req ? WAIT : IDLE;
             WAIT: next_state = lsu_resp_valid ? IDLE : WAIT;
             default: next_state = IDLE;
         endcase
@@ -649,18 +650,18 @@ module LSU (
         endcase
     end
 
-    logic lsu_req_valid_q;
+    logic lsu_req_valid_q, pmem_req_q;
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     delay_line #(
         .N(5),
-        .WIDTH(1)
+        .WIDTH(2)
     ) u_delay_line (
         .clk  (clk),
         .reset(reset),
-        .din  (lsu_req_valid),
-        .dout (lsu_req_valid_q)
+        .din  ({lsu_req_valid, pmem_req}),
+        .dout ({lsu_req_valid_q, pmem_req_q})
     );
-    assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
+    assign lsu_resp_valid = pmem_req && lsu_req_valid || pmem_req_q && lsu_req_valid_q;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
