@@ -680,14 +680,14 @@ module LSU (
     //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
     //     .dout (lsu_req_valid_q)
     // );
-    logic lfsr_out;
+    logic lsu_req_valid_q;
     lfsr8 lsu_lfsr8 (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
-        .out  (lfsr_out)
+        .out  (lsu_req_valid_q)
     );
-    assign lsu_resp_valid_d = lfsr_out && (next_state == WAIT) && !reset;
+    assign lsu_resp_valid_d = lsu_req_valid_q && (next_state == WAIT) && !reset;
 
     // 指令逻辑
     assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
