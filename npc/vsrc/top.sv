@@ -207,30 +207,31 @@ module IFU (
         endcase
     end
 
-    logic ifu_resp_valid_d, lfsr8_out;
+    logic ifu_resp_valid_d;
 
     always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
     always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
-    always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    // lfsr8 #(
-    //     .TAPS(8'b10111010)
-    // ) ifu_lfsr8 (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .en   (1'b1),
-    //     .out  (lfsr8_out)
-    // );
-    // assign ifu_req_valid_q = lfsr8_out && state == WAIT;
-    delay_line #(
-        .N(0),
-        .WIDTH(1)
-    ) u_delay_line (
+    logic lfsr_out;
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) ifu_lfsr8 (
         .clk  (clk),
         .reset(reset),
-        .din  (state == IDLE && ifu_req_valid),
-        .dout (ifu_resp_valid_d)
+        .en   (1'b1),
+        .out  (lfsr_out)
     );
+    assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid));
+    // delay_line #(
+    //     .N(0),
+    //     .WIDTH(1)
+    // ) u_delay_line (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .din  (state == IDLE && ifu_req_valid),
+    //     .dout (ifu_resp_valid_d)
+    // );
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -654,25 +655,43 @@ module LSU (
         endcase
     end
 
+    logic lsu_resp_valid_d, lsu_resp_valid_q;
+    always @(posedge clk) lsu_resp_valid_q <= lsu_resp_valid_d;
 
     // 内存接口信号
     logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
     logic [7:0] pmem_wmask;
     logic pmem_ren, pmem_wen, pmem_req, pmem_idle;
-    assign pmem_req  = pmem_ren || pmem_wen;
-    assign pmem_idle = (state == IDLE);
+    assign pmem_req = pmem_ren || pmem_wen;
+    assign lsu_resp_valid = pmem_req ? lsu_resp_valid_q : lsu_req_valid;
     always @(posedge clk) begin
-        if (pmem_idle && pmem_ren && lsu_req_valid) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (pmem_ren && lsu_resp_valid_d) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
     // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb
-        if (pmem_idle && pmem_wen && lsu_req_valid)
-            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+    always_comb if (pmem_wen && lsu_resp_valid_q) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+
+    // delay_line #(
+    //     .N(5),
+    //     .WIDTH(1)
+    // ) u_delay_line (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
+    //     .dout (lsu_req_valid_q)
+    // );
+    logic lfsr_out;
+    lfsr8 lsu_lfsr8 (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (lfsr_out)
+    );
+    assign lsu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && lsu_req_valid && pmem_req));
 
     // 指令逻辑
-    assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
-    assign pmem_addr  = alu_result;
+    assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_addr = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
         unique case (funct3)
@@ -699,28 +718,6 @@ module LSU (
             end
         endcase
     end
-
-    logic lsu_req_valid_q;
-    // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
-    // delay_line #(
-    //     .N(5),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
-    //     .dout (lsu_req_valid_q)
-    // );
-    logic lfsr8_out;
-    lfsr8 lsu_lfsr8 (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (lfsr8_out)
-    );
-    assign lsu_req_valid_q = lfsr8_out && ~pmem_idle;
-    assign lsu_resp_valid  = pmem_req ? lsu_req_valid_q : lsu_req_valid;
-    // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
