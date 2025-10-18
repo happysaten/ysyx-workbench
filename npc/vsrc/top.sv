@@ -232,7 +232,7 @@ module IFU (
     //     .din  (state == IDLE && ifu_req_valid),
     //     .dout (ifu_resp_valid_d)
     // );
-    assign ifu_resp_valid_d = ifu_req_valid;
+    assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
