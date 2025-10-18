@@ -223,7 +223,7 @@ module IFU (
     // );
     // assign ifu_req_valid_q = lfsr8_out && state == WAIT;
     delay_line #(
-        .N(1),
+        .N(0),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
@@ -570,7 +570,7 @@ module delay_line #(
     generate
         if (N == 0) begin : gen_no_delay
             // N=0时直接透传输入
-            assign dout = din;
+            assign dout = reset ? '0 : din;
         end else begin : gen_with_delay
             logic [N-1:0][WIDTH-1:0] shift_reg;
             always_ff @(posedge clk) begin
