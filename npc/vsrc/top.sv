@@ -253,7 +253,7 @@ module IFU (
     //     .din  (ifu_req_valid),
     //     .dout (ifu_req_valid_q)
     // );
-    assign ifu_resp_valid_d = ifu_resp_valid_rand && (next_state == WAIT) && !reset;
+    assign ifu_resp_valid_d = 1'b1 && (next_state == WAIT) && !reset;
     // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
@@ -391,7 +391,10 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    assign gpr_resp_valid = (state == WAIT);
+    always_ff @(posedge clk) begin
+        if (reset) gpr_resp_valid <= 1'b1;
+        else gpr_resp_valid <= (next_state == WAIT);
+    end
 
 endmodule
 
@@ -448,7 +451,10 @@ module CSR #(
         if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
-    assign csr_resp_valid = (state == WAIT);
+    always_ff @(posedge clk) begin
+        if (reset) csr_resp_valid <= 1'b1;
+        else csr_resp_valid <= (next_state == WAIT);
+    end
 
 endmodule
 
