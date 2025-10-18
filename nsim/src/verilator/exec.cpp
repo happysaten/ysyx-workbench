@@ -50,7 +50,7 @@ extern "C" void exec_one_cpu() {
     //     printf("%d\n", top->npc_resp_valid);
     // }
     // 等待 IFU 响应有效，带超时保护
-    constexpr int kTimeoutCycles = 10;
+    constexpr int kTimeoutCycles = 100;
     int cycles = 0;
     do {
         // printf("%d\n", top->npc_resp_valid);
@@ -80,13 +80,17 @@ extern "C" void reset_cpu() {
     top->reset = LOW; // 复位信号拉低
 }
 
+// 仿真结束操作
+extern "C" void finish_simulation() {
+    tfp->close();      // 关闭波形文件
+    top->final();      // 结束仿真
+}
+
 void NPCTRAP() {
     if (!DPI_EN)
         return;
     // printf("NPCTRAP called at pc = " FMT_WORD "\n", top->pc);
     ebreak();     // 调用ebreak处理函数
-    tfp->close(); // 关闭波形文件
-    top->final(); // 结束仿真
     context->gotFinish(true);
     // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
