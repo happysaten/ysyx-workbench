@@ -593,7 +593,7 @@ module lfsr8 #(
         else if (en) lfsr <= {lfsr[6:0], feedback};
     end
 
-    assign out = (lfsr[2:0] == 3'b000);
+    assign out = (lfsr[1:0] == 2'b00);
 
 endmodule
 
