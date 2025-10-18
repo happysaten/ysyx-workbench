@@ -229,7 +229,7 @@ module IFU (
     // ) u_delay_line (
     //     .clk  (clk),
     //     .reset(reset),
-    //     .din  (state == IDLE && ifu_req_valid),
+    //     .din  (next_state == WAIT),
     //     .dout (ifu_resp_valid_d)
     // );
     assign ifu_resp_valid_d = !reset && ifu_req_valid;
@@ -687,7 +687,7 @@ module LSU (
         .en   (1'b1),
         .out  (lfsr_out)
     );
-    assign lsu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && lsu_req_valid && pmem_req)) && !reset;
+    assign lsu_resp_valid_d = lfsr_out && (next_state == WAIT) && !reset;
 
     // 指令逻辑
     assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
