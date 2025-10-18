@@ -184,8 +184,6 @@ module IFU (
     } state_t;
     state_t state, next_state;
 
-    assign ifu_resp_valid = (state == WAIT);
-
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset) pc <= RESET_PC;
@@ -213,7 +211,21 @@ module IFU (
         if (state == IDLE && ifu_rsq_valid) ifu_rdata <= pmem_read_npc(pc);
     end
 
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+    always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+
+    assign ifu_resp_valid = (state == WAIT);
+
+    logic ifu_req_valid_q, lfsr8_out;
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) ifu_lfsr8 (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (lfsr8_out)
+    );
+    assign ifu_req_valid_q = lfsr8_out && ~pmem_idle;
+    assign ifu_resp_valid  = pmem_req ? ifu_req_valid_q : ifu_req_valid;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -564,15 +576,18 @@ module delay_line #(
 
 endmodule
 
-module lfsr8 (
+module lfsr8 #(
+    parameter logic [7:0] TAPS = 8'b10111000 // 默认抽头：位7,5,4,3，对应x^8 + x^6 + x^5 + x^4 + 1
+) (
     input clk,
     input reset,
     input en,
     output logic out
 );
+
     logic [7:0] lfsr;
     logic feedback;
-    assign feedback = lfsr[7] ^ lfsr[5] ^ lfsr[4] ^ lfsr[3];
+    assign feedback = ^(lfsr & TAPS);  // 参数化反馈计算
 
     // 8-bit maximal-length LFSR polynomial: x^8 + x^6 + x^5 + x^4 + 1
     always_ff @(posedge clk) begin
@@ -684,7 +699,7 @@ module LSU (
     //     .dout (lsu_req_valid_q)
     // );
     logic lfsr8_out;
-    lfsr8 u_lfsr8 (
+    lfsr8 lsu_lfsr8 (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
