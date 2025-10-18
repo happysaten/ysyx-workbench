@@ -186,7 +186,7 @@ module IFU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC - 4;
+        if (reset) pc <= RESET_PC;
         else if (ifu_resp_valid_d) pc <= dnpc;
     end
 
