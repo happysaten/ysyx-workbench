@@ -47,6 +47,8 @@ static void step() {
 extern "C" void finish_simulation() {
     tfp->close(); // 关闭波形文件
     top->final(); // 结束仿真
+    printf("Verilator simulation finished at time %lu ns.\n",
+           context->time()); // 打印仿真结束时间
 }
 
 // 执行单条CPU指令
