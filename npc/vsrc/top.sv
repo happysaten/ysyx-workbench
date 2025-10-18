@@ -661,7 +661,7 @@ module LSU (
         .din  ({lsu_req_valid, pmem_req}),
         .dout ({lsu_req_valid_q, pmem_req_q})
     );
-    assign lsu_resp_valid = pmem_req && lsu_req_valid || pmem_req_q && lsu_req_valid_q;
+    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q && pmem_req_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
