@@ -564,6 +564,26 @@ module delay_line #(
 
 endmodule
 
+module lfsr8 (
+    input clk,
+    input reset,
+    input en,
+    output logic out
+);
+    logic [7:0] lfsr;
+    logic feedback;
+    assign feedback = lfsr[7] ^ lfsr[5] ^ lfsr[4] ^ lfsr[3];
+
+    // 8-bit maximal-length LFSR polynomial: x^8 + x^6 + x^5 + x^4 + 1
+    always_ff @(posedge clk) begin
+        if (reset) lfsr <= 8'h1;  // 初始值不能为0
+        else if (en) lfsr <= {lfsr[6:0], feedback};
+    end
+
+    assign out = (lfsr[2:0] == 3'b000);
+
+endmodule
+
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
@@ -587,18 +607,6 @@ module LSU (
     );
     import "DPI-C" function void NPCINV(input int pc);
 
-
-    // 内存接口信号
-    logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
-    logic [7:0] pmem_wmask;
-    logic pmem_ren, pmem_wen, pmem_req;
-    assign pmem_req = pmem_ren || pmem_wen;
-    always @(posedge clk) begin
-        if (pmem_ren && lsu_req_valid) pmem_rdata <= pmem_read_npc(pmem_addr);
-    end
-    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb if (pmem_wen && lsu_req_valid) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
-
     typedef enum logic {
         IDLE,
         WAIT
@@ -617,6 +625,21 @@ module LSU (
             default: next_state = IDLE;
         endcase
     end
+
+
+    // 内存接口信号
+    logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
+    logic [7:0] pmem_wmask;
+    logic pmem_ren, pmem_wen, pmem_req, pmem_idle;
+    assign pmem_req  = pmem_ren || pmem_wen;
+    assign pmem_idle = (state == IDLE);
+    always @(posedge clk) begin
+        if (pmem_idle && pmem_ren && lsu_req_valid) pmem_rdata <= pmem_read_npc(pmem_addr);
+    end
+    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
+    always_comb
+        if (pmem_idle && pmem_wen && lsu_req_valid)
+            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
@@ -657,20 +680,18 @@ module LSU (
     // ) u_delay_line (
     //     .clk  (clk),
     //     .reset(reset),
-    //     .din  ({lsu_req_valid, pmem_req}),
-    //     .dout ({lsu_req_valid_q, pmem_req_q})
+    //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
+    //     .dout (lsu_req_valid_q)
     // );
-    // assign lsu_resp_valid = pmem_req ? lsu_req_valid_q && pmem_req_q : lsu_req_valid;
-    delay_line #(
-        .N(5),
-        .WIDTH(2)
-    ) u_delay_line (
+    logic lfsr8_out;
+    lfsr8 u_lfsr8 (
         .clk  (clk),
         .reset(reset),
-        .din  (lsu_req_valid && pmem_req),
-        .dout (lsu_req_valid_q)
+        .en   (1'b1),
+        .out  (lfsr8_out)
     );
-    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q : lsu_req_valid;
+    assign lsu_req_valid_q = lfsr8_out && ~pmem_idle;
+    assign lsu_resp_valid  = pmem_req ? lsu_req_valid_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
