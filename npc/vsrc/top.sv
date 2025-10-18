@@ -243,7 +243,7 @@ module IFU (
         .din  (1'b1),
         .dout (ifu_req_ready_rand)
     );
-    assign ifu_req_ready = 1'b1 && (state == IDLE) && !reset;
+    assign ifu_req_ready = ifu_req_ready_rand && (state == IDLE) && !reset;
     logic ifu_resp_valid_rand;
     lfsr8 #(
         .TAPS(8'b10111010)
