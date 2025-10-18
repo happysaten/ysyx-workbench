@@ -211,7 +211,7 @@ module IFU (
 
     always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
     always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, pc);
 
     // logic lfsr_out;
     // lfsr8 #(
