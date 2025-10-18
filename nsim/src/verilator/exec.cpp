@@ -50,7 +50,7 @@ extern "C" void exec_one_cpu() {
     //     printf("%d\n", top->npc_resp_valid);
     // }
     // 等待 IFU 响应有效，带超时保护
-    constexpr int kTimeoutCycles = 50;
+    constexpr int kTimeoutCycles = 100;
     int cycles = 0;
     do {
         // printf("%d\n", top->npc_resp_valid);
