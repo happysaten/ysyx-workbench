@@ -580,7 +580,7 @@ module lfsr8 (
         else if (en) lfsr <= {lfsr[6:0], feedback};
     end
 
-    assign out = (lfsr[2:0] == 3'b000);
+    assign out = (lfsr[1:0] == 2'b00);
 
 endmodule
 
@@ -672,7 +672,7 @@ module LSU (
         endcase
     end
 
-    logic lsu_req_valid_q, pmem_req_q;
+    logic lsu_req_valid_q;
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     // delay_line #(
     //     .N(5),
