@@ -402,7 +402,7 @@ module GPR (
 
     always_ff @(posedge clk) begin
         if (reset) gpr_resp_valid <= 1'b1;
-        else if (gpr_resp_valid) gpr_resp_valid <= gpr_req_valid;
+        else if (gpr_resp_ready) gpr_resp_valid <= gpr_req_valid;
     end
 
 endmodule
