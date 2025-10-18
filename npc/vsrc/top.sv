@@ -554,7 +554,12 @@ module delay_line #(
 
     always_ff @(posedge clk) begin
         if (reset) shift_reg <= '0;
-        else shift_reg <= {shift_reg[N-2:0], din};
+        else begin
+            shift_reg[0] <= din;
+            for (int i = 1; i < N; i++) begin
+                shift_reg[i] <= shift_reg[i-1];
+            end
+        end
     end
 
     assign dout = shift_reg[N-1];
