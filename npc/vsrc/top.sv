@@ -652,7 +652,7 @@ module LSU (
     logic lsu_req_valid_q;
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     delay_line #(
-        .N(2),
+        .N(5),
         .WIDTH(1)
     ) u_delay_line (
         .clk  (clk),
