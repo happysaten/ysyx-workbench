@@ -402,7 +402,7 @@ module GPR (
 
     always_ff @(posedge clk) begin
         if (reset) gpr_resp_valid <= 1'b1;
-        else gpr_resp_valid <= gpr_req_valid;
+        else if (gpr_req_ready) gpr_resp_valid <= gpr_req_valid;
     end
 
 endmodule
@@ -462,7 +462,7 @@ module CSR #(
 
     always_ff @(posedge clk) begin
         if (reset) csr_resp_valid <= 1'b1;
-        else csr_resp_valid <= csr_req_valid;
+        else if (csr_req_ready) csr_resp_valid <= csr_req_valid;
     end
 
 endmodule
