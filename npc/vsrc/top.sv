@@ -213,7 +213,7 @@ module IFU (
     always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    // logic lfsr_out;
+    logic ifu_req_valid_q;
     // lfsr8 #(
     //     .TAPS(8'b10111010)
     // ) ifu_lfsr8 (
@@ -229,9 +229,10 @@ module IFU (
     ) u_delay_line (
         .clk  (clk),
         .reset(reset),
-        .din  (next_state == WAIT),
-        .dout (ifu_resp_valid_d)
+        .din  (ifu_req_valid),
+        .dout (ifu_req_valid_q)
     );
+    assign ifu_resp_valid_d = ifu_req_valid_q && (next_state == WAIT) && !reset;
     // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
