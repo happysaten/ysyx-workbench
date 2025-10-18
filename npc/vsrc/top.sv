@@ -207,7 +207,7 @@ module IFU (
         endcase
     end
 
-    always_comb if (state == WAIT && ifu_resp_valid) ifu_rdata = pmem_read_npc(pc);
+    always @(posedge clk) if (state == IDLE && ifu_req_valid) ifu_rdata <= pmem_read_npc(pc);
     always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
     logic ifu_req_valid_q, lfsr8_out;
