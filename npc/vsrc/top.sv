@@ -186,8 +186,8 @@ module IFU (
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC-4;
-        else if (ifu_req_valid) pc <= dnpc;
+        if (reset) pc <= RESET_PC;
+        else if (ifu_resp_valid) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
@@ -210,8 +210,8 @@ module IFU (
     logic ifu_resp_valid_d;
 
     always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
-    // always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
-    always_comb ifu_rdata = pmem_read_npc(pc);
+    always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
+    // always_comb ifu_rdata = pmem_read_npc(pc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
     logic ifu_req_valid_q;
