@@ -556,9 +556,7 @@ module delay_line #(
         if (reset) shift_reg <= '0;
         else begin
             shift_reg[0] <= din;
-            for (int i = 1; i < N; i++) begin
-                shift_reg[i] <= shift_reg[i-1];
-            end
+            for (int i = 1; i < N; i++) shift_reg[i] <= shift_reg[i-1];
         end
     end
 
@@ -654,13 +652,13 @@ module LSU (
     logic lsu_req_valid_q;
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     delay_line #(
-        .N(5),
+        .N(2),
         .WIDTH(1)
     ) u_delay_line (
-        .clk(clk),
+        .clk  (clk),
         .reset(reset),
-        .din(lsu_req_valid),
-        .dout(lsu_req_valid_q)
+        .din  (lsu_req_valid),
+        .dout (lsu_req_valid_q)
     );
     assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
