@@ -81,7 +81,7 @@ extern "C" void reset_cpu() {
     DPI_EN = false;    // 禁用DPI-C接口
     top->reset = HIGH; // 复位信号拉高
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 6; i++) {
         step(); // 仿真3个周期，保证复位信号有效
     }
 
