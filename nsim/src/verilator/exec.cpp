@@ -43,6 +43,12 @@ static void step() {
 // 外部C接口：无效指令处理
 // extern "C" void invalid_inst(vaddr_t thispc);
 
+// 仿真结束操作
+extern "C" void finish_simulation() {
+    tfp->close(); // 关闭波形文件
+    top->final(); // 结束仿真
+}
+
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // for (int i = 0; i < 2; i++) {
@@ -61,6 +67,7 @@ extern "C" void exec_one_cpu() {
         if (++cycles > kTimeoutCycles) {
             fprintf(stderr,
                     "exec_one_cpu: timeout waiting for npc_resp_valid\n");
+            finish_simulation();
             break;
         }
     } while (top->npc_resp_valid != 1);
@@ -80,17 +87,11 @@ extern "C" void reset_cpu() {
     top->reset = LOW; // 复位信号拉低
 }
 
-// 仿真结束操作
-extern "C" void finish_simulation() {
-    tfp->close();      // 关闭波形文件
-    top->final();      // 结束仿真
-}
-
 void NPCTRAP() {
     if (!DPI_EN)
         return;
     // printf("NPCTRAP called at pc = " FMT_WORD "\n", top->pc);
-    ebreak();     // 调用ebreak处理函数
+    ebreak(); // 调用ebreak处理函数
     context->gotFinish(true);
     // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
