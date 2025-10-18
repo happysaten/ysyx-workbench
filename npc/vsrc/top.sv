@@ -651,16 +651,26 @@ module LSU (
 
     logic lsu_req_valid_q, pmem_req_q;
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    // delay_line #(
+    //     .N(5),
+    //     .WIDTH(2)
+    // ) u_delay_line (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .din  ({lsu_req_valid, pmem_req}),
+    //     .dout ({lsu_req_valid_q, pmem_req_q})
+    // );
+    // assign lsu_resp_valid = pmem_req ? lsu_req_valid_q && pmem_req_q : lsu_req_valid;
     delay_line #(
         .N(5),
         .WIDTH(2)
     ) u_delay_line (
         .clk  (clk),
-        .reset(reset),
-        .din  ({lsu_req_valid, pmem_req}),
-        .dout ({lsu_req_valid_q, pmem_req_q})
+        .reset(!pmem_req),
+        .din  (lsu_req_valid),
+        .dout (lsu_req_valid_q)
     );
-    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q && pmem_req_q : lsu_req_valid;
+    assign lsu_resp_valid = pmem_req ? lsu_req_valid_q: lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
 
