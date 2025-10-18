@@ -14,7 +14,7 @@ extern "C" void init_verilator(const char *trace_file) {
 #ifdef CONFIG_WTRACE
     Verilated::traceEverOn(true); // 启用波形追踪
     top->trace(tfp, 99);          // 绑定波形对象，最大层级99
-    tfp->open(trace_file == NULL ? "build/nsim-trace.fst"
+    tfp->open(trace_file == NULL ? "build/nsim-wave.fst"
                                  : trace_file); // 打开波形文件
 #endif
 }

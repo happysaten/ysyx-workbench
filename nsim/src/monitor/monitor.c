@@ -53,7 +53,7 @@ static char *log_file = NULL;
 static char *diff_so_file = NULL;
 static char *img_file = NULL;
 static char *elf_file = NULL;
-static char *trace_file = NULL;
+static char *wave_file = NULL;
 static int difftest_port = 1234;
 
 static long load_img() {
@@ -85,12 +85,12 @@ static int parse_args(int argc, char *argv[]) {
         {"diff", required_argument, NULL, 'd'},
         {"port", required_argument, NULL, 'p'},
         {"elf", required_argument, NULL, 'e'},
-        {"trace", required_argument, NULL, 't'},
+        {"wave", required_argument, NULL, 'w'},
         {"help", no_argument, NULL, 'h'},
         {0, 0, NULL, 0},
     };
     int o;
-    while ((o = getopt_long(argc, argv, "-bhl:d:p:e:t:", table, NULL)) != -1) {
+    while ((o = getopt_long(argc, argv, "-bhl:d:p:e:w:", table, NULL)) != -1) {
         switch (o) {
         case 'b':
             sdb_set_batch_mode();
@@ -107,8 +107,8 @@ static int parse_args(int argc, char *argv[]) {
         case 'e':
             elf_file = optarg;
             break;
-        case 't':
-            trace_file = optarg;
+        case 'w':
+            wave_file = optarg;
             break;
         case 1:
             img_file = optarg;
@@ -122,7 +122,7 @@ static int parse_args(int argc, char *argv[]) {
             printf("\t-p,--port=PORT          run DiffTest with port PORT\n");
             printf("\t-e,--elf=ELF_FILE       load ELF file for symbol "
                    "information\n");
-            printf("\t-t,--trace=TRACE_FILE   output verilator trace to TRACE_FILE\n");
+            printf("\t-w,--wave=WAVE_FILE     output verilator wave to WAVE_FILE\n");
             printf("\n");
             exit(0);
         }
@@ -141,7 +141,7 @@ void init_monitor(int argc, char *argv[]) {
 
     /* Initialize the Verilator interface. */
 #ifdef CONFIG_ISA_npc
-    init_verilator(trace_file);
+    init_verilator(wave_file);
 #endif
     /* Set random seed. */
     init_rand();

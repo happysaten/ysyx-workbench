@@ -80,15 +80,19 @@ extern "C" void reset_cpu() {
     top->reset = LOW; // 复位信号拉低
 }
 
+// 仿真结束操作
+extern "C" void finish_simulation() {
+    tfp->close();      // 关闭波形文件
+    top->final();      // 结束仿真
+    context->gotFinish(true);
+    // printf("NPC Finish = %d\n", context->gotFinish());
+}
+
 void NPCTRAP() {
     if (!DPI_EN)
         return;
     // printf("NPCTRAP called at pc = " FMT_WORD "\n", top->pc);
     ebreak();     // 调用ebreak处理函数
-    tfp->close(); // 关闭波形文件
-    top->final(); // 结束仿真
-    context->gotFinish(true);
-    // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
 }
 
