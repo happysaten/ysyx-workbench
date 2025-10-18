@@ -223,15 +223,16 @@ module IFU (
     //     .out  (lfsr_out)
     // );
     // assign ifu_resp_valid_d = lfsr_out && (state == WAIT || (state == IDLE && ifu_req_valid)) && !reset;
-    delay_line #(
-        .N(2),
-        .WIDTH(1)
-    ) u_delay_line (
-        .clk  (clk),
-        .reset(reset),
-        .din  (state == IDLE && ifu_req_valid),
-        .dout (ifu_resp_valid_d)
-    );
+    // delay_line #(
+    //     .N(0),
+    //     .WIDTH(1)
+    // ) u_delay_line (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .din  (state == IDLE && ifu_req_valid),
+    //     .dout (ifu_resp_valid_d)
+    // );
+    assign ifu_resp_valid_d = ifu_req_valid;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
