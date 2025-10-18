@@ -214,16 +214,25 @@ module IFU (
     always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
     logic ifu_req_valid_q, lfsr8_out;
-    lfsr8 #(
-        .TAPS(8'b10111010)
-    ) ifu_lfsr8 (
+    // lfsr8 #(
+    //     .TAPS(8'b10111010)
+    // ) ifu_lfsr8 (
+    //     .clk  (clk),
+    //     .reset(reset),
+    //     .en   (1'b1),
+    //     .out  (lfsr8_out)
+    // );
+    // assign ifu_req_valid_q = lfsr8_out && state == WAIT;
+    delay_line #(
+        .N(5),
+        .WIDTH(1)
+    ) u_delay_line (
         .clk  (clk),
         .reset(reset),
-        .en   (1'b1),
-        .out  (lfsr8_out)
+        .din  (state == IDLE && ifu_req_valid),
+        .dout (ifu_req_valid_q)
     );
-    assign ifu_req_valid_q = lfsr8_out && state == WAIT;
-    assign ifu_resp_valid  = ifu_req_valid_q;
+    assign ifu_resp_valid = ifu_req_valid_q;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -689,7 +698,7 @@ module LSU (
     // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
     // delay_line #(
     //     .N(5),
-    //     .WIDTH(2)
+    //     .WIDTH(1)
     // ) u_delay_line (
     //     .clk  (clk),
     //     .reset(reset),
