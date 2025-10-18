@@ -213,8 +213,6 @@ module IFU (
 
     always_comb if (state == WAIT && ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    assign ifu_resp_valid = (state == WAIT);
-
     logic ifu_req_valid_q, lfsr8_out;
     lfsr8 #(
         .TAPS(8'b10111010)
