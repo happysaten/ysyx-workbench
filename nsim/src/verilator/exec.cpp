@@ -84,8 +84,6 @@ extern "C" void reset_cpu() {
 extern "C" void finish_simulation() {
     tfp->close();      // 关闭波形文件
     top->final();      // 结束仿真
-    context->gotFinish(true);
-    // printf("NPC Finish = %d\n", context->gotFinish());
 }
 
 void NPCTRAP() {
@@ -93,6 +91,8 @@ void NPCTRAP() {
         return;
     // printf("NPCTRAP called at pc = " FMT_WORD "\n", top->pc);
     ebreak();     // 调用ebreak处理函数
+    context->gotFinish(true);
+    // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
 }
 
