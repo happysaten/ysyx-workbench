@@ -647,7 +647,16 @@ module LSU (
     end
 
     logic lsu_req_valid_q;
-    always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    // always_ff @(posedge clk) lsu_req_valid_q <= lsu_req_valid;
+    delay_line #(
+        .N(1),
+        .WIDTH(1)
+    ) u_delay_line (
+        .clk(clk),
+        .reset(reset),
+        .din(lsu_req_valid),
+        .dout(lsu_req_valid_q)
+    );
     assign lsu_resp_valid = (pmem_ren || pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
     // assign lsu_resp_valid = (pmem_wen) ? lsu_req_valid_q : lsu_req_valid;
 endmodule
