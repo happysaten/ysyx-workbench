@@ -754,10 +754,10 @@ module LSU (
     logic pmem_ren, pmem_wen, pmem_req;
     assign pmem_req = pmem_ren || pmem_wen;
     always @(posedge clk) begin
-        if (pmem_ren && req_fire && resp_data_ready) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (pmem_ren && req_fire) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
     always_comb
-        if (pmem_wen && req_fire && resp_data_ready)
+        if (pmem_wen && req_fire)
             pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
