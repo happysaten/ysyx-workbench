@@ -255,7 +255,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     // 指令读取逻辑
-    always @(posedge clk) if (next_state == RESP) ifu_rdata <= pmem_read_npc(pc);
+    always @(posedge clk) if (req_fire) ifu_rdata <= pmem_read_npc(dnpc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
 endmodule
