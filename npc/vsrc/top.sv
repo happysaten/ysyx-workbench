@@ -250,7 +250,7 @@ module IFU (
     //     .din  (1'b1),
     //     .dout (ifu_req_ready_rand)
     // );
-    assign ifu_req_ready = ifu_req_ready_rand && (state == IDLE) && !reset;
+    assign ifu_req_ready = ifu_resp_ready &&ifu_req_ready_rand && (state == IDLE) && !reset;
     logic ifu_resp_valid_rand;
     lfsr8 #(
         .TAPS(8'b10111010)
@@ -378,7 +378,7 @@ module GPR (
     end
 
     assign gpr_resp_valid = state == WAIT;
-    assign gpr_req_ready  = (state == IDLE) && !reset;
+    assign gpr_req_ready  = gpr_resp_ready && (state == IDLE) && !reset;
 
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -444,7 +444,7 @@ module CSR #(
     end
 
     assign csr_resp_valid = state == WAIT;
-    assign csr_req_ready  = (state == IDLE) && !reset;
+    assign csr_req_ready  = csr_resp_ready &&(state == IDLE) && !reset;
 
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
@@ -766,7 +766,7 @@ module LSU (
         .out  (lsu_req_valid_q)
     );
     assign lsu_resp_valid_d = lsu_req_valid_q && (next_state == WAIT) && !reset;
-    assign lsu_req_ready = state == IDLE && !reset;
+    assign lsu_req_ready = lsu_resp_ready && (state == IDLE) && !reset;
 
     // 指令逻辑
     assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
