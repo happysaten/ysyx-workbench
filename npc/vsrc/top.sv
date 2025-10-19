@@ -234,7 +234,7 @@ module IFU (
 
     logic ifu_req_ready_rand;
     lfsr8 #(
-        .TAPS(8'b11111010)
+        .TAPS(8'b10111010)
     ) u_ifu_req_lfsr (
         .clk  (clk),
         .reset(reset),
