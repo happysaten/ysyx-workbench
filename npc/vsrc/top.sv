@@ -246,13 +246,13 @@ module IFU (
     localparam int RESET_PC = 32'h80000000;
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC;
-        else if (req_fire) pc <= dnpc;
+        if (req_fire) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
-    assign dnpc = jump_en ? jump_target : snpc;
+    // assign dnpc = jump_en ? jump_target : snpc;
+    assign dnpc = reset ? RESET_PC : (jump_en ? jump_target : snpc);
 
     // 指令读取逻辑
     always @(posedge clk) if (req_fire) ifu_rdata <= pmem_read_npc(dnpc);
