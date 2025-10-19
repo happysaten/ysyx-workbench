@@ -16,7 +16,8 @@ typedef enum logic [2:0] {
 module top (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    output logic npc_resp_valid  // 指令响应有效输出
+    output logic npc_req_ready,
+    output logic npc_resp_valid
 );
 
     // IFU：负责 PC 和取指
@@ -42,6 +43,7 @@ module top (
         if (reset_sync) npc_req_valid_init <= 1'b1;
         else if (ifu_req_ready) npc_req_valid_init <= 1'b0;
     end
+    assign npc_req_ready = ifu_req_ready;
     assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
 
     IFU u_ifu (
