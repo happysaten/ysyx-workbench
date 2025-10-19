@@ -367,11 +367,11 @@ module GPR (
         endcase
     end
 
-    assign ifu_resp_valid  = state == RESP;
-    assign ifu_req_ready   = state == IDLE;
+    assign gpr_resp_valid = state == RESP;
+    assign gpr_req_ready  = state == IDLE;
     assign resp_data_ready = 1'b1;
-    assign req_fire        = ifu_req_valid && ifu_req_ready;
-    assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
+    assign req_fire        = gpr_req_valid && gpr_req_ready;
+    assign resp_fire       = gpr_resp_valid && gpr_resp_ready;
 
     logic [31:0] regfile[32];  // 寄存器文件
 
