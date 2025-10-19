@@ -212,29 +212,27 @@ module IFU (
         endcase
     end
 
-    logic ifu_req_ready_rand;
+    logic random_bit0, random_bit1;
     lfsr8 #(
         .TAPS(8'b10101010)
     ) u_ifu_req_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
-        .out  (ifu_req_ready_rand)
+        .out  (random_bit0)
     );
-
-    logic ifu_resp_valid_rand;
     lfsr8 #(
         .TAPS(8'b10111010)
     ) u_ifu_resp_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
-        .out  (ifu_resp_valid_rand)
+        .out  (random_bit1)
     );
 
     assign ifu_resp_valid  = state == RESP;
-    assign ifu_req_ready   = state == IDLE && ifu_req_ready_rand;
-    assign resp_data_ready = ifu_resp_valid_rand;
+    assign ifu_req_ready   = state == IDLE && random_bit0;
+    assign resp_data_ready = random_bit1;
     assign req_fire        = ifu_req_valid && ifu_req_ready;
     assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
 
