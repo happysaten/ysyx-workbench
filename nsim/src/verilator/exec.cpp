@@ -64,8 +64,8 @@ extern "C" void exec_one_cpu() {
         // printf("%d\n", top->npc_resp_valid);
         step();
         // printf("%d\n", top->npc_resp_valid);
-        if (context->gotFinish())
-            break;
+        // if (context->gotFinish())
+        //     break;
         if (++cycles > kTimeoutCycles) {
             fprintf(stderr,
                     "exec_one_cpu: timeout waiting for npc_resp_valid\n");
