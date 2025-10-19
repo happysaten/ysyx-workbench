@@ -192,7 +192,7 @@ module IFU (
 );
 
     localparam int RESET_PC = 32'h80000000;
-    typedef enum logic {
+    typedef enum logic [1:0] {
         IDLE,
         WAIT,
         RESP
