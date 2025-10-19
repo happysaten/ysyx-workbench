@@ -247,7 +247,7 @@ module IFU (
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset) pc <= RESET_PC;
-        else if (ifu_resp_valid) pc <= dnpc;
+        else if (req_fire) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
