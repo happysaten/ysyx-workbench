@@ -37,11 +37,12 @@ module top (
     logic ifu_req_ready, lsu_req_ready, gpr_req_ready, csr_req_ready;
     assign npc_resp_valid = gpr_resp_valid || csr_resp_valid;
 
-    logic npc_req_valid;
+    logic npc_req_valid, npc_req_valid_init;
     always @(posedge clk) begin
-        if (reset_sync) npc_req_valid <= 1'b1;
-        else if (ifu_req_ready) npc_req_valid <= 1'b0;
+        if (reset_sync) npc_req_valid_init <= 1'b1;
+        else if (ifu_req_ready) npc_req_valid_init <= 1'b0;
     end
+    assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
 
     IFU u_ifu (
         .clk(clk),
@@ -52,7 +53,7 @@ module top (
         .snpc(snpc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_req_valid(npc_resp_valid),
+        .ifu_req_valid(npc_req_valid),
         .ifu_req_ready(ifu_req_ready),
         .ifu_resp_valid(ifu_resp_valid),
         .ifu_resp_ready(lsu_req_ready)
