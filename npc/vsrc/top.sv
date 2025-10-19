@@ -247,7 +247,7 @@ module IFU (
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset) pc <= RESET_PC - 4;
-        else if (req_fire) pc <= dnpc;
+        else if (state != RESP && next_state == RESP) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
@@ -255,7 +255,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     // 指令读取逻辑
-    always @(posedge clk) if (req_fire) ifu_rdata <= pmem_read_npc(dnpc);
+    always @(posedge clk) if (state != RESP && next_state == RESP) ifu_rdata <= pmem_read_npc(dnpc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
 endmodule
@@ -381,7 +381,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_wen && req_fire) begin  // 修改：添加valid条件
+        end else if (gpr_wen && state != RESP && next_state == RESP) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -393,7 +393,7 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_wen && req_fire) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
@@ -754,11 +754,9 @@ module LSU (
     logic pmem_ren, pmem_wen, pmem_req;
     assign pmem_req = pmem_ren || pmem_wen;
     always @(posedge clk) begin
-        if (pmem_ren && req_fire) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
-    always_comb
-        if (pmem_wen && req_fire)
-            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+    always_comb if (pmem_wen && state != RESP && next_state == RESP) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
