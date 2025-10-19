@@ -181,28 +181,71 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
-    input               ifu_req_valid,
-    input               ifu_resp_ready,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
     output logic [31:0] ifu_rdata,
+    input               ifu_req_valid,
+    output logic        ifu_req_ready,
     output logic        ifu_resp_valid,
-    output logic        ifu_req_ready
+    input               ifu_resp_ready
 );
+
+    localparam int RESET_PC = 32'h80000000;
+    typedef enum logic {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    logic ifu_req_ready_rand;
+    lfsr8 #(
+        .TAPS(8'b10101010)
+    ) u_ifu_req_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (ifu_req_ready_rand)
+    );
+
+    logic ifu_resp_valid_rand;
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) u_ifu_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (ifu_resp_valid_rand)
+    );
+
+    assign ifu_resp_valid  = state == RESP;
+    assign ifu_req_ready   = state == IDLE && ifu_req_ready_rand;
+    assign resp_data_ready = ifu_resp_valid_rand;
+    assign req_fire        = ifu_req_valid && ifu_req_ready;
+    assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
+
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void update_inst_npc(
         input int inst,
         input int dnpc
     );
-
-    localparam int RESET_PC = 32'h80000000;
-    typedef enum logic {
-        IDLE,
-        WAIT
-    } state_t;
-    state_t state, next_state;
 
     // PC 寄存器更新
     always_ff @(posedge clk) begin
@@ -214,65 +257,10 @@ module IFU (
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
-
-    always_comb begin
-        unique case (state)
-            IDLE: next_state = ifu_req_valid && ifu_req_ready ? WAIT : IDLE;
-            WAIT: next_state = ifu_resp_valid && ifu_resp_ready ? IDLE : WAIT;
-            default: next_state = IDLE;
-        endcase
-    end
-
-    logic ifu_resp_valid_d;
-
-    always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
-    always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
-    // always_comb ifu_rdata = pmem_read_npc(pc);
+    // 指令读取逻辑
+    always @(posedge clk) if (next_state == RESP) ifu_rdata <= pmem_read_npc(pc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    logic ifu_req_ready_rand;
-    lfsr8 #(
-        .TAPS(8'b10101010)
-    ) u_ifu_req_lfsr (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (ifu_req_ready_rand)
-    );
-    // delay_line #(
-    //     .N(10),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (1'b1),
-    //     .dout (ifu_req_ready_rand)
-    // );
-    assign ifu_req_ready = ifu_req_ready_rand && (state == IDLE) && !reset;
-    logic ifu_resp_valid_rand;
-    lfsr8 #(
-        .TAPS(8'b10111010)
-    ) u_ifu_resp_lfsr (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (ifu_resp_valid_rand)
-    );
-    // delay_line #(
-    //     .N(10),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (ifu_req_valid),
-    //     .dout (ifu_req_valid_q)
-    // );
-    assign ifu_resp_valid_d = ifu_resp_valid_rand && (next_state == WAIT) && !reset;
-    // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
