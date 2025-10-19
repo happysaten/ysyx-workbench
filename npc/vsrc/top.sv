@@ -417,9 +417,10 @@ module CSR #(
     output logic [N-1:0][31:0] csr_rdata,  // 读数据
     output logic csr_resp_valid  // 读响应有效信号
 );
-    typedef enum logic {
+    typedef enum logic [1:0] {
         IDLE,
-        WAIT
+        WAIT,
+        RESP
     } state_t;
     state_t state, next_state;
 
@@ -428,22 +429,27 @@ module CSR #(
         else state <= next_state;
     end
 
+    logic resp_data_ready, req_fire, resp_fire;
     always_comb begin
         unique case (state)
-            IDLE: next_state = csr_req_valid && csr_req_ready ? WAIT : IDLE;
-            WAIT: next_state = csr_resp_valid && csr_resp_ready ? IDLE : WAIT;
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
             default: next_state = IDLE;
         endcase
     end
 
-    assign csr_resp_valid = state == WAIT;
-    assign csr_req_ready  = (state == IDLE) && !reset;
+    assign csr_resp_valid  = state == RESP;
+    assign csr_req_ready   = state == IDLE && !reset;
+    assign resp_data_ready = 1'b1;
+    assign req_fire        = csr_req_valid && csr_req_ready;
+    assign resp_fire       = csr_resp_valid && csr_resp_ready;
 
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++)
-            if (csr_req_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
+            if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -454,7 +460,7 @@ module CSR #(
 
     always_comb begin
         for (int i = 0; i < N; i++)
-        if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
+        if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
 endmodule
