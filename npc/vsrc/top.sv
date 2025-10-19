@@ -233,14 +233,14 @@ module IFU (
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
     logic ifu_req_ready_rand;
-    // lfsr8 #(
-    //     .TAPS(8'b10111010)
-    // ) u_ifu_req_lfsr (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .en   (1'b1),
-    //     .out  (ifu_req_ready_rand)
-    // );
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) u_ifu_req_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (ifu_req_ready_rand)
+    );
     // delay_line #(
     //     .N(10),
     //     .WIDTH(1)
@@ -250,7 +250,7 @@ module IFU (
     //     .din  (1'b1),
     //     .dout (ifu_req_ready_rand)
     // );
-    assign ifu_req_ready = 1'b1 && (state == IDLE) && !reset;
+    assign ifu_req_ready = ifu_req_ready_rand && (state == IDLE) && !reset;
     logic ifu_resp_valid_rand;
     lfsr8 #(
         .TAPS(8'b10111010)
