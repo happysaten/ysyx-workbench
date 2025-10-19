@@ -72,7 +72,8 @@ extern "C" void exec_one_cpu() {
             finish_simulation();
             break;
         }
-    } while (top->npc_resp_valid != 1);
+        // } while (top->npc_resp_valid != 1);
+    } while (0);
 }
 
 bool DPI_EN = false; // 定义并初始化
