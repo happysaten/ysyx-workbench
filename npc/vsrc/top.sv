@@ -190,8 +190,6 @@ module IFU (
     output logic        ifu_resp_valid,
     input               ifu_resp_ready
 );
-
-    localparam int RESET_PC = 32'h80000000;
     typedef enum logic [1:0] {
         IDLE,
         WAIT,
@@ -204,7 +202,7 @@ module IFU (
         else state <= next_state;
     end
 
-    logic resp_data_ready,req_fire, resp_fire;
+    logic resp_data_ready, req_fire, resp_fire;
     always_comb begin
         unique case (state)
             IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
@@ -247,6 +245,7 @@ module IFU (
         input int dnpc
     );
 
+    localparam int RESET_PC = 32'h80000000;
     // PC 寄存器更新
     always_ff @(posedge clk) begin
         if (reset) pc <= RESET_PC;
@@ -697,17 +696,11 @@ module LSU (
     output logic         lsu_resp_valid,
     output logic         lsu_req_ready
 );
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void pmem_write_npc(
-        input int  waddr,
-        input int  wdata,
-        input byte wmask
-    );
-    import "DPI-C" function void NPCINV(input int pc);
 
-    typedef enum logic {
+    typedef enum logic [1:0] {
         IDLE,
-        WAIT
+        WAIT,
+        RESP
     } state_t;
     state_t state, next_state;
 
@@ -716,53 +709,56 @@ module LSU (
         else state <= next_state;
     end
 
+    logic resp_data_ready, req_fire, resp_fire;
     always_comb begin
         unique case (state)
-            IDLE: next_state = lsu_req_valid && lsu_req_ready && pmem_req ? WAIT : IDLE;
-            WAIT: next_state = lsu_resp_valid && lsu_resp_ready ? IDLE : WAIT;
+            IDLE:
+            next_state = pmem_req ? (req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
             default: next_state = IDLE;
         endcase
     end
 
-    logic lsu_resp_valid_d, lsu_resp_valid_q;
-    always @(posedge clk) lsu_resp_valid_q <= lsu_resp_valid_d;
+    logic random_bit;
+    lfsr8 #(
+        .TAPS(8'b01010110)
+    ) u_lsu_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit)
+    );
+
+    assign lsu_resp_valid  = pmem_req ? state == RESP : req_fire;
+    assign lsu_req_ready   = state == IDLE;
+    assign resp_data_ready = random_bit;
+    assign req_fire        = lsu_req_valid && lsu_req_ready;
+    assign resp_fire       = lsu_resp_valid && lsu_resp_ready;
+
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void pmem_write_npc(
+        input int  waddr,
+        input int  wdata,
+        input byte wmask
+    );
+    import "DPI-C" function void NPCINV(input int pc);
 
     // 内存接口信号
     logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
     logic [7:0] pmem_wmask;
-    logic pmem_ren, pmem_wen, pmem_req, pmem_idle;
+    logic pmem_ren, pmem_wen, pmem_req;
     assign pmem_req = pmem_ren || pmem_wen;
-    assign lsu_resp_valid = pmem_req ? lsu_resp_valid_q : lsu_req_valid;
     always @(posedge clk) begin
-        if (pmem_ren && lsu_resp_valid_d) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (pmem_ren && next_data == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
-    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb if (pmem_wen && lsu_resp_valid_q) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
-
-    // delay_line #(
-    //     .N(5),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
-    //     .dout (lsu_req_valid_q)
-    // );
-    logic lsu_req_valid_q;
-    lfsr8 lsu_lfsr8 (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (lsu_req_valid_q)
-    );
-    assign lsu_resp_valid_d = lsu_req_valid_q && (next_state == WAIT) && !reset;
-    // assign lsu_req_ready = lsu_resp_ready && state == IDLE && !reset;
-    assign lsu_req_ready = (pmem_req ? (lsu_resp_ready && (state == IDLE)) : lsu_resp_ready) && !reset;
+    always_comb
+        if (pmem_wen && next_data == RESP) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
-    assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
-    assign pmem_addr = alu_result;
+    assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_addr  = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
         unique case (funct3)
