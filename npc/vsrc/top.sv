@@ -271,7 +271,7 @@ module IFU (
     //     .din  (ifu_req_valid),
     //     .dout (ifu_req_valid_q)
     // );
-    assign ifu_resp_valid_d = 1'b1 && (next_state == WAIT) && !reset;
+    assign ifu_resp_valid_d = ifu_resp_valid_rand && (next_state == WAIT) && !reset;
     // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
