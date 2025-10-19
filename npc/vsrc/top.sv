@@ -37,6 +37,12 @@ module top (
     logic ifu_req_ready, lsu_req_ready, gpr_req_ready, csr_req_ready;
     assign npc_resp_valid = gpr_resp_valid || csr_resp_valid;
 
+    logic npc_req_valid;
+    always @(posedge clk) begin
+        if (reset_sync) npc_req_valid <= 1'b1;
+        else if (ifu_req_ready) npc_req_valid <= 1'b0;
+    end
+
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
@@ -358,7 +364,7 @@ module GPR (
     state_t state, next_state;
 
     always @(posedge clk) begin
-        if (reset) state <= WAIT;
+        if (reset) state <= IDLE;
         else state <= next_state;
     end
 
@@ -370,7 +376,8 @@ module GPR (
         endcase
     end
 
-    assign gpr_req_ready = (state == IDLE) && !reset;
+    assign gpr_resp_valid = state == WAIT;
+    assign gpr_req_ready  = (state == IDLE) && !reset;
 
     logic [31:0] regfile[32];  // 寄存器文件
 
@@ -400,11 +407,6 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
-    always_ff @(posedge clk) begin
-        if (reset) gpr_resp_valid <= 1'b1;
-        else if (gpr_resp_ready) gpr_resp_valid <= gpr_req_valid;
-    end
-
 endmodule
 
 // CSR(Control and Status Register) 负责控制和状态寄存器的读写
@@ -428,7 +430,7 @@ module CSR #(
     state_t state, next_state;
 
     always @(posedge clk) begin
-        if (reset) state <= WAIT;
+        if (reset) state <= IDLE;
         else state <= next_state;
     end
 
@@ -440,7 +442,8 @@ module CSR #(
         endcase
     end
 
-    assign csr_req_ready = (state == IDLE) && !reset;
+    assign csr_resp_valid = state == WAIT;
+    assign csr_req_ready  = (state == IDLE) && !reset;
 
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
@@ -459,11 +462,6 @@ module CSR #(
         for (int i = 0; i < N; i++)
         if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
     end
-
-        always_ff @(posedge clk) begin
-            if (reset) csr_resp_valid <= 1'b1;
-            else csr_resp_valid <= csr_req_valid;
-        end
 
 endmodule
 
