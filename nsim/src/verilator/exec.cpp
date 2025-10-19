@@ -53,27 +53,27 @@ extern "C" void finish_simulation() {
 
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
-    // for (int i = 0; i < 2; i++) {
-    //     step(); // 仿真两个周期以完成指令执行
-    //     printf("%d\n", top->npc_resp_valid);
-    // }
+    for (int i = 0; i < 2; i++) {
+        step(); // 仿真两个周期以完成指令执行
+        printf("%d\n", top->npc_resp_valid);
+    }
     // 等待 IFU 响应有效，带超时保护
-    constexpr int kTimeoutCycles = 100;
-    int cycles = 0;
-    do {
-        // printf("%d\n", top->npc_resp_valid);
-        step();
-        // printf("%d\n", top->npc_resp_valid);
-        if (context->gotFinish())
-            break;
-        if (++cycles > kTimeoutCycles) {
-            fprintf(stderr,
-                    "exec_one_cpu: timeout waiting for npc_resp_valid\n");
-            finish_simulation();
-            break;
-        }
-        // } while (top->npc_resp_valid != 1);
-    } while (0);
+    // constexpr int kTimeoutCycles = 100;
+    // int cycles = 0;
+    // do {
+    //     // printf("%d\n", top->npc_resp_valid);
+    //     step();
+    //     // printf("%d\n", top->npc_resp_valid);
+    //     if (context->gotFinish())
+    //         break;
+    //     if (++cycles > kTimeoutCycles) {
+    //         fprintf(stderr,
+    //                 "exec_one_cpu: timeout waiting for npc_resp_valid\n");
+    //         finish_simulation();
+    //         break;
+    //     }
+    // } while (top->npc_resp_valid != 1);
+    // } while (0);
 }
 
 bool DPI_EN = false; // 定义并初始化
