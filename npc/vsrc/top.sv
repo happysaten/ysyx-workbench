@@ -16,7 +16,8 @@ typedef enum logic [2:0] {
 module top (
     input clk,  // 时钟信号
     input reset,  // 复位信号
-    output logic npc_resp_valid  // 指令响应有效输出
+    output logic npc_req_ready,
+    output logic npc_resp_valid
 );
 
     // IFU：负责 PC 和取指
@@ -27,26 +28,37 @@ module top (
 
     logic        reset_sync;
     // 同步复位信号
-    // always_ff @(posedge clk) begin
-    //     if (reset) reset_sync <= 1'b1;
-    //     else reset_sync <= 1'b0;
-    // end
-    assign reset_sync = reset;
+    always_ff @(posedge clk or posedge reset) begin
+        if (reset) reset_sync <= 1'b1;
+        else reset_sync <= 1'b0;
+    end
+    // assign reset_sync = reset;
 
     logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid, csr_resp_valid;
+    logic ifu_req_ready, lsu_req_ready, gpr_req_ready, csr_req_ready;
     assign npc_resp_valid = gpr_resp_valid || csr_resp_valid;
+
+    logic npc_req_valid, npc_req_valid_init;
+    always @(posedge clk) begin
+        if (reset_sync) npc_req_valid_init <= 1'b1;
+        else if (ifu_req_ready) npc_req_valid_init <= 1'b0;
+    end
+    assign npc_req_ready = ifu_req_ready;
+    assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
 
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
         .jump_target(jump_target),
         .jump_en(jump_en),
-        .ifu_req_valid(npc_resp_valid),
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_resp_valid(ifu_resp_valid)
+        .ifu_req_valid(npc_req_valid),
+        .ifu_req_ready(ifu_req_ready),
+        .ifu_resp_valid(ifu_resp_valid),
+        .ifu_resp_ready(lsu_req_ready)
     );
 
     // IDU：负责指令解码
@@ -86,7 +98,9 @@ module top (
         .gpr_rdata1(gpr_rdata1),
         .gpr_rdata2(gpr_rdata2),
         .gpr_req_valid(lsu_resp_valid),
-        .gpr_resp_valid(gpr_resp_valid)
+        .gpr_req_ready(gpr_req_ready),
+        .gpr_resp_valid(gpr_resp_valid),
+        .gpr_resp_ready(ifu_req_ready)
     );
 
     // CSR：控制状态寄存器
@@ -99,7 +113,9 @@ module top (
         .csr_wdata(csr_wdata),
         .csr_rdata(csr_rdata),
         .csr_req_valid(lsu_resp_valid),
-        .csr_resp_valid(csr_resp_valid)
+        .csr_req_ready(csr_req_ready),
+        .csr_resp_valid(csr_resp_valid),
+        .csr_resp_ready(ifu_req_ready)
     );
 
 
@@ -138,7 +154,9 @@ module top (
         .gpr_rdata2    (gpr_rdata2),
         .lsu_rdata     (lsu_rdata),
         .lsu_req_valid (ifu_resp_valid),
-        .lsu_resp_valid(lsu_resp_valid)
+        .lsu_req_ready (lsu_req_ready),
+        .lsu_resp_valid(lsu_resp_valid),
+        .lsu_resp_ready(gpr_req_ready && csr_req_ready)
     );
 
     // WBU：负责写回GPR
@@ -163,13 +181,61 @@ module IFU (
     input               reset,
     input        [31:0] jump_target,
     input               jump_en,
-    input               ifu_req_valid,
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
     output logic [31:0] ifu_rdata,
-    output logic        ifu_resp_valid
+    input               ifu_req_valid,
+    output logic        ifu_req_ready,
+    output logic        ifu_resp_valid,
+    input               ifu_resp_ready
 );
+    typedef enum logic [1:0] {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    logic random_bit0, random_bit1;
+    lfsr8 #(
+        .TAPS(8'b10101010)
+    ) u_ifu_req_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit0)
+    );
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) u_ifu_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit1)
+    );
+
+    assign ifu_resp_valid  = state == RESP;
+    assign ifu_req_ready   = state == IDLE && random_bit0;
+    assign resp_data_ready = random_bit1;
+    assign req_fire        = ifu_req_valid && ifu_req_ready;
+    assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
+
     // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void update_inst_npc(
@@ -178,62 +244,20 @@ module IFU (
     );
 
     localparam int RESET_PC = 32'h80000000;
-    typedef enum logic {
-        IDLE,
-        WAIT
-    } state_t;
-    state_t state, next_state;
-
     // PC 寄存器更新
     always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC;
-        else if (ifu_resp_valid) pc <= dnpc;
+        if (reset) pc <= RESET_PC - 4;
+        else if (state != RESP && next_state == RESP) pc <= dnpc;
     end
 
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
-
-    always_comb begin
-        unique case (state)
-            IDLE: next_state = ifu_req_valid ? WAIT : IDLE;
-            WAIT: next_state = ifu_resp_valid ? IDLE : WAIT;
-            default: next_state = IDLE;
-        endcase
-    end
-
-    logic ifu_resp_valid_d;
-
-    always @(posedge clk) ifu_resp_valid <= ifu_resp_valid_d;
-    always @(posedge clk) if (ifu_resp_valid_d) ifu_rdata <= pmem_read_npc(pc);
-    // always_comb ifu_rdata = pmem_read_npc(pc);
+    // 指令读取逻辑
+    always @(posedge clk) if (state != RESP && next_state == RESP) ifu_rdata <= pmem_read_npc(dnpc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
-    logic ifu_req_valid_q;
-    lfsr8 #(
-        .TAPS(8'b10111010)
-    ) ifu_lfsr8 (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (ifu_req_valid_q)
-    );
-    // delay_line #(
-    //     .N(3),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (ifu_req_valid),
-    //     .dout (ifu_req_valid_q)
-    // );
-    assign ifu_resp_valid_d = ifu_req_valid_q && (next_state == WAIT) && !reset;
-    // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -307,18 +331,48 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input               clk,            // 时钟信号
-    input               reset,          // 复位信号
-    input               gpr_wen,        // 写使能信号
-    input        [ 4:0] gpr_waddr,      // 写寄存器地址
-    input        [31:0] gpr_wdata,      // 写数据
-    input        [ 4:0] gpr_raddr1,     // 读寄存器1地址
-    input        [ 4:0] gpr_raddr2,     // 读寄存器2地址
-    input               gpr_req_valid,  // 请求有效信号
-    output logic [31:0] gpr_rdata1,     // 读寄存器1数据
-    output logic [31:0] gpr_rdata2,     // 读寄存器2数据
-    output logic        gpr_resp_valid  // 响应有效信号
+    input               clk,             // 时钟信号
+    input               reset,           // 复位信号
+    input               gpr_wen,         // 写使能信号
+    input        [ 4:0] gpr_waddr,       // 写寄存器地址
+    input        [31:0] gpr_wdata,       // 写数据
+    input        [ 4:0] gpr_raddr1,      // 读寄存器1地址
+    input        [ 4:0] gpr_raddr2,      // 读寄存器2地址
+    input               gpr_req_valid,   // 请求有效信号
+    input               gpr_resp_ready,  // 响应准备信号
+    output logic        gpr_req_ready,   // 请求准备信号
+    output logic [31:0] gpr_rdata1,      // 读寄存器1数据
+    output logic [31:0] gpr_rdata2,      // 读寄存器2数据
+    output logic        gpr_resp_valid   // 响应有效信号
 );
+    typedef enum logic [1:0] {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    assign gpr_resp_valid  = state == RESP;
+    assign gpr_req_ready   = state == IDLE;
+    assign resp_data_ready = 1'b1;
+    assign req_fire        = gpr_req_valid && gpr_req_ready;
+    assign resp_fire       = gpr_resp_valid && gpr_resp_ready;
+
     logic [31:0] regfile[32];  // 寄存器文件
 
     // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
@@ -327,7 +381,7 @@ module GPR (
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_wen && gpr_req_valid) begin  // 修改：添加valid条件
+        end else if (gpr_wen && state != RESP && next_state == RESP) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
         end
         // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
@@ -339,17 +393,12 @@ module GPR (
         input logic [31:0] data
     );
     always_comb begin
-        if (gpr_wen && gpr_req_valid) write_gpr_npc(gpr_waddr, gpr_wdata);
+        if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
     end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
-    end
-
-    always @(posedge clk) begin
-        if (reset) gpr_resp_valid <= 1'b1;
-        else gpr_resp_valid <= gpr_req_valid;
     end
 
 endmodule
@@ -363,14 +412,44 @@ module CSR #(
     input [N-1:0] csr_wen,  // 写使能信号
     input [N-1:0][31:0] csr_wdata,  // 写数据
     input csr_req_valid,  // 读请求有效信号
+    input csr_resp_ready,  // 响应准备信号
+    output logic csr_req_ready,  // 请求准备信号
     output logic [N-1:0][31:0] csr_rdata,  // 读数据
     output logic csr_resp_valid  // 读响应有效信号
 );
+    typedef enum logic [1:0] {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    assign csr_resp_valid  = state == RESP;
+    assign csr_req_ready   = state == IDLE && !reset;
+    assign resp_data_ready = 1'b1;
+    assign req_fire        = csr_req_valid && csr_req_ready;
+    assign resp_fire       = csr_resp_valid && csr_resp_ready;
+
     always_ff @(posedge clk) begin
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++)
-            if (csr_req_valid && csr_wen[i]) csr_rdata[i] <= csr_wdata[i];
+            if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -381,12 +460,7 @@ module CSR #(
 
     always_comb begin
         for (int i = 0; i < N; i++)
-        if (csr_req_valid && csr_wen[i]) write_csr_npc(i[1:0], csr_wdata[i]);
-    end
-
-    always @(posedge clk) begin
-        if (reset) csr_resp_valid <= 1'b1;
-        else csr_resp_valid <= csr_req_valid;
+        if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) write_csr_npc(i[1:0], csr_wdata[i]);
     end
 
 endmodule
@@ -611,7 +685,7 @@ module lfsr8 #(
         else if (en) lfsr <= {lfsr[6:0], feedback};
     end
 
-    assign out = (lfsr[1:0] == 2'b00);
+    assign out = (lfsr[1:0] == 2'b10);
 
 endmodule
 
@@ -627,20 +701,16 @@ module LSU (
     input         [31:0] alu_result,
     input         [31:0] gpr_rdata2,
     input                lsu_req_valid,
+    input                lsu_resp_ready,
     output logic  [31:0] lsu_rdata,
-    output logic         lsu_resp_valid
+    output logic         lsu_resp_valid,
+    output logic         lsu_req_ready
 );
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void pmem_write_npc(
-        input int  waddr,
-        input int  wdata,
-        input byte wmask
-    );
-    import "DPI-C" function void NPCINV(input int pc);
 
-    typedef enum logic {
+    typedef enum logic [1:0] {
         IDLE,
-        WAIT
+        WAIT,
+        RESP
     } state_t;
     state_t state, next_state;
 
@@ -649,51 +719,55 @@ module LSU (
         else state <= next_state;
     end
 
+    logic resp_data_ready, req_fire, resp_fire;
     always_comb begin
         unique case (state)
-            IDLE: next_state = lsu_req_valid && pmem_req ? WAIT : IDLE;
-            WAIT: next_state = lsu_resp_valid ? IDLE : WAIT;
+            IDLE:
+            next_state = pmem_req ? (req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
             default: next_state = IDLE;
         endcase
     end
 
-    logic lsu_resp_valid_d, lsu_resp_valid_q;
-    always @(posedge clk) lsu_resp_valid_q <= lsu_resp_valid_d;
+    logic random_bit;
+    lfsr8 #(
+        .TAPS(8'b01010110)
+    ) u_lsu_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit)
+    );
+
+    assign lsu_resp_valid  = pmem_req ? state == RESP : req_fire;
+    assign lsu_req_ready   = state == IDLE;
+    assign resp_data_ready = random_bit;
+    assign req_fire        = lsu_req_valid && lsu_req_ready;
+    assign resp_fire       = lsu_resp_valid && lsu_resp_ready;
+
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void pmem_write_npc(
+        input int  waddr,
+        input int  wdata,
+        input byte wmask
+    );
+    import "DPI-C" function void NPCINV(input int pc);
 
     // 内存接口信号
     logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
     logic [7:0] pmem_wmask;
-    logic pmem_ren, pmem_wen, pmem_req, pmem_idle;
+    logic pmem_ren, pmem_wen, pmem_req;
     assign pmem_req = pmem_ren || pmem_wen;
-    assign lsu_resp_valid = pmem_req ? lsu_resp_valid_q : lsu_req_valid;
     always @(posedge clk) begin
-        if (pmem_ren && lsu_resp_valid_d) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
-    // always_comb pmem_rdata = (pmem_ren && lsu_req_valid) ? pmem_read_npc(pmem_addr) : 32'b0;
-    always_comb if (pmem_wen && lsu_resp_valid_q) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
-
-    // delay_line #(
-    //     .N(5),
-    //     .WIDTH(1)
-    // ) u_delay_line (
-    //     .clk  (clk),
-    //     .reset(reset),
-    //     .din  (pmem_idle&&lsu_req_valid && pmem_req),
-    //     .dout (lsu_req_valid_q)
-    // );
-    logic lsu_req_valid_q;
-    lfsr8 lsu_lfsr8 (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (lsu_req_valid_q)
-    );
-    assign lsu_resp_valid_d = lsu_req_valid_q && (next_state == WAIT) && !reset;
+    always_comb if (pmem_wen && state != RESP && next_state == RESP) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
-    assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
-    assign pmem_addr = alu_result;
+    assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_addr  = alu_result;
     assign pmem_wdata = gpr_rdata2;
     always_comb begin
         unique case (funct3)

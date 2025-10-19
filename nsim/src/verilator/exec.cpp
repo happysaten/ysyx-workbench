@@ -43,6 +43,14 @@ static void step() {
 // 外部C接口：无效指令处理
 // extern "C" void invalid_inst(vaddr_t thispc);
 
+// 仿真结束操作
+extern "C" void finish_simulation() {
+    tfp->close(); // 关闭波形文件
+    top->final(); // 结束仿真
+    printf("Verilator simulation finished at time %lu ns.\n",
+           context->time()); // 打印仿真结束时间
+}
+
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // for (int i = 0; i < 2; i++) {
@@ -61,9 +69,11 @@ extern "C" void exec_one_cpu() {
         if (++cycles > kTimeoutCycles) {
             fprintf(stderr,
                     "exec_one_cpu: timeout waiting for npc_resp_valid\n");
+            finish_simulation();
             break;
         }
-    } while (top->npc_resp_valid != 1);
+    } while ((top->npc_req_ready && top->npc_resp_valid) != 1);
+    // } while (0);
 }
 
 bool DPI_EN = false; // 定义并初始化
@@ -72,25 +82,20 @@ extern "C" void reset_cpu() {
     DPI_EN = false;    // 禁用DPI-C接口
     top->reset = HIGH; // 复位信号拉高
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 6; i++) {
         step(); // 仿真3个周期，保证复位信号有效
     }
 
     DPI_EN = true;    // 启用DPI-C接口
     top->reset = LOW; // 复位信号拉低
-}
-
-// 仿真结束操作
-extern "C" void finish_simulation() {
-    tfp->close();      // 关闭波形文件
-    top->final();      // 结束仿真
+    step();
 }
 
 void NPCTRAP() {
     if (!DPI_EN)
         return;
     // printf("NPCTRAP called at pc = " FMT_WORD "\n", top->pc);
-    ebreak();     // 调用ebreak处理函数
+    ebreak(); // 调用ebreak处理函数
     context->gotFinish(true);
     // printf("NPC Finish = %d\n", context->gotFinish());
     // reset_cpu();
