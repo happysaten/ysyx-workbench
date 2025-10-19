@@ -367,8 +367,8 @@ module GPR (
         endcase
     end
 
-    assign gpr_resp_valid = state == RESP;
-    assign gpr_req_ready  = state == IDLE;
+    assign gpr_resp_valid  = state == RESP;
+    assign gpr_req_ready   = state == IDLE && !reset;
     assign resp_data_ready = 1'b1;
     assign req_fire        = gpr_req_valid && gpr_req_ready;
     assign resp_fire       = gpr_resp_valid && gpr_resp_ready;
