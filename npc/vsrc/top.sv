@@ -252,23 +252,23 @@ module IFU (
     // );
     assign ifu_req_ready = ~ifu_req_ready_rand && (state == IDLE) && !reset;
     logic ifu_resp_valid_rand;
-    lfsr8 #(
-        .TAPS(8'b10111010)
-    ) u_ifu_resp_lfsr (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (ifu_resp_valid_rand)
-    );
-    // delay_line #(
-    //     .N(3),
-    //     .WIDTH(1)
-    // ) u_delay_line (
+    // lfsr8 #(
+    //     .TAPS(8'b10111010)
+    // ) u_ifu_resp_lfsr (
     //     .clk  (clk),
     //     .reset(reset),
-    //     .din  (ifu_req_valid),
-    //     .dout (ifu_req_valid_q)
+    //     .en   (1'b1),
+    //     .out  (ifu_resp_valid_rand)
     // );
+    delay_line #(
+        .N(10),
+        .WIDTH(1)
+    ) u_delay_line (
+        .clk  (clk),
+        .reset(reset),
+        .din  (ifu_req_valid),
+        .dout (ifu_req_valid_q)
+    );
     assign ifu_resp_valid_d = 1'b1 && (next_state == WAIT) && !reset;
     // assign ifu_resp_valid_d = !reset && ifu_req_valid;
 endmodule
