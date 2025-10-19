@@ -54,7 +54,6 @@ static int cmd_c(char *args) {
 /* 命令：退出 NSIM */
 static int cmd_q(char *args) {
     nsim_state.state = NSIM_QUIT; // 设置状态为退出
-    cpu_exec(0);               // 执行0步以触发退出
     return -1;                    // 返回负值表示退出
 }
 

@@ -135,6 +135,10 @@ void cpu_exec(uint64_t n) {
     case NSIM_END:
     case NSIM_ABORT:
     case NSIM_QUIT:
+#ifdef CONFIG_ISA_npc
+        void finish_simulation();
+        finish_simulation();
+#endif
         printf("Program execution has ended. To restart the program, exit NSIM "
                "and run again.\n");
         return;
@@ -167,9 +171,5 @@ void cpu_exec(uint64_t n) {
         // fall through
     case NSIM_QUIT:
         statistic();
-#ifdef CONFIG_ISA_npc
-        void finish_simulation();
-        finish_simulation();
-#endif
     }
 }
