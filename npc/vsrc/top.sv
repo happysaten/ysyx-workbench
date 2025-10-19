@@ -204,7 +204,7 @@ module IFU (
         else state <= next_state;
     end
 
-    logic req_fire, resp_fire;
+    logic resp_data_ready,req_fire, resp_fire;
     always_comb begin
         unique case (state)
             IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
