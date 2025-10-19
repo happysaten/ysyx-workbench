@@ -128,6 +128,8 @@ void assert_fail_msg() {
     statistic();
 }
 
+void finish_simulation();
+
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
     g_print_step = (n < MAX_INST_TO_PRINT);
@@ -135,6 +137,9 @@ void cpu_exec(uint64_t n) {
     case NSIM_END:
     case NSIM_ABORT:
     case NSIM_QUIT:
+#ifdef CONFIG_ISA_npc
+        finish_simulation();
+#endif
         printf("Program execution has ended. To restart the program, exit NSIM "
                "and run again.\n");
         return;
@@ -167,7 +172,6 @@ void cpu_exec(uint64_t n) {
         // fall through
     case NSIM_QUIT:
 #ifdef CONFIG_ISA_npc
-        void finish_simulation();
         finish_simulation();
 #endif
         statistic();
