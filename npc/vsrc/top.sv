@@ -514,10 +514,10 @@ module Arbiter (
         dmem_bresp = 1'b0;
 
         mem_arvalid = 1'b0;
-        mem_araddr = 32'h0;
+        mem_araddr = 32'h80000000;
         mem_rready = 1'b0;
         mem_awvalid = 1'b0;
-        mem_awaddr = 32'h0;
+        mem_awaddr = 32'h80000000;
         mem_wvalid = 1'b0;
         mem_wdata = 32'h0;
         mem_wmask = 8'h0;
