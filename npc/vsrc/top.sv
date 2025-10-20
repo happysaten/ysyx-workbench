@@ -715,14 +715,14 @@ module PMEM (
     input               reset,
     input               pmem_req_valid,
     output logic        pmem_req_ready,
-    input               pmem_ren,
     input               pmem_wen,
     input        [31:0] pmem_addr,
     input        [31:0] pmem_wdata,
     input        [ 7:0] pmem_wmask,
     output logic        pmem_resp_valid,
     input               pmem_resp_ready,
-    output logic [31:0] pmem_rdata
+    output logic [31:0] pmem_rdata,
+    output logic        pmem_error
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -770,13 +770,13 @@ module PMEM (
     );
 
     always @(posedge clk) begin
-        if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
+        if (state != RESP && next_state == RESP) begin
+            if (!pmem_wen) pmem_rdata <= pmem_read_npc(pmem_addr);
+            else pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+        end
     end
 
-    always_comb begin
-        if (pmem_wen && state != RESP && next_state == RESP)
-            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
-    end
+    assign pmem_error = 0;
 
 endmodule
 
@@ -801,10 +801,11 @@ module LSU (
 
     // PMEM接口信号
     logic pmem_req_valid, pmem_req_ready;
-    logic pmem_ren, pmem_wen;
+    logic pmem_wen;
     logic [31:0] pmem_addr, pmem_wdata, pmem_rdata;
     logic [7:0] pmem_wmask;
     logic pmem_resp_valid, pmem_resp_ready;
+    logic pmem_error;
 
     // 实例化PMEM模块
     PMEM u_pmem (
@@ -812,18 +813,18 @@ module LSU (
         .reset          (reset),
         .pmem_req_valid (pmem_req_valid),
         .pmem_req_ready (pmem_req_ready),
-        .pmem_ren       (pmem_ren),
         .pmem_wen       (pmem_wen),
         .pmem_addr      (pmem_addr),
         .pmem_wdata     (pmem_wdata),
         .pmem_wmask     (pmem_wmask),
         .pmem_resp_valid(pmem_resp_valid),
         .pmem_resp_ready(pmem_resp_ready),
-        .pmem_rdata     (pmem_rdata)
+        .pmem_rdata     (pmem_rdata),
+        .pmem_error     (pmem_error)
     );
 
     // LSU根据指令决定是否访问PMEM
-    logic pmem_req;
+    logic pmem_req, pmem_ren;
     assign pmem_ren        = (inst_type == TYPE_I && opcode == 7'b0000011);
     assign pmem_wen        = (inst_type == TYPE_S && opcode == 7'b0100011);
     assign pmem_req        = pmem_ren || pmem_wen;
@@ -865,7 +866,7 @@ module LSU (
         endcase
     end
 
-    assign lsu_error = 0;
+    assign lsu_error = pmem_error;
 
 endmodule
 
