@@ -882,8 +882,8 @@ module DMEM (
     assign dmem_wready = (state == IDLE);
     assign resp_data_ready = random_bit;
 
-    import "DPI-C" function int dmem_read_npc(input int raddr);
-    import "DPI-C" function void dmem_write_npc(
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void pmem_write_npc(
         input int  waddr,
         input int  wdata,
         input byte wmask
@@ -891,10 +891,10 @@ module DMEM (
 
     always @(posedge clk) begin
         if ((state == RWAIT && next_state == RRESP) || (state == IDLE && next_state == RRESP)) begin
-            dmem_rdata <= dmem_read_npc(dmem_araddr);
+            dmem_rdata <= pmem_read_npc(dmem_araddr);
         end
         if ((state == WWAIT && next_state == WRESP) || (state == IDLE && next_state == WRESP)) begin
-            dmem_write_npc(dmem_awaddr, dmem_wdata, dmem_wmask);
+            pmem_write_npc(dmem_awaddr, dmem_wdata, dmem_wmask);
         end
     end
 
