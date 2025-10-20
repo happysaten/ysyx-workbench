@@ -500,8 +500,8 @@ module Arbiter (
     // 锁存请求阶段的信息
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_araddr <= 32'h0;
-            locked_awaddr <= 32'h0;
+            locked_araddr <= 32'h80000000;
+            locked_awaddr <= 32'h80000000;
             locked_wdata <= 32'h0;
             locked_wmask <= 8'h0;
             locked_arvalid <= 1'b0;
