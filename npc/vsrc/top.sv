@@ -199,6 +199,68 @@ module IFU (
     output logic [31:0] dnpc,
     output logic        ifu_error
 );
+    // IMEM接口信号
+    logic imem_arvalid, imem_arready, imem_rvalid, imem_rready;
+    logic [31:0] imem_araddr, imem_rdata;
+    logic imem_rresp;
+
+    // 实例化IMEM模块
+    IMEM u_imem (
+        .clk         (clk),
+        .reset       (reset),
+        .imem_arvalid(imem_arvalid),
+        .imem_arready(imem_arready),
+        .imem_araddr (imem_araddr),
+        .imem_rvalid (imem_rvalid),
+        .imem_rready (imem_rready),
+        .imem_rdata  (imem_rdata),
+        .imem_rresp  (imem_rresp)
+    );
+    // snpc / dnpc 选择逻辑
+    assign snpc = pc + 4;
+    assign dnpc = jump_en ? jump_target : snpc;
+
+    // IMEM访问控制
+    assign imem_araddr = dnpc;
+    assign imem_arvalid = ifu_req_valid;
+    assign imem_rready = ifu_resp_ready;
+
+    // IFU握手逻辑
+    assign ifu_req_ready = imem_arready;
+    assign ifu_resp_valid = imem_rvalid;
+    assign ifu_rdata = imem_rdata;
+    assign ifu_error = imem_rresp;
+
+
+    import "DPI-C" function void update_inst_npc(
+        input int inst,
+        input int dnpc
+    );
+    localparam int RESET_PC = 32'h80000000;
+
+    // PC 寄存器更新 - 握手成功时更新
+    always_ff @(posedge clk) begin
+        if (reset) pc <= RESET_PC - 4;
+        else if (imem_arvalid && imem_arready) pc <= dnpc;
+    end
+    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+
+endmodule
+
+// IMEM(Instruction Memory) 负责指令内存的读访问
+module IMEM (
+    input               clk,
+    input               reset,
+    // 读地址通道(AR)
+    input               imem_arvalid,
+    output logic        imem_arready,
+    input        [31:0] imem_araddr,
+    // 读数据通道(R)
+    output logic        imem_rvalid,
+    input               imem_rready,
+    output logic [31:0] imem_rdata,
+    output logic        imem_rresp
+);
     typedef enum logic [1:0] {
         IDLE,
         WAIT,
@@ -211,12 +273,16 @@ module IFU (
         else state <= next_state;
     end
 
-    logic resp_data_ready, req_fire, resp_fire;
+    logic resp_data_ready;
+
     always_comb begin
         unique case (state)
-            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            IDLE: begin
+                if (imem_arvalid && imem_arready) next_state = resp_data_ready ? RESP : WAIT;
+                else next_state = IDLE;
+            end
             WAIT: next_state = resp_data_ready ? RESP : WAIT;
-            RESP: next_state = resp_fire ? IDLE : RESP;
+            RESP: next_state = (imem_rvalid && imem_rready) ? IDLE : RESP;
             default: next_state = IDLE;
         endcase
     end
@@ -224,7 +290,7 @@ module IFU (
     logic random_bit0, random_bit1;
     lfsr8 #(
         .TAPS(8'b10101010)
-    ) u_ifu_req_lfsr (
+    ) u_imem_req_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
@@ -232,42 +298,26 @@ module IFU (
     );
     lfsr8 #(
         .TAPS(8'b10111010)
-    ) u_ifu_resp_lfsr (
+    ) u_imem_resp_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
         .out  (random_bit1)
     );
 
-    assign ifu_resp_valid  = state == RESP;
-    assign ifu_req_ready   = state == IDLE && random_bit0;
+    assign imem_rvalid = (state == RESP);
+    assign imem_arready = (state == IDLE) && random_bit0;
     assign resp_data_ready = random_bit1;
-    assign req_fire        = ifu_req_valid && ifu_req_ready;
-    assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
 
-    // DPI 接口：从内存读取指令并上报 instruction + next pc
     import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
 
-    localparam int RESET_PC = 32'h80000000;
-    // PC 寄存器更新
-    always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC - 4;
-        else if (state != RESP && next_state == RESP) pc <= dnpc;
+    always @(posedge clk) begin
+        if ((state == WAIT && next_state == RESP) || (state == IDLE && next_state == RESP)) begin
+            imem_rdata <= pmem_read_npc(imem_araddr);
+        end
     end
 
-    // snpc / dnpc 选择逻辑
-    assign snpc = pc + 4;
-    assign dnpc = jump_en ? jump_target : snpc;
-
-    // 指令读取逻辑
-    always @(posedge clk) if (state != RESP && next_state == RESP) ifu_rdata <= pmem_read_npc(dnpc);
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
-
-    assign ifu_error = 0;  // 赋值为0
+    assign imem_rresp = 0;
 
 endmodule
 
@@ -713,25 +763,25 @@ endmodule
 module PMEM (
     input               clk,
     input               reset,
-    // 读地址通道
+    // 读地址通道(AR)
     input               pmem_arvalid,
     output logic        pmem_arready,
     input        [31:0] pmem_araddr,
-    // 读数据通道
+    // 读数据通道(R)
     output logic        pmem_rvalid,
     input               pmem_rready,
     output logic [31:0] pmem_rdata,
     output logic        pmem_rresp,
-    // 写地址通道
+    // 写地址通道(AW)
     input               pmem_awvalid,
     output logic        pmem_awready,
     input        [31:0] pmem_awaddr,
-    // 写数据通道
+    // 写数据通道(W)
     input               pmem_wvalid,
     output logic        pmem_wready,
     input        [31:0] pmem_wdata,
     input        [ 7:0] pmem_wmask,
-    // 写响应通道
+    // 写回复通道(B)
     output logic        pmem_bvalid,
     input               pmem_bready,
     output logic        pmem_bresp
@@ -757,15 +807,13 @@ module PMEM (
             IDLE: begin
                 if (pmem_awvalid && pmem_awready && pmem_wvalid && pmem_wready)
                     next_state = resp_data_ready ? WRESP : WWAIT;
-                else if (pmem_arvalid && pmem_arready)
-                    next_state = resp_data_ready ? RRESP : RWAIT;
-                else
-                    next_state = IDLE;
+                else if (pmem_arvalid && pmem_arready) next_state = resp_data_ready ? RRESP : RWAIT;
+                else next_state = IDLE;
             end
-            RWAIT: next_state = resp_data_ready ? RRESP : RWAIT;
-            RRESP: next_state = (pmem_rvalid && pmem_rready) ? IDLE : RRESP;
-            WWAIT: next_state = resp_data_ready ? WRESP : WWAIT;
-            WRESP: next_state = (pmem_bvalid && pmem_bready) ? IDLE : WRESP;
+            RWAIT:   next_state = resp_data_ready ? RRESP : RWAIT;
+            RRESP:   next_state = (pmem_rvalid && pmem_rready) ? IDLE : RRESP;
+            WWAIT:   next_state = resp_data_ready ? WRESP : WWAIT;
+            WRESP:   next_state = (pmem_bvalid && pmem_bready) ? IDLE : WRESP;
             default: next_state = IDLE;
         endcase
     end
@@ -874,7 +922,7 @@ module LSU (
 
     // LSU握手逻辑
     assign lsu_req_ready = pmem_ren ? pmem_arready : (pmem_wen ? (pmem_awready && pmem_wready) : 1'b1);
-    assign lsu_resp_valid  = pmem_ren ? pmem_rvalid : (pmem_wen ? pmem_bvalid : lsu_req_valid);
+    assign lsu_resp_valid = pmem_ren ? pmem_rvalid : (pmem_wen ? pmem_bvalid : lsu_req_valid);
 
     // 写掩码生成
     always_comb begin
