@@ -713,28 +713,23 @@ endmodule
 module PMEM (
     input               clk,
     input               reset,
-    // 读地址通道
-    input               pmem_arvalid,
-    output logic        pmem_arready,
-    input        [31:0] pmem_araddr,
-    // 读数据通道
-    output logic        pmem_rvalid,
-    input               pmem_rready,
+    // 读通道
+    input               pmem_rreq_valid,
+    output logic        pmem_rreq_ready,
+    input        [31:0] pmem_raddr,
+    output logic        pmem_rresp_valid,
+    input               pmem_rresp_ready,
     output logic [31:0] pmem_rdata,
-    output logic        pmem_rresp,
-    // 写地址通道
-    input               pmem_awvalid,
-    output logic        pmem_awready,
-    input        [31:0] pmem_awaddr,
-    // 写数据通道
-    input               pmem_wvalid,
-    output logic        pmem_wready,
+    output logic        pmem_rerror,
+    // 写通道
+    input               pmem_wreq_valid,
+    output logic        pmem_wreq_ready,
+    input        [31:0] pmem_waddr,
     input        [31:0] pmem_wdata,
     input        [ 7:0] pmem_wmask,
-    // 写响应通道
-    output logic        pmem_bvalid,
-    input               pmem_bready,
-    output logic        pmem_bresp
+    output logic        pmem_wresp_valid,
+    input               pmem_wresp_ready,
+    output logic        pmem_werror
 );
     typedef enum logic [2:0] {
         IDLE,
@@ -750,22 +745,22 @@ module PMEM (
         else state <= next_state;
     end
 
-    logic resp_data_ready;
+    logic resp_data_ready, req_fire, resp_fire;
 
     always_comb begin
         unique case (state)
             IDLE: begin
-                if (pmem_awvalid && pmem_awready && pmem_wvalid && pmem_wready)
+                if (pmem_wreq_valid && pmem_wreq_ready)
                     next_state = resp_data_ready ? WRESP : WWAIT;
-                else if (pmem_arvalid && pmem_arready)
+                else if (pmem_rreq_valid && pmem_rreq_ready)
                     next_state = resp_data_ready ? RRESP : RWAIT;
                 else
                     next_state = IDLE;
             end
             RWAIT: next_state = resp_data_ready ? RRESP : RWAIT;
-            RRESP: next_state = (pmem_rvalid && pmem_rready) ? IDLE : RRESP;
+            RRESP: next_state = (pmem_rresp_valid && pmem_rresp_ready) ? IDLE : RRESP;
             WWAIT: next_state = resp_data_ready ? WRESP : WWAIT;
-            WRESP: next_state = (pmem_bvalid && pmem_bready) ? IDLE : WRESP;
+            WRESP: next_state = (pmem_wresp_valid && pmem_wresp_ready) ? IDLE : WRESP;
             default: next_state = IDLE;
         endcase
     end
@@ -781,11 +776,10 @@ module PMEM (
     );
 
     // 读写请求仲裁（写优先）
-    assign pmem_rvalid = (state == RRESP);
-    assign pmem_bvalid = (state == WRESP);
-    assign pmem_arready = (state == IDLE) && !(pmem_awvalid && pmem_wvalid);
-    assign pmem_awready = (state == IDLE);
-    assign pmem_wready = (state == IDLE);
+    assign pmem_rresp_valid = (state == RRESP);
+    assign pmem_wresp_valid = (state == WRESP);
+    assign pmem_rreq_ready = (state == IDLE) && !pmem_wreq_valid;
+    assign pmem_wreq_ready = (state == IDLE);
     assign resp_data_ready = random_bit;
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
@@ -797,15 +791,15 @@ module PMEM (
 
     always @(posedge clk) begin
         if ((state == RWAIT && next_state == RRESP) || (state == IDLE && next_state == RRESP)) begin
-            pmem_rdata <= pmem_read_npc(pmem_araddr);
+            pmem_rdata <= pmem_read_npc(pmem_raddr);
         end
         if ((state == WWAIT && next_state == WRESP) || (state == IDLE && next_state == WRESP)) begin
-            pmem_write_npc(pmem_awaddr, pmem_wdata, pmem_wmask);
+            pmem_write_npc(pmem_waddr, pmem_wdata, pmem_wmask);
         end
     end
 
-    assign pmem_rresp = 0;
-    assign pmem_bresp = 0;
+    assign pmem_rerror = 0;
+    assign pmem_werror = 0;
 
 endmodule
 
@@ -829,33 +823,31 @@ module LSU (
     import "DPI-C" function void NPCINV(input int pc);
 
     // PMEM接口信号
-    logic pmem_arvalid, pmem_arready, pmem_rvalid, pmem_rready;
-    logic pmem_awvalid, pmem_awready, pmem_wvalid, pmem_wready, pmem_bvalid, pmem_bready;
-    logic [31:0] pmem_araddr, pmem_awaddr, pmem_wdata, pmem_rdata;
+    logic pmem_rreq_valid, pmem_rreq_ready, pmem_rresp_valid, pmem_rresp_ready;
+    logic pmem_wreq_valid, pmem_wreq_ready, pmem_wresp_valid, pmem_wresp_ready;
+    logic [31:0] pmem_raddr, pmem_waddr, pmem_wdata, pmem_rdata;
     logic [7:0] pmem_wmask;
-    logic pmem_rresp, pmem_bresp;
+    logic pmem_rerror, pmem_werror;
 
     // 实例化PMEM模块
     PMEM u_pmem (
-        .clk         (clk),
-        .reset       (reset),
-        .pmem_arvalid(pmem_arvalid),
-        .pmem_arready(pmem_arready),
-        .pmem_araddr (pmem_araddr),
-        .pmem_rvalid (pmem_rvalid),
-        .pmem_rready (pmem_rready),
-        .pmem_rdata  (pmem_rdata),
-        .pmem_rresp  (pmem_rresp),
-        .pmem_awvalid(pmem_awvalid),
-        .pmem_awready(pmem_awready),
-        .pmem_awaddr (pmem_awaddr),
-        .pmem_wvalid (pmem_wvalid),
-        .pmem_wready (pmem_wready),
-        .pmem_wdata  (pmem_wdata),
-        .pmem_wmask  (pmem_wmask),
-        .pmem_bvalid (pmem_bvalid),
-        .pmem_bready (pmem_bready),
-        .pmem_bresp  (pmem_bresp)
+        .clk             (clk),
+        .reset           (reset),
+        .pmem_rreq_valid (pmem_rreq_valid),
+        .pmem_rreq_ready (pmem_rreq_ready),
+        .pmem_raddr      (pmem_raddr),
+        .pmem_rresp_valid(pmem_rresp_valid),
+        .pmem_rresp_ready(pmem_rresp_ready),
+        .pmem_rdata      (pmem_rdata),
+        .pmem_rerror     (pmem_rerror),
+        .pmem_wreq_valid (pmem_wreq_valid),
+        .pmem_wreq_ready (pmem_wreq_ready),
+        .pmem_waddr      (pmem_waddr),
+        .pmem_wdata      (pmem_wdata),
+        .pmem_wmask      (pmem_wmask),
+        .pmem_wresp_valid(pmem_wresp_valid),
+        .pmem_wresp_ready(pmem_wresp_ready),
+        .pmem_werror     (pmem_werror)
     );
 
     // LSU根据指令决定是否访问PMEM
@@ -863,18 +855,17 @@ module LSU (
     assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
     assign pmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
 
-    assign pmem_araddr = alu_result;
-    assign pmem_awaddr = alu_result;
+    assign pmem_raddr = alu_result;
+    assign pmem_waddr = alu_result;
     assign pmem_wdata = gpr_rdata2;
-    assign pmem_arvalid = lsu_req_valid && pmem_ren;
-    assign pmem_awvalid = lsu_req_valid && pmem_wen;
-    assign pmem_wvalid = lsu_req_valid && pmem_wen;
-    assign pmem_rready = lsu_resp_ready;
-    assign pmem_bready = lsu_resp_ready;
+    assign pmem_rreq_valid = lsu_req_valid && pmem_ren;
+    assign pmem_wreq_valid = lsu_req_valid && pmem_wen;
+    assign pmem_rresp_ready = lsu_resp_ready;
+    assign pmem_wresp_ready = lsu_resp_ready;
 
     // LSU握手逻辑
-    assign lsu_req_ready = pmem_ren ? pmem_arready : (pmem_wen ? (pmem_awready && pmem_wready) : 1'b1);
-    assign lsu_resp_valid  = pmem_ren ? pmem_rvalid : (pmem_wen ? pmem_bvalid : lsu_req_valid);
+    assign lsu_req_ready = pmem_ren ? pmem_rreq_ready : (pmem_wen ? pmem_wreq_ready : 1'b1);
+    assign lsu_resp_valid  = pmem_ren ? pmem_rresp_valid : (pmem_wen ? pmem_wresp_valid : lsu_req_valid);
 
     // 写掩码生成
     always_comb begin
@@ -904,7 +895,7 @@ module LSU (
         endcase
     end
 
-    assign lsu_error = pmem_rresp | pmem_bresp;
+    assign lsu_error = pmem_rerror | pmem_werror;
 
 endmodule
 
