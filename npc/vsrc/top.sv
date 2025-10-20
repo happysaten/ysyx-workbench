@@ -544,6 +544,8 @@ module Arbiter (
     //     end
     // end
     assign imem_arready = (state == IDLE) && mem_arready;
+    assign imem_awready = 1'b0;
+    assign imem_wready = 1'b0;
     assign dmem_arready = (state == IDLE) && mem_arready;
     assign dmem_awready = (state == IDLE) && mem_awready;
     assign dmem_wready = (state == IDLE) && mem_wready;
@@ -656,10 +658,6 @@ module Arbiter (
     assign mem_rready = (state == IFETCH) ? imem_rready : 
                         (state == DMEM && locked_is_read) ? dmem_rready : 1'b0;
     assign mem_bready = (state == DMEM && locked_is_write) ? dmem_bready : 1'b0;
-
-    // 未使用的写通道信号（IFU不写）
-    assign imem_awready = 1'b0;
-    assign imem_wready = 1'b0;
 
 endmodule
 
