@@ -201,8 +201,10 @@ module IFU (
 );
     // IMEM接口信号
     logic imem_arvalid, imem_arready, imem_rvalid, imem_rready;
-    logic [31:0] imem_araddr, imem_rdata;
-    logic imem_rresp;
+    logic imem_awvalid, imem_awready, imem_wvalid, imem_wready, imem_bvalid, imem_bready;
+    logic [31:0] imem_araddr, imem_awaddr, imem_wdata, imem_rdata;
+    logic [7:0] imem_wmask;
+    logic imem_rresp, imem_bresp;
 
     // 实例化IMEM模块
     IMEM u_imem (
@@ -214,23 +216,41 @@ module IFU (
         .imem_rvalid (imem_rvalid),
         .imem_rready (imem_rready),
         .imem_rdata  (imem_rdata),
-        .imem_rresp  (imem_rresp)
+        .imem_rresp  (imem_rresp),
+        .imem_awvalid(imem_awvalid),
+        .imem_awready(imem_awready),
+        .imem_awaddr (imem_awaddr),
+        .imem_wvalid (imem_wvalid),
+        .imem_wready (imem_wready),
+        .imem_wdata  (imem_wdata),
+        .imem_wmask  (imem_wmask),
+        .imem_bvalid (imem_bvalid),
+        .imem_bready (imem_bready),
+        .imem_bresp  (imem_bresp)
     );
+
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    // IMEM访问控制
+    // IMEM访问控制 - 只使用读通道
     assign imem_araddr = dnpc;
     assign imem_arvalid = ifu_req_valid;
     assign imem_rready = ifu_resp_ready;
+    
+    // 写通道全部置为无效
+    assign imem_awvalid = 1'b0;
+    assign imem_awaddr = 32'h0;
+    assign imem_wvalid = 1'b0;
+    assign imem_wdata = 32'h0;
+    assign imem_wmask = 8'h0;
+    assign imem_bready = 1'b0;
 
     // IFU握手逻辑
     assign ifu_req_ready = imem_arready;
     assign ifu_resp_valid = imem_rvalid;
     assign ifu_rdata = imem_rdata;
     assign ifu_error = imem_rresp;
-
 
     import "DPI-C" function void update_inst_npc(
         input int inst,
@@ -259,7 +279,20 @@ module IMEM (
     output logic        imem_rvalid,
     input               imem_rready,
     output logic [31:0] imem_rdata,
-    output logic        imem_rresp
+    output logic        imem_rresp,
+    // 写地址通道(AW)
+    input               imem_awvalid,
+    output logic        imem_awready,
+    input        [31:0] imem_awaddr,
+    // 写数据通道(W)
+    input               imem_wvalid,
+    output logic        imem_wready,
+    input        [31:0] imem_wdata,
+    input        [ 7:0] imem_wmask,
+    // 写回复通道(B)
+    output logic        imem_bvalid,
+    input               imem_bready,
+    output logic        imem_bresp
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -311,6 +344,12 @@ module IMEM (
     assign req_fire = imem_arvalid && imem_arready;
     assign resp_fire = imem_rvalid && imem_rready;
 
+    // 写通道保持无效
+    assign imem_awready = 1'b0;
+    assign imem_wready = 1'b0;
+    assign imem_bvalid = 1'b0;
+    assign imem_bresp = 1'b0;
+
     import "DPI-C" function int pmem_read_npc(input int raddr);
 
     always @(posedge clk) begin
@@ -318,6 +357,13 @@ module IMEM (
     end
 
     assign imem_rresp = 0;
+
+    // 断言：确保写通道信号始终为0
+    always @(posedge clk) begin
+        assert (imem_awvalid == 1'b0) else $fatal("IMEM: imem_awvalid should always be 0");
+        assert (imem_wvalid == 1'b0) else $fatal("IMEM: imem_wvalid should always be 0");
+        assert (imem_bready == 1'b0) else $fatal("IMEM: imem_bready should always be 0");
+    end
 
 endmodule
 
