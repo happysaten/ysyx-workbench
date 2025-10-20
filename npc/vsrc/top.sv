@@ -771,8 +771,8 @@ module PMEM (
 
     always @(posedge clk) begin
         if (state != RESP && next_state == RESP) begin
-            if (!pmem_wen) pmem_rdata <= pmem_read_npc(pmem_addr);
-            // else pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+            if (pmem_wen) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+            else pmem_rdata <= pmem_read_npc(pmem_addr);
         end
     end
 
