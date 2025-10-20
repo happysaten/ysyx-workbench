@@ -1311,7 +1311,7 @@ module LSU (
             3'b100: lsu_rdata = {24'b0, dmem_rdata[7:0]};  // LBU
             default: begin
                 lsu_rdata = 32'h0;
-                if (dmem_ren) NPCINV(pc);
+                // if (dmem_ren) NPCINV(pc);
             end
         endcase
     end
