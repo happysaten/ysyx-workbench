@@ -50,6 +50,20 @@ module top (
     logic ifu_error, gpr_error, csr_error, lsu_error;
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
+    // IMEM接口信号（IFU侧）
+    logic imem_arvalid, imem_arready, imem_rvalid, imem_rready;
+    logic imem_awvalid, imem_awready, imem_wvalid, imem_wready, imem_bvalid, imem_bready;
+    logic [31:0] imem_araddr, imem_awaddr, imem_wdata, imem_rdata;
+    logic [7:0] imem_wmask;
+    logic imem_rresp, imem_bresp;
+
+    // DMEM接口信号（LSU侧）
+    logic dmem_arvalid, dmem_arready, dmem_rvalid, dmem_rready;
+    logic dmem_awvalid, dmem_awready, dmem_wvalid, dmem_wready, dmem_bvalid, dmem_bready;
+    logic [31:0] dmem_araddr, dmem_awaddr, dmem_wdata, dmem_rdata;
+    logic [7:0] dmem_wmask;
+    logic dmem_rresp, dmem_bresp;
+
     // MEM接口信号（合并后的单一存储器接口）
     logic mem_arvalid, mem_arready, mem_rvalid, mem_rready;
     logic mem_awvalid, mem_awready, mem_wvalid, mem_wready, mem_bvalid, mem_bready;
@@ -138,6 +152,41 @@ module top (
         .mem_bvalid   (mem_bvalid),
         .mem_bready   (mem_bready),
         .mem_bresp    (mem_bresp)
+    );
+
+    // 实例化IFU模块
+    IFU u_ifu (
+        .clk(clk),
+        .reset(reset_sync),
+        .ifu_req_valid(npc_req_valid),
+        .ifu_req_ready(ifu_req_ready),
+        .jump_en(jump_en),
+        .jump_target(jump_target),
+        .ifu_rdata(inst),
+        .ifu_resp_valid(ifu_resp_valid),
+        .ifu_resp_ready(lsu_req_ready),
+        .pc(pc),
+        .snpc(snpc),
+        .dnpc(dnpc),
+        .ifu_error(ifu_error),
+        // IMEM接口
+        .imem_arvalid(imem_arvalid),
+        .imem_arready(imem_arready),
+        .imem_araddr(imem_araddr),
+        .imem_rvalid(imem_rvalid),
+        .imem_rready(imem_rready),
+        .imem_rdata(imem_rdata),
+        .imem_rresp(imem_rresp),
+        .imem_awvalid(imem_awvalid),
+        .imem_awready(imem_awready),
+        .imem_awaddr(imem_awaddr),
+        .imem_wvalid(imem_wvalid),
+        .imem_wready(imem_wready),
+        .imem_wdata(imem_wdata),
+        .imem_wmask(imem_wmask),
+        .imem_bvalid(imem_bvalid),
+        .imem_bready(imem_bready),
+        .imem_bresp(imem_bresp)
     );
 
     // IDU：负责指令解码
@@ -341,7 +390,7 @@ module IFU (
     // PC 寄存器更新 - 握手成功时更新
     always_ff @(posedge clk) begin
         if (reset) pc <= RESET_PC - 4;
-        else if (imem_arvalid && imem_arready) pc <= dnpc;
+        else if (ifu_req_valid && ifu_req_ready) pc <= dnpc;
     end
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
@@ -407,7 +456,7 @@ module Arbiter (
     input               mem_bresp
 );
     typedef enum logic [1:0] {
-        IDLE,   // 空闲状态
+        IDLE,
         IFETCH, // IFU访问中
         DMEM    // LSU访问中
     } state_t;
