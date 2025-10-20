@@ -49,14 +49,14 @@ module top (
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
-        .jump_target(jump_target),
-        .jump_en(jump_en),
+        .ifu_req_valid(npc_req_valid),
+        .ifu_req_ready(ifu_req_ready),
         .pc(pc),
+        .jump_en(jump_en),
+        .jump_target(jump_target),
         .snpc(snpc),
         .dnpc(dnpc),
         .ifu_rdata(inst),
-        .ifu_req_valid(npc_req_valid),
-        .ifu_req_ready(ifu_req_ready),
         .ifu_resp_valid(ifu_resp_valid),
         .ifu_resp_ready(lsu_req_ready)
     );
@@ -90,17 +90,17 @@ module top (
     GPR u_gpr (
         .clk(clk),
         .reset(reset_sync),
+        .gpr_req_valid(lsu_resp_valid),
+        .gpr_req_ready(gpr_req_ready),
         .gpr_wen(gpr_we && (|rd)),
         .gpr_waddr(rd),
         .gpr_wdata(gpr_wdata),
         .gpr_raddr1(rs1),
         .gpr_raddr2(rs2),
-        .gpr_rdata1(gpr_rdata1),
-        .gpr_rdata2(gpr_rdata2),
-        .gpr_req_valid(lsu_resp_valid),
-        .gpr_req_ready(gpr_req_ready),
         .gpr_resp_valid(gpr_resp_valid),
-        .gpr_resp_ready(ifu_req_ready)
+        .gpr_resp_ready(ifu_req_ready),
+        .gpr_rdata1(gpr_rdata1),
+        .gpr_rdata2(gpr_rdata2)
     );
 
     // CSR：控制状态寄存器
@@ -109,13 +109,13 @@ module top (
     CSR u_csr (
         .clk(clk),
         .reset(reset_sync),
-        .csr_wen(csr_we),
-        .csr_wdata(csr_wdata),
-        .csr_rdata(csr_rdata),
         .csr_req_valid(lsu_resp_valid),
         .csr_req_ready(csr_req_ready),
+        .csr_wen(csr_we),
+        .csr_wdata(csr_wdata),
         .csr_resp_valid(csr_resp_valid),
-        .csr_resp_ready(ifu_req_ready)
+        .csr_resp_ready(ifu_req_ready),
+        .csr_rdata(csr_rdata)
     );
 
 
@@ -144,19 +144,19 @@ module top (
     // LSU：负责加载和存储指令的内存访问
     logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
-        .clk           (clk),
-        .reset         (reset_sync),
-        .inst_type     (inst_type),
-        .opcode        (opcode),
-        .funct3        (funct3),
-        .pc            (pc),
-        .alu_result    (alu_result),
-        .gpr_rdata2    (gpr_rdata2),
-        .lsu_rdata     (lsu_rdata),
-        .lsu_req_valid (ifu_resp_valid),
-        .lsu_req_ready (lsu_req_ready),
+        .clk(clk),
+        .reset(reset_sync),
+        .lsu_req_valid(ifu_resp_valid),
+        .lsu_req_ready(lsu_req_ready),
+        .inst_type(inst_type),
+        .opcode(opcode),
+        .funct3(funct3),
+        .pc(pc),
+        .alu_result(alu_result),
+        .gpr_rdata2(gpr_rdata2),
         .lsu_resp_valid(lsu_resp_valid),
-        .lsu_resp_ready(gpr_req_ready && csr_req_ready)
+        .lsu_resp_ready(gpr_req_ready && csr_req_ready),
+        .lsu_rdata(lsu_rdata)
     );
 
     // WBU：负责写回GPR
@@ -177,18 +177,18 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责PC管理和取指
 module IFU (
-    input               clk,
-    input               reset,
-    input        [31:0] jump_target,
-    input               jump_en,
+    input        clk,
+    input        reset,
+    input        ifu_req_valid,
+    output logic ifu_req_ready,
     output logic [31:0] pc,
+    input        jump_en,
+    input [31:0] jump_target,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
     output logic [31:0] ifu_rdata,
-    input               ifu_req_valid,
-    output logic        ifu_req_ready,
-    output logic        ifu_resp_valid,
-    input               ifu_resp_ready
+    output logic ifu_resp_valid,
+    input        ifu_resp_ready
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -331,19 +331,19 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input               clk,             // 时钟信号
-    input               reset,           // 复位信号
-    input               gpr_wen,         // 写使能信号
-    input        [ 4:0] gpr_waddr,       // 写寄存器地址
-    input        [31:0] gpr_wdata,       // 写数据
-    input        [ 4:0] gpr_raddr1,      // 读寄存器1地址
-    input        [ 4:0] gpr_raddr2,      // 读寄存器2地址
-    input               gpr_req_valid,   // 请求有效信号
-    input               gpr_resp_ready,  // 响应准备信号
-    output logic        gpr_req_ready,   // 请求准备信号
-    output logic [31:0] gpr_rdata1,      // 读寄存器1数据
-    output logic [31:0] gpr_rdata2,      // 读寄存器2数据
-    output logic        gpr_resp_valid   // 响应有效信号
+    input        clk,
+    input        reset,
+    input        gpr_req_valid,
+    output logic gpr_req_ready,
+    input        gpr_wen,
+    input [4:0]  gpr_waddr,
+    input [31:0] gpr_wdata,
+    input [4:0]  gpr_raddr1,
+    input [4:0]  gpr_raddr2,
+    output logic gpr_resp_valid,
+    input        gpr_resp_ready,
+    output logic [31:0] gpr_rdata1,
+    output logic [31:0] gpr_rdata2
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -405,17 +405,17 @@ endmodule
 
 // CSR(Control and Status Register) 负责控制和状态寄存器的读写
 module CSR #(
-    localparam int N = 4  // CSR寄存器数量
+    localparam int N = 4
 ) (
-    input clk,  // 时钟信号
-    input reset,  // 复位信号
-    input [N-1:0] csr_wen,  // 写使能信号
-    input [N-1:0][31:0] csr_wdata,  // 写数据
-    input csr_req_valid,  // 读请求有效信号
-    input csr_resp_ready,  // 响应准备信号
-    output logic csr_req_ready,  // 请求准备信号
-    output logic [N-1:0][31:0] csr_rdata,  // 读数据
-    output logic csr_resp_valid  // 读响应有效信号
+    input        clk,
+    input        reset,
+    input        csr_req_valid,
+    output logic csr_req_ready,
+    input [N-1:0] csr_wen,
+    input [N-1:0][31:0] csr_wdata,
+    output logic csr_resp_valid,
+    input        csr_resp_ready,
+    output logic [N-1:0][31:0] csr_rdata
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -692,19 +692,19 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input                clk,
-    input                reset,
-    input  inst_t        inst_type,
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [31:0] pc,
-    input         [31:0] alu_result,
-    input         [31:0] gpr_rdata2,
-    input                lsu_req_valid,
-    input                lsu_resp_ready,
-    output logic  [31:0] lsu_rdata,
-    output logic         lsu_resp_valid,
-    output logic         lsu_req_ready
+    input        clk,
+    input        reset,
+    input        lsu_req_valid,
+    output logic lsu_req_ready,
+    input  inst_t inst_type,
+    input  [6:0]  opcode,
+    input  [2:0]  funct3,
+    input  [31:0] pc,
+    input  [31:0] alu_result,
+    input  [31:0] gpr_rdata2,
+    output logic  lsu_resp_valid,
+    input         lsu_resp_ready,
+    output logic  [31:0] lsu_rdata
 );
 
     typedef enum logic [1:0] {
