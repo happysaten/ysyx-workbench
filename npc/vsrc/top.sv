@@ -456,16 +456,19 @@ module Arbiter (
     input               mem_bresp
 );
     typedef enum logic [1:0] {
-        IDLE,   // 空闲状态
+        IDLE,
         IFETCH, // IFU访问中
         DMEM    // LSU访问中
     } state_t;
     state_t state, next_state;
 
-    // 锁存master的请求信息
-    logic [31:0] locked_araddr, locked_awaddr, locked_wdata;
-    logic [7:0] locked_wmask;
-    logic locked_arvalid, locked_awvalid, locked_wvalid;
+    // 添加寄存器来锁存请求信息
+    logic [31:0] locked_araddr;
+    logic [31:0] locked_awaddr;
+    logic [31:0] locked_wdata;
+    logic [ 7:0] locked_wmask;
+    logic        locked_is_read;
+    logic        locked_is_write;
 
     always_ff @(posedge clk) begin
         if (reset) state <= IDLE;
@@ -476,56 +479,53 @@ module Arbiter (
     always_comb begin
         unique case (state)
             IDLE: begin
-                // 优先级：LSU > IFU
+                // 优先级：LSU > IFU (写/读优先于取指)
                 if (dmem_arvalid || dmem_awvalid) next_state = DMEM;
                 else if (imem_arvalid) next_state = IFETCH;
                 else next_state = IDLE;
             end
             IFETCH: begin
                 // IFU读事务完成
-                if (mem_rvalid && imem_rready) next_state = IDLE;
+                if (mem_rvalid && mem_rready) next_state = IDLE;
                 else next_state = IFETCH;
             end
             DMEM: begin
                 // LSU读事务完成
-                if (mem_rvalid && dmem_rready) next_state = IDLE;
+                if (mem_rvalid && mem_rready) next_state = IDLE;
                 // LSU写事务完成
-                else if (mem_bvalid && dmem_bready) next_state = IDLE;
+                else if (mem_bvalid && mem_bready) next_state = IDLE;
                 else next_state = DMEM;
             end
             default: next_state = IDLE;
         endcase
     end
 
-    // 锁存请求阶段的信息
+    // 时序逻辑：锁存请求信息
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_araddr <= 32'h80000000;
-            locked_awaddr <= 32'h80000000;
+            locked_araddr <= 32'h0;
+            locked_awaddr <= 32'h0;
             locked_wdata <= 32'h0;
             locked_wmask <= 8'h0;
-            locked_arvalid <= 1'b0;
-            locked_awvalid <= 1'b0;
-            locked_wvalid <= 1'b0;
-        end else if (state == IDLE && next_state == DMEM) begin
-            // 锁存LSU的请求
-            locked_araddr <= dmem_araddr;
-            locked_awaddr <= dmem_awaddr;
-            locked_wdata <= dmem_wdata;
-            locked_wmask <= dmem_wmask;
-            locked_arvalid <= dmem_arvalid;
-            locked_awvalid <= dmem_awvalid;
-            locked_wvalid <= dmem_wvalid;
-        end else if (state == IDLE && next_state == IFETCH) begin
-            // 锁存IFU的请求
-            locked_araddr <= imem_araddr;
-            locked_arvalid <= imem_arvalid;
-            locked_awvalid <= 1'b0;
-            locked_wvalid <= 1'b0;
+            locked_is_read <= 1'b0;
+            locked_is_write <= 1'b0;
+        end else if (state == IDLE) begin
+            if (dmem_arvalid || dmem_awvalid) begin
+                locked_araddr <= dmem_araddr;
+                locked_awaddr <= dmem_awaddr;
+                locked_wdata <= dmem_wdata;
+                locked_wmask <= dmem_wmask;
+                locked_is_read <= dmem_arvalid;
+                locked_is_write <= dmem_awvalid;
+            end else if (imem_arvalid) begin
+                locked_araddr <= imem_araddr;
+                locked_is_read <= 1'b1;
+                locked_is_write <= 1'b0;
+            end
         end
     end
 
-    // 请求阶段握手信号
+    // 组合逻辑：握手信号（在IDLE状态时接受新请求）
     always_comb begin
         // 默认值
         imem_arready = 1'b0;
@@ -533,108 +533,129 @@ module Arbiter (
         dmem_awready = 1'b0;
         dmem_wready = 1'b0;
 
-        mem_arvalid = 1'b0;
-        mem_araddr = 32'h0;
-        mem_awvalid = 1'b0;
-        mem_awaddr = 32'h0;
-        mem_wvalid = 1'b0;
-        mem_wdata = 32'h0;
-        mem_wmask = 8'h0;
-
         if (state == IDLE) begin
-            // LSU优先
             if (dmem_arvalid || dmem_awvalid) begin
-                // LSU读请求
-                if (dmem_arvalid) begin
-                    mem_arvalid = 1'b1;
-                    mem_araddr = dmem_araddr;
-                    dmem_arready = mem_arready;
-                end
-                // LSU写请求
-                if (dmem_awvalid && dmem_wvalid) begin
-                    mem_awvalid = 1'b1;
-                    mem_awaddr = dmem_awaddr;
-                    dmem_awready = mem_awready;
-                    mem_wvalid = 1'b1;
-                    mem_wdata = dmem_wdata;
-                    mem_wmask = dmem_wmask;
-                    dmem_wready = mem_wready;
-                end
+                dmem_arready = mem_arready && dmem_arvalid;
+                dmem_awready = mem_awready && dmem_awvalid;
+                dmem_wready = mem_wready && dmem_wvalid;
             end else if (imem_arvalid) begin
-                // IFU读请求
-                mem_arvalid = 1'b1;
-                mem_araddr = imem_araddr;
                 imem_arready = mem_arready;
             end
         end
     end
 
-    // 响应阶段信号（使用寄存器）
-    logic imem_rvalid_reg, dmem_rvalid_reg, dmem_bvalid_reg;
-    logic [31:0] imem_rdata_reg, dmem_rdata_reg;
-    logic imem_rresp_reg, dmem_rresp_reg, dmem_bresp_reg;
-
+    // 时序逻辑：向MEM发送请求
     always_ff @(posedge clk) begin
         if (reset) begin
-            imem_rvalid_reg <= 1'b0;
-            dmem_rvalid_reg <= 1'b0;
-            dmem_bvalid_reg <= 1'b0;
-            imem_rdata_reg <= 32'h0;
-            dmem_rdata_reg <= 32'h0;
-            imem_rresp_reg <= 1'b0;
-            dmem_rresp_reg <= 1'b0;
-            dmem_bresp_reg <= 1'b0;
+            mem_arvalid <= 1'b0;
+            mem_awvalid <= 1'b0;
+            mem_wvalid <= 1'b0;
         end else begin
-            // IFU读响应
-            if (state == IFETCH && mem_rvalid && !imem_rvalid_reg) begin
-                imem_rvalid_reg <= 1'b1;
-                imem_rdata_reg <= mem_rdata;
-                imem_rresp_reg <= mem_rresp;
-            end else if (imem_rvalid_reg && imem_rready) begin
-                imem_rvalid_reg <= 1'b0;
-            end
-
-            // LSU读响应
-            if (state == DMEM && mem_rvalid && locked_arvalid && !dmem_rvalid_reg) begin
-                dmem_rvalid_reg <= 1'b1;
-                dmem_rdata_reg <= mem_rdata;
-                dmem_rresp_reg <= mem_rresp;
-            end else if (dmem_rvalid_reg && dmem_rready) begin
-                dmem_rvalid_reg <= 1'b0;
-            end
-
-            // LSU写响应
-            if (state == DMEM && mem_bvalid && locked_awvalid && !dmem_bvalid_reg) begin
-                dmem_bvalid_reg <= 1'b1;
-                dmem_bresp_reg <= mem_bresp;
-            end else if (dmem_bvalid_reg && dmem_bready) begin
-                dmem_bvalid_reg <= 1'b0;
-            end
+            unique case (state)
+                IDLE: begin
+                    if (dmem_arvalid || dmem_awvalid) begin
+                        mem_arvalid <= dmem_arvalid;
+                        mem_awvalid <= dmem_awvalid;
+                        mem_wvalid <= dmem_wvalid;
+                    end else if (imem_arvalid) begin
+                        mem_arvalid <= 1'b1;
+                        mem_awvalid <= 1'b0;
+                        mem_wvalid <= 1'b0;
+                    end else begin
+                        mem_arvalid <= 1'b0;
+                        mem_awvalid <= 1'b0;
+                        mem_wvalid <= 1'b0;
+                    end
+                end
+                IFETCH, DMEM: begin
+                    if (mem_arvalid && mem_arready) mem_arvalid <= 1'b0;
+                    if (mem_awvalid && mem_awready) mem_awvalid <= 1'b0;
+                    if (mem_wvalid && mem_wready) mem_wvalid <= 1'b0;
+                end
+                default: begin
+                    mem_arvalid <= 1'b0;
+                    mem_awvalid <= 1'b0;
+                    mem_wvalid <= 1'b0;
+                end
+            endcase
         end
     end
 
-    // 输出响应信号
-    assign imem_rvalid = imem_rvalid_reg;
-    assign imem_rdata = imem_rdata_reg;
-    assign imem_rresp = imem_rresp_reg;
-    
-    assign dmem_rvalid = dmem_rvalid_reg;
-    assign dmem_rdata = dmem_rdata_reg;
-    assign dmem_rresp = dmem_rresp_reg;
-    
-    assign dmem_bvalid = dmem_bvalid_reg;
-    assign dmem_bresp = dmem_bresp_reg;
+    // 组合逻辑：地址和数据输出（使用锁存的值）
+    assign mem_araddr = locked_araddr;
+    assign mem_awaddr = locked_awaddr;
+    assign mem_wdata = locked_wdata;
+    assign mem_wmask = locked_wmask;
 
-    // MEM响应握手
-    assign mem_rready = (state == IFETCH) ? (!imem_rvalid_reg) : 
-                        (state == DMEM && locked_arvalid) ? (!dmem_rvalid_reg) : 1'b0;
-    assign mem_bready = (state == DMEM && locked_awvalid) ? (!dmem_bvalid_reg) : 1'b0;
+    // 时序逻辑：转发读响应
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            imem_rvalid <= 1'b0;
+            imem_rdata <= 32'h0;
+            imem_rresp <= 1'b0;
+            dmem_rvalid <= 1'b0;
+            dmem_rdata <= 32'h0;
+            dmem_rresp <= 1'b0;
+        end else begin
+            unique case (state)
+                IFETCH: begin
+                    imem_rvalid <= mem_rvalid;
+                    if (mem_rvalid) begin
+                        imem_rdata <= mem_rdata;
+                        imem_rresp <= mem_rresp;
+                    end
+                    if (imem_rvalid && imem_rready) imem_rvalid <= 1'b0;
+                end
+                DMEM: begin
+                    if (locked_is_read) begin
+                        dmem_rvalid <= mem_rvalid;
+                        if (mem_rvalid) begin
+                            dmem_rdata <= mem_rdata;
+                            dmem_rresp <= mem_rresp;
+                        end
+                        if (dmem_rvalid && dmem_rready) dmem_rvalid <= 1'b0;
+                    end
+                end
+                default: begin
+                    imem_rvalid <= 1'b0;
+                    dmem_rvalid <= 1'b0;
+                end
+            endcase
+        end
+    end
 
-    // IFU/LSU的写通道无效信号
+    // 时序逻辑：转发写响应
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            imem_bvalid <= 1'b0;
+            imem_bresp <= 1'b0;
+            dmem_bvalid <= 1'b0;
+            dmem_bresp <= 1'b0;
+        end else begin
+            unique case (state)
+                DMEM: begin
+                    if (locked_is_write) begin
+                        dmem_bvalid <= mem_bvalid;
+                        if (mem_bvalid) dmem_bresp <= mem_bresp;
+                        if (dmem_bvalid && dmem_bready) dmem_bvalid <= 1'b0;
+                    end
+                end
+                default: begin
+                    imem_bvalid <= 1'b0;
+                    dmem_bvalid <= 1'b0;
+                end
+            endcase
+        end
+    end
+
+    // 组合逻辑：ready信号
+    assign mem_rready = (state == IFETCH) ? imem_rready : 
+                        (state == DMEM && locked_is_read) ? dmem_rready : 1'b0;
+    assign mem_bready = (state == DMEM && locked_is_write) ? dmem_bready : 1'b0;
+
+    // 未使用的写通道信号（IFU不写）
     assign imem_awready = 1'b0;
     assign imem_wready = 1'b0;
-    assign imem_bvalid = 1'b0;
-    assign imem_bresp = 1'b0;
 
 endmodule
 
