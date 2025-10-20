@@ -731,10 +731,12 @@ module PMEM (
     input               pmem_wresp_ready,
     output logic        pmem_werror
 );
-    typedef enum logic [1:0] {
+    typedef enum logic [2:0] {
         IDLE,
-        WAIT,
-        RESP
+        RWAIT,  // 读等待
+        RRESP,  // 读响应
+        WWAIT,  // 写等待
+        WRESP   // 写响应
     } state_t;
     state_t state, next_state;
 
@@ -744,13 +746,21 @@ module PMEM (
     end
 
     logic resp_data_ready, req_fire, resp_fire;
-    logic is_write_op;  // 记录当前是否为写操作
 
     always_comb begin
         unique case (state)
-            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
-            WAIT: next_state = resp_data_ready ? RESP : WAIT;
-            RESP: next_state = resp_fire ? IDLE : RESP;
+            IDLE: begin
+                if (pmem_wreq_valid && pmem_wreq_ready)
+                    next_state = resp_data_ready ? WRESP : WWAIT;
+                else if (pmem_rreq_valid && pmem_rreq_ready)
+                    next_state = resp_data_ready ? RRESP : RWAIT;
+                else
+                    next_state = IDLE;
+            end
+            RWAIT: next_state = resp_data_ready ? RRESP : RWAIT;
+            RRESP: next_state = (pmem_rresp_valid && pmem_rresp_ready) ? IDLE : RRESP;
+            WWAIT: next_state = resp_data_ready ? WRESP : WWAIT;
+            WRESP: next_state = (pmem_wresp_valid && pmem_wresp_ready) ? IDLE : WRESP;
             default: next_state = IDLE;
         endcase
     end
@@ -766,16 +776,11 @@ module PMEM (
     );
 
     // 读写请求仲裁（写优先）
-
-    assign is_write_op = pmem_wreq_valid;
-    assign pmem_rresp_valid = state == RESP && !is_write_op;
-    assign pmem_wresp_valid = state == RESP && is_write_op;
-    assign pmem_rreq_ready = state == IDLE && !pmem_wreq_valid;
-    assign pmem_wreq_ready = state == IDLE;
+    assign pmem_rresp_valid = (state == RRESP);
+    assign pmem_wresp_valid = (state == WRESP);
+    assign pmem_rreq_ready = (state == IDLE) && !pmem_wreq_valid;
+    assign pmem_wreq_ready = (state == IDLE);
     assign resp_data_ready = random_bit;
-    assign req_fire         = is_write_op ? (pmem_wreq_valid && pmem_wreq_ready) :(pmem_rreq_valid && pmem_rreq_ready);
-    assign resp_fire = (pmem_rresp_valid && pmem_rresp_ready) ||
-                       (pmem_wresp_valid && pmem_wresp_ready);
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -785,9 +790,11 @@ module PMEM (
     );
 
     always @(posedge clk) begin
-        if (state != RESP && next_state == RESP) begin
-            if (is_write_op) pmem_write_npc(pmem_waddr, pmem_wdata, pmem_wmask);
-            else pmem_rdata <= pmem_read_npc(pmem_raddr);
+        if ((state == RWAIT && next_state == RRESP) || (state == IDLE && next_state == RRESP)) begin
+            pmem_rdata <= pmem_read_npc(pmem_raddr);
+        end
+        if ((state == WWAIT && next_state == WRESP) || (state == IDLE && next_state == WRESP)) begin
+            pmem_write_npc(pmem_waddr, pmem_wdata, pmem_wmask);
         end
     end
 
