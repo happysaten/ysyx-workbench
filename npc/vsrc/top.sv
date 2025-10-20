@@ -50,142 +50,94 @@ module top (
     logic ifu_error, gpr_error, csr_error, lsu_error;
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
-    // IFU的AXI4-Lite接口信号
-    logic ifu_arvalid, ifu_arready, ifu_rvalid, ifu_rready;
-    logic ifu_awvalid, ifu_awready, ifu_wvalid, ifu_wready, ifu_bvalid, ifu_bready;
-    logic [31:0] ifu_araddr, ifu_awaddr, ifu_wdata, ifu_rdata;
-    logic [7:0] ifu_wmask;
-    logic ifu_rresp, ifu_bresp;
-
-    // LSU的AXI4-Lite接口信号
-    logic lsu_arvalid, lsu_arready, lsu_rvalid, lsu_rready;
-    logic lsu_awvalid, lsu_awready, lsu_wvalid, lsu_wready, lsu_bvalid, lsu_bready;
-    logic [31:0] lsu_araddr, lsu_awaddr, lsu_wdata, lsu_rdata;
-    logic [7:0] lsu_wmask;
-    logic lsu_rresp, lsu_bresp;
-
-    // MEM的AXI4-Lite接口信号
+    // MEM接口信号（合并后的单一存储器接口）
     logic mem_arvalid, mem_arready, mem_rvalid, mem_rready;
     logic mem_awvalid, mem_awready, mem_wvalid, mem_wready, mem_bvalid, mem_bready;
     logic [31:0] mem_araddr, mem_awaddr, mem_wdata, mem_rdata;
     logic [7:0] mem_wmask;
     logic mem_rresp, mem_bresp;
 
-    // 实例化仲裁器
-    AXI4_Lite_Arbiter u_arbiter (
-        .clk(clk),
-        .reset(reset_sync),
-        // IFU接口
-        .ifu_arvalid(ifu_arvalid),
-        .ifu_arready(ifu_arready),
-        .ifu_araddr(ifu_araddr),
-        .ifu_rvalid(ifu_rvalid),
-        .ifu_rready(ifu_rready),
-        .ifu_rdata(ifu_rdata),
-        .ifu_rresp(ifu_rresp),
-        .ifu_awvalid(ifu_awvalid),
-        .ifu_awready(ifu_awready),
-        .ifu_awaddr(ifu_awaddr),
-        .ifu_wvalid(ifu_wvalid),
-        .ifu_wready(ifu_wready),
-        .ifu_wdata(ifu_wdata),
-        .ifu_wmask(ifu_wmask),
-        .ifu_bvalid(ifu_bvalid),
-        .ifu_bready(ifu_bready),
-        .ifu_bresp(ifu_bresp),
-        // LSU接口
-        .lsu_arvalid(lsu_arvalid),
-        .lsu_arready(lsu_arready),
-        .lsu_araddr(lsu_araddr),
-        .lsu_rvalid(lsu_rvalid),
-        .lsu_rready(lsu_rready),
-        .lsu_rdata(lsu_rdata),
-        .lsu_rresp(lsu_rresp),
-        .lsu_awvalid(lsu_awvalid),
-        .lsu_awready(lsu_awready),
-        .lsu_awaddr(lsu_awaddr),
-        .lsu_wvalid(lsu_wvalid),
-        .lsu_wready(lsu_wready),
-        .lsu_wdata(lsu_wdata),
-        .lsu_wmask(lsu_wmask),
-        .lsu_bvalid(lsu_bvalid),
-        .lsu_bready(lsu_bready),
-        .lsu_bresp(lsu_bresp),
-        // MEM接口
-        .mem_arvalid(mem_arvalid),
-        .mem_arready(mem_arready),
-        .mem_araddr(mem_araddr),
-        .mem_rvalid(mem_rvalid),
-        .mem_rready(mem_rready),
-        .mem_rdata(mem_rdata),
-        .mem_rresp(mem_rresp),
-        .mem_awvalid(mem_awvalid),
-        .mem_awready(mem_awready),
-        .mem_awaddr(mem_awaddr),
-        .mem_wvalid(mem_wvalid),
-        .mem_wready(mem_wready),
-        .mem_wdata(mem_wdata),
-        .mem_wmask(mem_wmask),
-        .mem_bvalid(mem_bvalid),
-        .mem_bready(mem_bready),
-        .mem_bresp(mem_bresp)
-    );
-
-    // 实例化MEM模块
+    // 实例化MEM模块（合并后的存储器）
     MEM u_mem (
-        .clk(clk),
-        .reset(reset_sync),
-        .mem_arvalid(mem_arvalid),
-        .mem_arready(mem_arready),
-        .mem_araddr(mem_araddr),
-        .mem_rvalid(mem_rvalid),
-        .mem_rready(mem_rready),
-        .mem_rdata(mem_rdata),
-        .mem_rresp(mem_rresp),
-        .mem_awvalid(mem_awvalid),
-        .mem_awready(mem_awready),
-        .mem_awaddr(mem_awaddr),
-        .mem_wvalid(mem_wvalid),
-        .mem_wready(mem_wready),
-        .mem_wdata(mem_wdata),
-        .mem_wmask(mem_wmask),
-        .mem_bvalid(mem_bvalid),
-        .mem_bready(mem_bready),
-        .mem_bresp(mem_bresp)
+        .clk         (clk),
+        .reset       (reset_sync),
+        .mem_arvalid (mem_arvalid),
+        .mem_arready (mem_arready),
+        .mem_araddr  (mem_araddr),
+        .mem_rvalid  (mem_rvalid),
+        .mem_rready  (mem_rready),
+        .mem_rdata   (mem_rdata),
+        .mem_rresp   (mem_rresp),
+        .mem_awvalid (mem_awvalid),
+        .mem_awready (mem_awready),
+        .mem_awaddr  (mem_awaddr),
+        .mem_wvalid  (mem_wvalid),
+        .mem_wready  (mem_wready),
+        .mem_wdata   (mem_wdata),
+        .mem_wmask   (mem_wmask),
+        .mem_bvalid  (mem_bvalid),
+        .mem_bready  (mem_bready),
+        .mem_bresp   (mem_bresp)
     );
 
-    IFU u_ifu (
-        .clk(clk),
-        .reset(reset_sync),
-        .ifu_req_valid(npc_req_valid),
-        .ifu_req_ready(ifu_req_ready),
-        .jump_en(jump_en),
-        .jump_target(jump_target),
-        .ifu_rdata(inst),
-        .ifu_resp_valid(ifu_resp_valid),
-        .ifu_resp_ready(lsu_req_ready),
-        .pc(pc),
-        .snpc(snpc),
-        .dnpc(dnpc),
-        .ifu_error(ifu_error),
-        // AXI4-Lite接口
-        .imem_arvalid(ifu_arvalid),
-        .imem_arready(ifu_arready),
-        .imem_araddr(ifu_araddr),
-        .imem_rvalid(ifu_rvalid),
-        .imem_rready(ifu_rready),
-        .imem_rdata(ifu_rdata),
-        .imem_rresp(ifu_rresp),
-        .imem_awvalid(ifu_awvalid),
-        .imem_awready(ifu_awready),
-        .imem_awaddr(ifu_awaddr),
-        .imem_wvalid(ifu_wvalid),
-        .imem_wready(ifu_wready),
-        .imem_wdata(ifu_wdata),
-        .imem_wmask(ifu_wmask),
-        .imem_bvalid(ifu_bvalid),
-        .imem_bready(ifu_bready),
-        .imem_bresp(ifu_bresp)
+    // 实例化仲裁器
+    Arbiter u_arbiter (
+        .clk          (clk),
+        .reset        (reset_sync),
+        // IFU接口
+        .imem_arvalid (imem_arvalid),
+        .imem_arready (imem_arready),
+        .imem_araddr  (imem_araddr),
+        .imem_rvalid  (imem_rvalid),
+        .imem_rready  (imem_rready),
+        .imem_rdata   (imem_rdata),
+        .imem_rresp   (imem_rresp),
+        .imem_awvalid (imem_awvalid),
+        .imem_awready (imem_awready),
+        .imem_awaddr  (imem_awaddr),
+        .imem_wvalid  (imem_wvalid),
+        .imem_wready  (imem_wready),
+        .imem_wdata   (imem_wdata),
+        .imem_wmask   (imem_wmask),
+        .imem_bvalid  (imem_bvalid),
+        .imem_bready  (imem_bready),
+        .imem_bresp   (imem_bresp),
+        // LSU接口
+        .dmem_arvalid (dmem_arvalid),
+        .dmem_arready (dmem_arready),
+        .dmem_araddr  (dmem_araddr),
+        .dmem_rvalid  (dmem_rvalid),
+        .dmem_rready  (dmem_rready),
+        .dmem_rdata   (dmem_rdata),
+        .dmem_rresp   (dmem_rresp),
+        .dmem_awvalid (dmem_awvalid),
+        .dmem_awready (dmem_awready),
+        .dmem_awaddr  (dmem_awaddr),
+        .dmem_wvalid  (dmem_wvalid),
+        .dmem_wready  (dmem_wready),
+        .dmem_wdata   (dmem_wdata),
+        .dmem_wmask   (dmem_wmask),
+        .dmem_bvalid  (dmem_bvalid),
+        .dmem_bready  (dmem_bready),
+        .dmem_bresp   (dmem_bresp),
+        // MEM接口
+        .mem_arvalid  (mem_arvalid),
+        .mem_arready  (mem_arready),
+        .mem_araddr   (mem_araddr),
+        .mem_rvalid   (mem_rvalid),
+        .mem_rready   (mem_rready),
+        .mem_rdata    (mem_rdata),
+        .mem_rresp    (mem_rresp),
+        .mem_awvalid  (mem_awvalid),
+        .mem_awready  (mem_awready),
+        .mem_awaddr   (mem_awaddr),
+        .mem_wvalid   (mem_wvalid),
+        .mem_wready   (mem_wready),
+        .mem_wdata    (mem_wdata),
+        .mem_wmask    (mem_wmask),
+        .mem_bvalid   (mem_bvalid),
+        .mem_bready   (mem_bready),
+        .mem_bresp    (mem_bresp)
     );
 
     // IDU：负责指令解码
@@ -271,6 +223,7 @@ module top (
     );
 
     // LSU：负责加载和存储指令的内存访问
+    logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
         .clk(clk),
         .reset(reset_sync),
@@ -286,24 +239,24 @@ module top (
         .lsu_resp_ready(gpr_req_ready && csr_req_ready),
         .lsu_rdata(lsu_rdata),
         .lsu_error(lsu_error),
-        // AXI4-Lite接口
-        .dmem_arvalid(lsu_arvalid),
-        .dmem_arready(lsu_arready),
-        .dmem_araddr(lsu_araddr),
-        .dmem_rvalid(lsu_rvalid),
-        .dmem_rready(lsu_rready),
-        .dmem_rdata(lsu_rdata),
-        .dmem_rresp(lsu_rresp),
-        .dmem_awvalid(lsu_awvalid),
-        .dmem_awready(lsu_awready),
-        .dmem_awaddr(lsu_awaddr),
-        .dmem_wvalid(lsu_wvalid),
-        .dmem_wready(lsu_wready),
-        .dmem_wdata(lsu_wdata),
-        .dmem_wmask(lsu_wmask),
-        .dmem_bvalid(lsu_bvalid),
-        .dmem_bready(lsu_bready),
-        .dmem_bresp(lsu_bresp)
+        // DMEM接口
+        .dmem_arvalid(dmem_arvalid),
+        .dmem_arready(dmem_arready),
+        .dmem_araddr(dmem_araddr),
+        .dmem_rvalid(dmem_rvalid),
+        .dmem_rready(dmem_rready),
+        .dmem_rdata(dmem_rdata),
+        .dmem_rresp(dmem_rresp),
+        .dmem_awvalid(dmem_awvalid),
+        .dmem_awready(dmem_awready),
+        .dmem_awaddr(dmem_awaddr),
+        .dmem_wvalid(dmem_wvalid),
+        .dmem_wready(dmem_wready),
+        .dmem_wdata(dmem_wdata),
+        .dmem_wmask(dmem_wmask),
+        .dmem_bvalid(dmem_bvalid),
+        .dmem_bready(dmem_bready),
+        .dmem_bresp(dmem_bresp)
     );
 
     // WBU：负责写回GPR
@@ -394,7 +347,181 @@ module IFU (
 
 endmodule
 
-// MEM(Memory) 负责内存的读写访问
+// Arbiter(仲裁器) 负责IFU和LSU对存储器的访问仲裁
+module Arbiter (
+    input               clk,
+    input               reset,
+    // IFU(IMEM)接口
+    input               imem_arvalid,
+    output logic        imem_arready,
+    input        [31:0] imem_araddr,
+    output logic        imem_rvalid,
+    input               imem_rready,
+    output logic [31:0] imem_rdata,
+    output logic        imem_rresp,
+    input               imem_awvalid,
+    output logic        imem_awready,
+    input        [31:0] imem_awaddr,
+    input               imem_wvalid,
+    output logic        imem_wready,
+    input        [31:0] imem_wdata,
+    input        [ 7:0] imem_wmask,
+    output logic        imem_bvalid,
+    input               imem_bready,
+    output logic        imem_bresp,
+    // LSU(DMEM)接口
+    input               dmem_arvalid,
+    output logic        dmem_arready,
+    input        [31:0] dmem_araddr,
+    output logic        dmem_rvalid,
+    input               dmem_rready,
+    output logic [31:0] dmem_rdata,
+    output logic        dmem_rresp,
+    input               dmem_awvalid,
+    output logic        dmem_awready,
+    input        [31:0] dmem_awaddr,
+    input               dmem_wvalid,
+    output logic        dmem_wready,
+    input        [31:0] dmem_wdata,
+    input        [ 7:0] dmem_wmask,
+    output logic        dmem_bvalid,
+    input               dmem_bready,
+    output logic        dmem_bresp,
+    // MEM接口
+    output logic        mem_arvalid,
+    input               mem_arready,
+    output logic [31:0] mem_araddr,
+    input               mem_rvalid,
+    output logic        mem_rready,
+    input        [31:0] mem_rdata,
+    input               mem_rresp,
+    output logic        mem_awvalid,
+    input               mem_awready,
+    output logic [31:0] mem_awaddr,
+    output logic        mem_wvalid,
+    input               mem_wready,
+    output logic [31:0] mem_wdata,
+    output logic [ 7:0] mem_wmask,
+    input               mem_bvalid,
+    output logic        mem_bready,
+    input               mem_bresp
+);
+    typedef enum logic [1:0] {
+        IDLE,   // 空闲状态
+        IFETCH, // IFU访问中
+        DMEM    // LSU访问中
+    } state_t;
+    state_t state, next_state;
+
+    always_ff @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    // 状态转移逻辑
+    always_comb begin
+        unique case (state)
+            IDLE: begin
+                // 优先级：LSU > IFU (写/读优先于取指)
+                if (dmem_arvalid || dmem_awvalid) next_state = DMEM;
+                else if (imem_arvalid) next_state = IFETCH;
+                else next_state = IDLE;
+            end
+            IFETCH: begin
+                // IFU读事务完成
+                if (mem_rvalid && mem_rready) next_state = IDLE;
+                else next_state = IFETCH;
+            end
+            DMEM: begin
+                // LSU读事务完成
+                if (mem_rvalid && mem_rready) next_state = IDLE;
+                // LSU写事务完成
+                else if (mem_bvalid && mem_bready) next_state = IDLE;
+                else next_state = DMEM;
+            end
+            default: next_state = IDLE;
+        endcase
+    end
+
+    // 仲裁和转发逻辑
+    always_comb begin
+        // 默认值：所有信号无效
+        imem_arready = 1'b0;
+        imem_rvalid = 1'b0;
+        imem_rdata = 32'h0;
+        imem_rresp = 1'b0;
+        imem_awready = 1'b0;
+        imem_wready = 1'b0;
+        imem_bvalid = 1'b0;
+        imem_bresp = 1'b0;
+
+        dmem_arready = 1'b0;
+        dmem_rvalid = 1'b0;
+        dmem_rdata = 32'h0;
+        dmem_rresp = 1'b0;
+        dmem_awready = 1'b0;
+        dmem_wready = 1'b0;
+        dmem_bvalid = 1'b0;
+        dmem_bresp = 1'b0;
+
+        mem_arvalid = 1'b0;
+        mem_araddr = 32'h0;
+        mem_rready = 1'b0;
+        mem_awvalid = 1'b0;
+        mem_awaddr = 32'h0;
+        mem_wvalid = 1'b0;
+        mem_wdata = 32'h0;
+        mem_wmask = 8'h0;
+        mem_bready = 1'b0;
+
+        unique case (state)
+            IDLE: begin
+                // LSU优先
+                if (dmem_arvalid || dmem_awvalid) begin
+                    // LSU读请求
+                    mem_arvalid = dmem_arvalid;
+                    mem_araddr = dmem_araddr;
+                    dmem_arready = mem_arready;
+                    // LSU写请求
+                    mem_awvalid = dmem_awvalid;
+                    mem_awaddr = dmem_awaddr;
+                    dmem_awready = mem_awready;
+                    mem_wvalid = dmem_wvalid;
+                    mem_wdata = dmem_wdata;
+                    mem_wmask = dmem_wmask;
+                    dmem_wready = mem_wready;
+                end else if (imem_arvalid) begin
+                    // IFU读请求
+                    mem_arvalid = imem_arvalid;
+                    mem_araddr = imem_araddr;
+                    imem_arready = mem_arready;
+                end
+            end
+            IFETCH: begin
+                // 转发IFU读响应
+                imem_rvalid = mem_rvalid;
+                imem_rdata = mem_rdata;
+                imem_rresp = mem_rresp;
+                mem_rready = imem_rready;
+            end
+            DMEM: begin
+                // 转发LSU读响应
+                dmem_rvalid = mem_rvalid;
+                dmem_rdata = mem_rdata;
+                dmem_rresp = mem_rresp;
+                mem_rready = dmem_rready;
+                // 转发LSU写响应
+                dmem_bvalid = mem_bvalid;
+                dmem_bresp = mem_bresp;
+                mem_bready = dmem_bready;
+            end
+            default: ;
+        endcase
+    end
+
+endmodule
+
+// MEM(Memory) 负责统一的内存访问（合并IMEM和DMEM）
 module MEM (
     input               clk,
     input               reset,
@@ -489,207 +616,6 @@ module MEM (
 
     assign mem_rresp = 0;
     assign mem_bresp = 0;
-
-endmodule
-
-// AXI4-Lite仲裁器：在IFU和LSU之间进行仲裁
-module AXI4_Lite_Arbiter (
-    input               clk,
-    input               reset,
-    // IFU的AXI4-Lite接口
-    input               ifu_arvalid,
-    output logic        ifu_arready,
-    input        [31:0] ifu_araddr,
-    output logic        ifu_rvalid,
-    input               ifu_rready,
-    output logic [31:0] ifu_rdata,
-    output logic        ifu_rresp,
-    input               ifu_awvalid,
-    output logic        ifu_awready,
-    input        [31:0] ifu_awaddr,
-    input               ifu_wvalid,
-    output logic        ifu_wready,
-    input        [31:0] ifu_wdata,
-    input        [ 7:0] ifu_wmask,
-    output logic        ifu_bvalid,
-    input               ifu_bready,
-    output logic        ifu_bresp,
-    // LSU的AXI4-Lite接口
-    input               lsu_arvalid,
-    output logic        lsu_arready,
-    input        [31:0] lsu_araddr,
-    output logic        lsu_rvalid,
-    input               lsu_rready,
-    output logic [31:0] lsu_rdata,
-    output logic        lsu_rresp,
-    input               lsu_awvalid,
-    output logic        lsu_awready,
-    input        [31:0] lsu_awaddr,
-    input               lsu_wvalid,
-    output logic        lsu_wready,
-    input        [31:0] lsu_wdata,
-    input        [ 7:0] lsu_wmask,
-    output logic        lsu_bvalid,
-    input               lsu_bready,
-    output logic        lsu_bresp,
-    // MEM的AXI4-Lite接口
-    output logic        mem_arvalid,
-    input               mem_arready,
-    output logic [31:0] mem_araddr,
-    input               mem_rvalid,
-    output logic        mem_rready,
-    input        [31:0] mem_rdata,
-    input               mem_rresp,
-    output logic        mem_awvalid,
-    input               mem_awready,
-    output logic [31:0] mem_awaddr,
-    output logic        mem_wvalid,
-    input               mem_wready,
-    output logic [31:0] mem_wdata,
-    output logic [ 7:0] mem_wmask,
-    input               mem_bvalid,
-    output logic        mem_bready,
-    input               mem_bresp
-);
-
-    typedef enum logic [1:0] {
-        IDLE,
-        IFU_GRANT,
-        LSU_GRANT
-    } state_t;
-    state_t state, next_state;
-
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
-
-    // 状态转换逻辑
-    always_comb begin
-        unique case (state)
-            IDLE: begin
-                if (ifu_arvalid || ifu_awvalid) next_state = IFU_GRANT;
-                else if (lsu_arvalid || lsu_awvalid) next_state = LSU_GRANT;
-                else next_state = IDLE;
-            end
-            IFU_GRANT: begin
-                // 当IFU的读或写事务完成时，返回IDLE
-                if ((ifu_rvalid && ifu_rready) || (ifu_bvalid && ifu_bready)) next_state = IDLE;
-                else next_state = IFU_GRANT;
-            end
-            LSU_GRANT: begin
-                // 当LSU的读或写事务完成时，返回IDLE
-                if ((lsu_rvalid && lsu_rready) || (lsu_bvalid && lsu_bready)) next_state = IDLE;
-                else next_state = LSU_GRANT;
-            end
-            default: next_state = IDLE;
-        endcase
-    end
-
-    // 输出逻辑
-    always_comb begin
-        // 默认值：阻塞所有请求
-        ifu_arready = 1'b0;
-        ifu_awready = 1'b0;
-        ifu_wready = 1'b0;
-        ifu_rvalid = 1'b0;
-        ifu_rdata = 32'h0;
-        ifu_rresp = 1'b0;
-        ifu_bvalid = 1'b0;
-        ifu_bresp = 1'b0;
-
-        lsu_arready = 1'b0;
-        lsu_awready = 1'b0;
-        lsu_wready = 1'b0;
-        lsu_rvalid = 1'b0;
-        lsu_rdata = 32'h0;
-        lsu_rresp = 1'b0;
-        lsu_bvalid = 1'b0;
-        lsu_bresp = 1'b0;
-
-        mem_arvalid = 1'b0;
-        mem_araddr = 32'h0;
-        mem_rready = 1'b0;
-        mem_awvalid = 1'b0;
-        mem_awaddr = 32'h0;
-        mem_wvalid = 1'b0;
-        mem_wdata = 32'h0;
-        mem_wmask = 8'h0;
-        mem_bready = 1'b0;
-
-        unique case (state)
-            IDLE: begin
-                // 在IDLE状态，准备接受新请求
-                if (ifu_arvalid || ifu_awvalid) begin
-                    // IFU优先
-                    ifu_arready = mem_arready;
-                    ifu_awready = mem_awready;
-                    ifu_wready = mem_wready;
-                    mem_arvalid = ifu_arvalid;
-                    mem_araddr = ifu_araddr;
-                    mem_awvalid = ifu_awvalid;
-                    mem_awaddr = ifu_awaddr;
-                    mem_wvalid = ifu_wvalid;
-                    mem_wdata = ifu_wdata;
-                    mem_wmask = ifu_wmask;
-                end else if (lsu_arvalid || lsu_awvalid) begin
-                    // LSU次优先
-                    lsu_arready = mem_arready;
-                    lsu_awready = mem_awready;
-                    lsu_wready = mem_wready;
-                    mem_arvalid = lsu_arvalid;
-                    mem_araddr = lsu_araddr;
-                    mem_awvalid = lsu_awvalid;
-                    mem_awaddr = lsu_awaddr;
-                    mem_wvalid = lsu_wvalid;
-                    mem_wdata = lsu_wdata;
-                    mem_wmask = lsu_wmask;
-                end
-            end
-            IFU_GRANT: begin
-                // 转发IFU的请求和响应
-                mem_arvalid = ifu_arvalid;
-                mem_araddr = ifu_araddr;
-                mem_awvalid = ifu_awvalid;
-                mem_awaddr = ifu_awaddr;
-                mem_wvalid = ifu_wvalid;
-                mem_wdata = ifu_wdata;
-                mem_wmask = ifu_wmask;
-                mem_rready = ifu_rready;
-                mem_bready = ifu_bready;
-
-                ifu_arready = mem_arready;
-                ifu_awready = mem_awready;
-                ifu_wready = mem_wready;
-                ifu_rvalid = mem_rvalid;
-                ifu_rdata = mem_rdata;
-                ifu_rresp = mem_rresp;
-                ifu_bvalid = mem_bvalid;
-                ifu_bresp = mem_bresp;
-            end
-            LSU_GRANT: begin
-                // 转发LSU的请求和响应
-                mem_arvalid = lsu_arvalid;
-                mem_araddr = lsu_araddr;
-                mem_awvalid = lsu_awvalid;
-                mem_awaddr = lsu_awaddr;
-                mem_wvalid = lsu_wvalid;
-                mem_wdata = lsu_wdata;
-                mem_wmask = lsu_wmask;
-                mem_rready = lsu_rready;
-                mem_bready = lsu_bready;
-
-                lsu_arready = mem_arready;
-                lsu_awready = mem_awready;
-                lsu_wready = mem_wready;
-                lsu_rvalid = mem_rvalid;
-                lsu_rdata = mem_rdata;
-                lsu_rresp = mem_rresp;
-                lsu_bvalid = mem_bvalid;
-                lsu_bresp = mem_bresp;
-            end
-        endcase
-    end
 
 endmodule
 
