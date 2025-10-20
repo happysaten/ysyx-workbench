@@ -709,6 +709,77 @@ module lfsr8 #(
 endmodule
 
 
+// PMEM(Physical Memory) 负责物理内存的读写访问
+module PMEM (
+    input               clk,
+    input               reset,
+    input               pmem_req_valid,
+    output logic        pmem_req_ready,
+    input               pmem_ren,
+    input               pmem_wen,
+    input        [31:0] pmem_addr,
+    input        [31:0] pmem_wdata,
+    input        [ 7:0] pmem_wmask,
+    output logic        pmem_resp_valid,
+    input               pmem_resp_ready,
+    output logic [31:0] pmem_rdata
+);
+    typedef enum logic [1:0] {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    logic random_bit;
+    lfsr8 #(
+        .TAPS(8'b01010110)
+    ) u_pmem_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit)
+    );
+
+    assign pmem_resp_valid = state == RESP;
+    assign pmem_req_ready  = state == IDLE;
+    assign resp_data_ready = random_bit;
+    assign req_fire        = pmem_req_valid && pmem_req_ready;
+    assign resp_fire       = pmem_resp_valid && pmem_resp_ready;
+
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void pmem_write_npc(
+        input int  waddr,
+        input int  wdata,
+        input byte wmask
+    );
+
+    always @(posedge clk) begin
+        if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
+    end
+
+    always_comb begin
+        if (pmem_wen && state != RESP && next_state == RESP)
+            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+    end
+
+endmodule
+
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
     input                clk,
@@ -726,71 +797,60 @@ module LSU (
     output logic  [31:0] lsu_rdata,
     output logic         lsu_error
 );
+    import "DPI-C" function void NPCINV(input int pc);
 
-    typedef enum logic [1:0] {
-        IDLE,
-        WAIT,
-        RESP
-    } state_t;
-    state_t state, next_state;
+    // PMEM接口信号
+    logic pmem_req_valid, pmem_req_ready;
+    logic pmem_ren, pmem_wen;
+    logic [31:0] pmem_addr, pmem_wdata, pmem_rdata;
+    logic [7:0] pmem_wmask;
+    logic pmem_resp_valid, pmem_resp_ready;
 
-    always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
-    end
+    // 实例化PMEM模块
+    PMEM u_pmem (
+        .clk            (clk),
+        .reset          (reset),
+        .pmem_req_valid (pmem_req_valid),
+        .pmem_req_ready (pmem_req_ready),
+        .pmem_ren       (pmem_ren),
+        .pmem_wen       (pmem_wen),
+        .pmem_addr      (pmem_addr),
+        .pmem_wdata     (pmem_wdata),
+        .pmem_wmask     (pmem_wmask),
+        .pmem_resp_valid(pmem_resp_valid),
+        .pmem_resp_ready(pmem_resp_ready),
+        .pmem_rdata     (pmem_rdata)
+    );
 
-    logic resp_data_ready, req_fire, resp_fire;
+    // LSU根据指令决定是否访问PMEM
+    logic pmem_req;
+    assign pmem_ren        = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen        = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_req        = pmem_ren || pmem_wen;
+
+    assign pmem_addr       = alu_result;
+    assign pmem_wdata      = gpr_rdata2;
+    assign pmem_req_valid  = lsu_req_valid && pmem_req;
+    assign pmem_resp_ready = lsu_resp_ready;
+
+    // LSU握手逻辑
+    assign lsu_req_ready   = pmem_req ? pmem_req_ready : 1'b1;
+    assign lsu_resp_valid  = pmem_req ? pmem_resp_valid : lsu_req_valid;
+
+    // 写掩码生成
     always_comb begin
-        unique case (state)
-            IDLE:
-            next_state = pmem_req ? (req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE) : IDLE;
-            WAIT: next_state = resp_data_ready ? RESP : WAIT;
-            RESP: next_state = resp_fire ? IDLE : RESP;
-            default: next_state = IDLE;
+        unique case (funct3)
+            3'b000: pmem_wmask = 8'h1;  // SB
+            3'b001: pmem_wmask = 8'h3;  // SH
+            3'b010: pmem_wmask = 8'hF;  // SW
+            default: begin
+                pmem_wmask = 8'h0;
+                if (pmem_wen) NPCINV(pc);
+            end
         endcase
     end
 
-    logic random_bit;
-    lfsr8 #(
-        .TAPS(8'b01010110)
-    ) u_lsu_resp_lfsr (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (random_bit)
-    );
-
-    assign lsu_resp_valid  = pmem_req ? state == RESP : req_fire;
-    assign lsu_req_ready   = state == IDLE;
-    assign resp_data_ready = random_bit;
-    assign req_fire        = lsu_req_valid && lsu_req_ready;
-    assign resp_fire       = lsu_resp_valid && lsu_resp_ready;
-
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void pmem_write_npc(
-        input int  waddr,
-        input int  wdata,
-        input byte wmask
-    );
-    import "DPI-C" function void NPCINV(input int pc);
-
-    // 内存接口信号
-    logic [31:0] pmem_addr, pmem_rdata, pmem_wdata;
-    logic [7:0] pmem_wmask;
-    logic pmem_ren, pmem_wen, pmem_req;
-    assign pmem_req = pmem_ren || pmem_wen;
-    always @(posedge clk) begin
-        if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
-    end
-    always_comb
-        if (pmem_wen && state != RESP && next_state == RESP)
-            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
-
-    // 指令逻辑
-    assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen   = (inst_type == TYPE_S && opcode == 7'b0100011);
-    assign pmem_addr  = alu_result;
-    assign pmem_wdata = gpr_rdata2;
+    // 读数据扩展
     always_comb begin
         unique case (funct3)
             3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
@@ -805,19 +865,7 @@ module LSU (
         endcase
     end
 
-    always_comb begin
-        unique case (funct3)
-            3'b000: pmem_wmask = 8'h1;  // SB
-            3'b001: pmem_wmask = 8'h3;  // SH
-            3'b010: pmem_wmask = 8'hF;  // SW
-            default: begin
-                pmem_wmask = 8'h0;
-                if (pmem_wen) NPCINV(pc);
-            end
-        endcase
-    end
-
-    assign lsu_error = 0;  // 赋值为0
+    assign lsu_error = 0;
 
 endmodule
 
