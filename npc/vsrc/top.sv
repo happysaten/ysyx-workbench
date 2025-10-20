@@ -745,7 +745,7 @@ module PMEM (
 
     logic resp_data_ready, req_fire, resp_fire;
     logic is_write_op;  // 记录当前是否为写操作
-    
+
     always_comb begin
         unique case (state)
             IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
@@ -766,23 +766,16 @@ module PMEM (
     );
 
     // 读写请求仲裁（写优先）
-    logic req_valid;
-    assign req_valid = pmem_wreq_valid | pmem_rreq_valid;
-    
+
+    assign is_write_op = pmem_wreq_valid;
     assign pmem_rresp_valid = state == RESP && !is_write_op;
     assign pmem_wresp_valid = state == RESP && is_write_op;
-    assign pmem_rreq_ready  = state == IDLE && !pmem_wreq_valid;
-    assign pmem_wreq_ready  = state == IDLE;
-    assign resp_data_ready  = random_bit;
-    assign req_fire         = req_valid && (pmem_wreq_valid ? pmem_wreq_ready : pmem_rreq_ready);
-    assign resp_fire        = (is_write_op ? pmem_wresp_valid : pmem_rresp_valid) && 
-                              (is_write_op ? pmem_wresp_ready : pmem_rresp_ready);
-
-    // 记录是否为写操作
-    always_ff @(posedge clk) begin
-        if (reset) is_write_op <= 1'b0;
-        else if (state == IDLE && req_fire) is_write_op <= pmem_wreq_valid;
-    end
+    assign pmem_rreq_ready = state == IDLE && !pmem_wreq_valid;
+    assign pmem_wreq_ready = state == IDLE;
+    assign resp_data_ready = random_bit;
+    assign req_fire         = is_write_op ? (pmem_wreq_valid && pmem_wreq_ready) :(pmem_rreq_valid && pmem_rreq_ready);
+    assign resp_fire = (pmem_rresp_valid && pmem_rresp_ready) ||
+                       (pmem_wresp_valid && pmem_wresp_ready);
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -852,19 +845,19 @@ module LSU (
 
     // LSU根据指令决定是否访问PMEM
     logic pmem_ren, pmem_wen;
-    assign pmem_ren        = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign pmem_wen        = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
 
-    assign pmem_raddr      = alu_result;
-    assign pmem_waddr      = alu_result;
-    assign pmem_wdata      = gpr_rdata2;
+    assign pmem_raddr = alu_result;
+    assign pmem_waddr = alu_result;
+    assign pmem_wdata = gpr_rdata2;
     assign pmem_rreq_valid = lsu_req_valid && pmem_ren;
     assign pmem_wreq_valid = lsu_req_valid && pmem_wen;
     assign pmem_rresp_ready = lsu_resp_ready;
     assign pmem_wresp_ready = lsu_resp_ready;
 
     // LSU握手逻辑
-    assign lsu_req_ready   = pmem_ren ? pmem_rreq_ready : (pmem_wen ? pmem_wreq_ready : 1'b1);
+    assign lsu_req_ready = pmem_ren ? pmem_rreq_ready : (pmem_wen ? pmem_wreq_ready : 1'b1);
     assign lsu_resp_valid  = pmem_ren ? pmem_rresp_valid : (pmem_wen ? pmem_wresp_valid : lsu_req_valid);
 
     // 写掩码生成
