@@ -525,30 +525,12 @@ module Arbiter (
         end
     end
 
-    // // 组合逻辑：握手信号（在IDLE状态时接受新请求）
-    // always_comb begin
-    //     // 默认值
-    //     imem_arready = 1'b0;
-    //     dmem_arready = 1'b0;
-    //     dmem_awready = 1'b0;
-    //     dmem_wready = 1'b0;
-
-    //     if (state == IDLE) begin
-    //         if (dmem_arvalid || dmem_awvalid) begin
-    //             dmem_arready = mem_arready && dmem_arvalid;
-    //             dmem_awready = mem_awready && dmem_awvalid;
-    //             dmem_wready = mem_wready && dmem_wvalid;
-    //         end else if (imem_arvalid) begin
-    //             imem_arready = mem_arready;
-    //         end
-    //     end
-    // end
-    assign imem_arready = (state == IDLE) && mem_arready;
+    assign imem_arready = (state == IFETCH) && mem_arready;
     assign imem_awready = 1'b0;
     assign imem_wready = 1'b0;
-    assign dmem_arready = (state == IDLE) && mem_arready;
-    assign dmem_awready = (state == IDLE) && mem_awready;
-    assign dmem_wready = (state == IDLE) && mem_wready;
+    assign dmem_arready = (state == DMEM) && mem_arready;
+    assign dmem_awready = (state == DMEM) && mem_awready;
+    assign dmem_wready = (state == DMEM) && mem_wready;
 
     // 时序逻辑：向MEM发送请求
     always_ff @(posedge clk) begin
