@@ -273,16 +273,16 @@ module IMEM (
         else state <= next_state;
     end
 
-    logic resp_data_ready;
+    logic resp_data_ready, req_fire, resp_fire;
 
     always_comb begin
         unique case (state)
             IDLE: begin
-                if (imem_arvalid && imem_arready) next_state = resp_data_ready ? RESP : WAIT;
+                if (req_fire) next_state = resp_data_ready ? RESP : WAIT;
                 else next_state = IDLE;
             end
-            WAIT: next_state = resp_data_ready ? RESP : WAIT;
-            RESP: next_state = (imem_rvalid && imem_rready) ? IDLE : RESP;
+            WAIT:    next_state = resp_data_ready ? RESP : WAIT;
+            RESP:    next_state = resp_fire ? IDLE : RESP;
             default: next_state = IDLE;
         endcase
     end
@@ -308,13 +308,13 @@ module IMEM (
     assign imem_rvalid = (state == RESP);
     assign imem_arready = (state == IDLE) && random_bit0;
     assign resp_data_ready = random_bit1;
+    assign req_fire = imem_arvalid && imem_arready;
+    assign resp_fire = imem_rvalid && imem_rready;
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
 
     always @(posedge clk) begin
-        if ((state == WAIT && next_state == RESP) || (state == IDLE && next_state == RESP)) begin
-            imem_rdata <= pmem_read_npc(imem_araddr);
-        end
+        if (req_fire) imem_rdata <= pmem_read_npc(imem_araddr);
     end
 
     assign imem_rresp = 0;
