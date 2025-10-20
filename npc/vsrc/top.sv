@@ -17,14 +17,15 @@ module top (
     input clk,  // 时钟信号
     input reset,  // 复位信号
     output logic npc_req_ready,
-    output logic npc_resp_valid
+    output logic npc_resp_valid,
+    output logic npc_error
 );
 
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
     logic        jump_en;
     logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
-    logic [31:0] dnpc;  // 新增dnpc信号，从PCU输出
+    logic [31:0] dnpc;  // dnpc信号，从PCU输出
 
     logic        reset_sync;
     // 同步复位信号
@@ -46,19 +47,23 @@ module top (
     assign npc_req_ready = ifu_req_ready;
     assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
 
+    logic ifu_error, gpr_error, csr_error, lsu_error;
+    assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
+
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
         .ifu_req_valid(npc_req_valid),
         .ifu_req_ready(ifu_req_ready),
-        .pc(pc),
         .jump_en(jump_en),
         .jump_target(jump_target),
-        .snpc(snpc),
-        .dnpc(dnpc),
         .ifu_rdata(inst),
         .ifu_resp_valid(ifu_resp_valid),
-        .ifu_resp_ready(lsu_req_ready)
+        .ifu_resp_ready(lsu_req_ready),
+        .pc(pc),
+        .snpc(snpc),
+        .dnpc(dnpc),
+        .ifu_error(ifu_error)
     );
 
     // IDU：负责指令解码
@@ -68,7 +73,7 @@ module top (
     logic [31:0] imm;
     logic [4:0] rs1, rs2, rd;
     inst_t   inst_type;
-    alu_op_t alu_op;  // 新增alu_op信号
+    alu_op_t alu_op;
     IDU u_idu (
         .inst(inst),
         .opcode(opcode),
@@ -100,7 +105,8 @@ module top (
         .gpr_resp_valid(gpr_resp_valid),
         .gpr_resp_ready(ifu_req_ready),
         .gpr_rdata1(gpr_rdata1),
-        .gpr_rdata2(gpr_rdata2)
+        .gpr_rdata2(gpr_rdata2),
+        .gpr_error(gpr_error)
     );
 
     // CSR：控制状态寄存器
@@ -115,7 +121,8 @@ module top (
         .csr_wdata(csr_wdata),
         .csr_resp_valid(csr_resp_valid),
         .csr_resp_ready(ifu_req_ready),
-        .csr_rdata(csr_rdata)
+        .csr_rdata(csr_rdata),
+        .csr_error(csr_error)
     );
 
 
@@ -156,7 +163,8 @@ module top (
         .gpr_rdata2(gpr_rdata2),
         .lsu_resp_valid(lsu_resp_valid),
         .lsu_resp_ready(gpr_req_ready && csr_req_ready),
-        .lsu_rdata(lsu_rdata)
+        .lsu_rdata(lsu_rdata),
+        .lsu_error(lsu_error)
     );
 
     // WBU：负责写回GPR
@@ -177,18 +185,19 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责PC管理和取指
 module IFU (
-    input        clk,
-    input        reset,
-    input        ifu_req_valid,
-    output logic ifu_req_ready,
+    input               clk,
+    input               reset,
+    input               ifu_req_valid,
+    output logic        ifu_req_ready,
+    input               jump_en,
+    input        [31:0] jump_target,
+    output logic [31:0] ifu_rdata,
+    output logic        ifu_resp_valid,
+    input               ifu_resp_ready,
     output logic [31:0] pc,
-    input        jump_en,
-    input [31:0] jump_target,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
-    output logic [31:0] ifu_rdata,
-    output logic ifu_resp_valid,
-    input        ifu_resp_ready
+    output logic        ifu_error
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -258,6 +267,8 @@ module IFU (
     always @(posedge clk) if (state != RESP && next_state == RESP) ifu_rdata <= pmem_read_npc(dnpc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
+    assign ifu_error = 0;  // 赋值为0
+
 endmodule
 
 // IDU(Instruction Decode Unit) 负责对当前指令进行译码, 准备执行阶段需要使用的数据和控制信号
@@ -270,7 +281,7 @@ module IDU (
     output [4:0] rs2,  // 源寄存器2编号
     output logic [31:0] imm,  // 立即数
     output inst_t inst_type,  // 指令类型输出
-    output alu_op_t alu_op  // 新增输出ALU操作码
+    output alu_op_t alu_op  // 输出ALU操作码
 );
     logic [6:0] funct7;  // 功能码扩展
     assign opcode = inst[6:0];
@@ -308,7 +319,7 @@ module IDU (
         endcase
     end
 
-    // 新增alu_op解析（从EXU移来）
+    // alu_op解析
     always_comb begin
         alu_op = ALU_ADD;
         if (opcode == 7'b0010011 || opcode == 7'b0110011) begin
@@ -331,19 +342,20 @@ endmodule
 
 // GPR(General Purpose Register) 负责通用寄存器的读写
 module GPR (
-    input        clk,
-    input        reset,
-    input        gpr_req_valid,
-    output logic gpr_req_ready,
-    input        gpr_wen,
-    input [4:0]  gpr_waddr,
-    input [31:0] gpr_wdata,
-    input [4:0]  gpr_raddr1,
-    input [4:0]  gpr_raddr2,
-    output logic gpr_resp_valid,
-    input        gpr_resp_ready,
+    input               clk,
+    input               reset,
+    input               gpr_req_valid,
+    output logic        gpr_req_ready,
+    input               gpr_wen,
+    input        [ 4:0] gpr_waddr,
+    input        [31:0] gpr_wdata,
+    input        [ 4:0] gpr_raddr1,
+    input        [ 4:0] gpr_raddr2,
+    output logic        gpr_resp_valid,
+    input               gpr_resp_ready,
     output logic [31:0] gpr_rdata1,
-    output logic [31:0] gpr_rdata2
+    output logic [31:0] gpr_rdata2,
+    output logic        gpr_error        // error输出
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -401,21 +413,24 @@ module GPR (
         gpr_rdata2 = (gpr_raddr2 == 5'b0) ? 32'h0 : regfile[gpr_raddr2];
     end
 
+    assign gpr_error = 0;  // 赋值为0
+
 endmodule
 
 // CSR(Control and Status Register) 负责控制和状态寄存器的读写
 module CSR #(
     localparam int N = 4
 ) (
-    input        clk,
-    input        reset,
-    input        csr_req_valid,
-    output logic csr_req_ready,
-    input [N-1:0] csr_wen,
-    input [N-1:0][31:0] csr_wdata,
-    output logic csr_resp_valid,
-    input        csr_resp_ready,
-    output logic [N-1:0][31:0] csr_rdata
+    input                      clk,
+    input                      reset,
+    input                      csr_req_valid,
+    output logic               csr_req_ready,
+    input        [N-1:0]       csr_wen,
+    input        [N-1:0][31:0] csr_wdata,
+    output logic               csr_resp_valid,
+    input                      csr_resp_ready,
+    output logic [N-1:0][31:0] csr_rdata,
+    output logic               csr_error
 );
     typedef enum logic [1:0] {
         IDLE,
@@ -449,7 +464,8 @@ module CSR #(
         if (reset) csr_rdata <= '0;  // 复位时清零所有CSR寄存器
         else begin
             for (int i = 0; i < N; i++)
-            if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) csr_rdata[i] <= csr_wdata[i];
+            if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP)
+                csr_rdata[i] <= csr_wdata[i];
         end
     end
 
@@ -460,8 +476,11 @@ module CSR #(
 
     always_comb begin
         for (int i = 0; i < N; i++)
-        if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP) write_csr_npc(i[1:0], csr_wdata[i]);
+        if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP)
+            write_csr_npc(i[1:0], csr_wdata[i]);
     end
+
+    assign csr_error = 0;  // 赋值为0
 
 endmodule
 
@@ -692,19 +711,20 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input        clk,
-    input        reset,
-    input        lsu_req_valid,
-    output logic lsu_req_ready,
-    input  inst_t inst_type,
-    input  [6:0]  opcode,
-    input  [2:0]  funct3,
-    input  [31:0] pc,
-    input  [31:0] alu_result,
-    input  [31:0] gpr_rdata2,
-    output logic  lsu_resp_valid,
-    input         lsu_resp_ready,
-    output logic  [31:0] lsu_rdata
+    input                clk,
+    input                reset,
+    input                lsu_req_valid,
+    output logic         lsu_req_ready,
+    input  inst_t        inst_type,
+    input         [ 6:0] opcode,
+    input         [ 2:0] funct3,
+    input         [31:0] pc,
+    input         [31:0] alu_result,
+    input         [31:0] gpr_rdata2,
+    output logic         lsu_resp_valid,
+    input                lsu_resp_ready,
+    output logic  [31:0] lsu_rdata,
+    output logic         lsu_error
 );
 
     typedef enum logic [1:0] {
@@ -762,7 +782,9 @@ module LSU (
     always @(posedge clk) begin
         if (pmem_ren && state != RESP && next_state == RESP) pmem_rdata <= pmem_read_npc(pmem_addr);
     end
-    always_comb if (pmem_wen && state != RESP && next_state == RESP) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+    always_comb
+        if (pmem_wen && state != RESP && next_state == RESP)
+            pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
 
     // 指令逻辑
     assign pmem_ren   = (inst_type == TYPE_I && opcode == 7'b0000011);
@@ -794,6 +816,9 @@ module LSU (
             end
         endcase
     end
+
+    assign lsu_error = 0;  // 赋值为0
+
 endmodule
 
 // WBU(WriteBack Unit): 将数据写入寄存器
