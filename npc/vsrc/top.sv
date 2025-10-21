@@ -55,20 +55,20 @@ module top (
     axi_lite_if arbiter_if ();  // 仲裁器输出接口
 
     // 创建xbar的slave接口数组
-    axi_lite_if xbar_slaves [2] ();
+    axi_lite_if xbar_slaves[2] ();
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
         .clk  (clk),
         .reset(reset_sync),
-        .m0   (imem_if.slave),  // Master 0: IFU (取指)
-        .m1   (dmem_if.slave),  // Master 1: LSU (访存)
-        .s    (arbiter_if.master)   // 输出到xbar
+        .m0   (imem_if.slave),     // Master 0: IFU (取指)
+        .m1   (dmem_if.slave),     // Master 1: LSU (访存)
+        .s    (arbiter_if.master)  // 输出到xbar
     );
 
     // 实例化Crossbar
     xbar #(
-        .SLAVE_NUM(2),
+        .SLAVE_NUM (2),
         .SLAVE_BASE('{32'ha00003f8, 32'h80000000}),
         .SLAVE_SIZE('{32'h00000004, 32'h08000000})
     ) u_xbar (
