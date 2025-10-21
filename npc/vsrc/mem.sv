@@ -1,7 +1,7 @@
 // MEM(Memory) 负责统一内存的读写访问
 module MEM (
-    input logic        clk,
-    input logic        reset,
+    input logic             clk,
+    input logic             reset,
           axi_lite_if.slave mem     // 使用interface替代所有独立的AXI信号
 );
     // 读通道状态机

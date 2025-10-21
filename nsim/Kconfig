@@ -204,7 +204,7 @@ config ETRACE_COND
 config WTRACE
   depends on TRACE && TARGET_NATIVE_ELF && ENGINE_INTERPRETER && ISA_npc
   bool "Enable wave tracer"
-  default n
+  default y
 
 config WTRACE_COND
   depends on WTRACE
