@@ -1,3 +1,10 @@
+// 此代码仅为yosys可综合使用
+
+// 为了yosys可综合，请作出如下修改：
+// 1. 将MEM例化为一个256*32的RAM
+// 2. 删除所有DPI-C接口
+// 3.增加一些输出端口以免顶层模块无输出被优化掉
+
 // import alu_pkg::*;
 
 // 指令类型枚举
@@ -18,7 +25,11 @@ module top (
     input reset,  // 复位信号
     output logic npc_req_ready,
     output logic npc_resp_valid,
-    output logic npc_error
+    output logic npc_error,
+    // 添加输出端口防止优化
+    output logic [31:0] debug_pc,
+    output logic [31:0] debug_inst,
+    output logic [31:0] debug_alu_result
 );
 
     // IFU：负责 PC 和取指
@@ -317,6 +328,11 @@ module top (
         .gpr_we       (gpr_we)
     );
 
+    // 添加调试输出赋值
+    assign debug_pc = pc;
+    assign debug_inst = inst;
+    assign debug_alu_result = alu_result;
+
 endmodule
 
 // IFU(Instruction Fetch Unit) 负责PC管理和取指
@@ -379,10 +395,6 @@ module IFU (
         end
     end
 
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
     localparam int RESET_PC = 32'h80000000;
 
     // PC 寄存器更新 - 握手成功时更新
@@ -390,7 +402,6 @@ module IFU (
         if (reset) pc <= RESET_PC - 4;
         else if (ifu_req_valid && ifu_req_ready) pc <= dnpc;
     end
-    always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
 
 endmodule
 
@@ -510,26 +521,13 @@ module GPR (
 
     logic [31:0] regfile[32];  // 寄存器文件
 
-    // import "DPI-C" function void output_gprs(input [31:0] gprs[]);
-    // always_comb output_gprs(regfile);  // 输出寄存器状态到DPI-C
-
     always_ff @(posedge clk) begin
         if (reset) begin
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
-        end else if (gpr_wen && state != RESP && next_state == RESP) begin  // 修改：添加valid条件
+        end else if (gpr_wen && state != RESP && next_state == RESP) begin
             regfile[gpr_waddr] <= gpr_wdata;
-            write_gpr_npc(gpr_waddr, gpr_wdata);
         end
     end
-
-
-    import "DPI-C" function void write_gpr_npc(
-        input logic [ 4:0] idx,
-        input logic [31:0] data
-    );
-    // always_comb begin
-    //     if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
-    // end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
@@ -592,17 +590,6 @@ module CSR #(
         end
     end
 
-    import "DPI-C" function void write_csr_npc(
-        input logic [ 1:0] idx,
-        input logic [31:0] data
-    );
-
-    always_comb begin
-        for (int i = 0; i < N; i++)
-        if (csr_req_valid && csr_wen[i] && state != RESP && next_state == RESP)
-            write_csr_npc(i[1:0], csr_wdata[i]);
-    end
-
     assign csr_error = 0;  // 赋值为0
 
 endmodule
@@ -633,9 +620,6 @@ module EXU (
     output logic    [ 3:0][31:0] csr_wdata,
     output logic    [31:0]       csr_read_data
 );
-    import "DPI-C" function void NPCINV(input int pc);
-    import "DPI-C" function void NPCTRAP();
-
     logic [31:0] alu_a, alu_b;
 
     alu #(
@@ -649,11 +633,11 @@ module EXU (
 
     function automatic logic [1:0] csr_addr_to_idx(input logic [11:0] addr);
         unique case (addr)
-            12'h305: return 2'd0;
-            12'h341: return 2'd1;
-            12'h300: return 2'd2;
-            12'h342: return 2'd3;
-            default: return 2'd0;
+            12'h305: csr_addr_to_idx = 2'd0;
+            12'h341: csr_addr_to_idx = 2'd1;
+            12'h300: csr_addr_to_idx = 2'd2;
+            12'h342: csr_addr_to_idx = 2'd3;
+            default: csr_addr_to_idx = 2'd0;
         endcase
     endfunction
 
@@ -753,11 +737,11 @@ module EXU (
                         mstatus_mret[12:11] = 2'b00;
                         csr_wdata[2]        = mstatus_mret;
                     end else if (imm == 32'h1) begin
-                        // EBREAK
-                        NPCTRAP();
+                        // EBREAK - 删除DPI-C调用
+                        // NPCTRAP();
                     end else begin
-                        // 不支持的系统指令保持兼容旧行为
-                        NPCINV(pc);
+                        // 不支持的系统指令 - 删除DPI-C调用
+                        // NPCINV(pc);
                     end
                 end
                 3'b001: begin
@@ -769,44 +753,12 @@ module EXU (
                     // CSRR
                     csr_read_data = csr_rdata[csr_idx];
                 end
-                default: NPCINV(pc);
+                default:  /* NPCINV(pc) */;  // 删除DPI-C调用
             endcase
         end
     end
 
 endmodule
-
-module delay_line #(
-    parameter int N     = 4,  // 延迟周期数，可为0
-    parameter int WIDTH = 8   // 信号位宽
-) (
-    input logic clk,
-    input logic reset,
-    input logic [WIDTH-1:0] din,
-    output logic [WIDTH-1:0] dout
-);
-
-    generate
-        if (N == 0) begin : gen_no_delay
-            // N=0时直接透传输入
-            assign dout = reset ? '0 : din;
-        end else begin : gen_with_delay
-            logic [N-1:0][WIDTH-1:0] shift_reg;
-            always_ff @(posedge clk) begin
-                if (reset) shift_reg <= '0;
-                else begin
-                    shift_reg[0] <= din;
-                    for (int i = 1; i < N; i++) begin
-                        shift_reg[i] <= shift_reg[i-1];
-                    end
-                end
-            end
-            assign dout = shift_reg[N-1];
-        end
-    endgenerate
-
-endmodule
-
 
 module lfsr8 #(
     parameter logic [7:0] TAPS = 8'b10111000 // 默认抽头：位7,5,4,3，对应x^8 + x^6 + x^5 + x^4 + 1
@@ -831,8 +783,7 @@ module lfsr8 #(
 
 endmodule
 
-
-// MEM(Memory) 负责统一内存的读写访问
+// MEM(Memory) 修改为256×32的RAM实现
 module MEM (
     input               clk,
     input               reset,
@@ -859,6 +810,18 @@ module MEM (
     input               mem_bready,
     output logic        mem_bresp
 );
+    // 256×32位RAM
+    logic [31:0] ram[256];
+
+    // 地址截取低8位作为RAM索引
+    wire [7:0] rd_addr = mem_araddr[9:2];  // 字对齐，取[9:2]作为索引
+    wire [7:0] wr_addr = mem_awaddr[9:2];
+
+    // RAM初始化 - 使用initial块从文件读取
+    initial begin
+        $readmemh("bit-riscv32e-nsim.bin", ram);
+    end
+
     // 读通道状态机
     typedef enum logic [1:0] {
         RD_IDLE,
@@ -937,21 +900,21 @@ module MEM (
     assign mem_wready  = (wr_state == WR_IDLE);
     assign mem_bvalid  = (wr_state == WR_RESP);
 
-    import "DPI-C" function int pmem_read_npc(input int raddr);
-    import "DPI-C" function void pmem_write_npc(
-        input int  waddr,
-        input int  wdata,
-        input byte wmask
-    );
-
-    // 读事务处理
+    // 读事务处理 - 直接从RAM读取
     always @(posedge clk) begin
-        if (mem_arvalid && mem_arready) mem_rdata <= pmem_read_npc(mem_araddr);
+        if (mem_arvalid && mem_arready) begin
+            mem_rdata <= ram[rd_addr];
+        end
     end
 
-    // 写事务处理
+    // 写事务处理 - 直接写入RAM，支持字节掩码
     always @(posedge clk) begin
-        if (mem_wvalid && mem_wready) pmem_write_npc(mem_awaddr, mem_wdata, mem_wmask);
+        if (mem_wvalid && mem_wready) begin
+            if (mem_wmask[0]) ram[wr_addr][7:0] <= mem_wdata[7:0];
+            if (mem_wmask[1]) ram[wr_addr][15:8] <= mem_wdata[15:8];
+            if (mem_wmask[2]) ram[wr_addr][23:16] <= mem_wdata[23:16];
+            if (mem_wmask[3]) ram[wr_addr][31:24] <= mem_wdata[31:24];
+        end
     end
 
     assign mem_rresp = 0;
@@ -994,8 +957,6 @@ module LSU (
     output logic         dmem_bready,
     input                dmem_bresp
 );
-    import "DPI-C" function void NPCINV(input int pc);
-
     // LSU根据指令决定是否访问DMEM
     logic dmem_ren, dmem_wen;
     assign dmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
@@ -1023,7 +984,8 @@ module LSU (
             3'b010: dmem_wmask = 8'hF;  // SW
             default: begin
                 dmem_wmask = 8'h0;
-                if (dmem_wen) NPCINV(pc);
+                // 删除DPI-C调用
+                // if (dmem_wen) NPCINV(pc);
             end
         endcase
     end
@@ -1038,7 +1000,8 @@ module LSU (
             3'b100: lsu_rdata = {24'b0, dmem_rdata[7:0]};  // LBU
             default: begin
                 lsu_rdata = 32'h0;
-                if (dmem_ren) NPCINV(pc);
+                // 删除DPI-C调用
+                // if (dmem_ren) NPCINV(pc);
             end
         endcase
     end
@@ -1060,8 +1023,6 @@ module WBU (
     output logic  [31:0] gpr_wdata,
     output logic         gpr_we
 );
-    import "DPI-C" function void NPCINV(input int pc);
-
     always_comb begin
         gpr_wdata = 32'h0;
         gpr_we = 1'b0;
@@ -1089,7 +1050,7 @@ module WBU (
                             gpr_wdata = alu_result;
                             gpr_we = 1'b1;
                         end
-                        default: NPCINV(pc);
+                        default:  /* NPCINV(pc) */;  // 删除DPI-C调用
                     endcase
                 end
             end
@@ -1099,7 +1060,7 @@ module WBU (
                         gpr_wdata = alu_result;
                         gpr_we = 1'b1;
                     end
-                    default: NPCINV(pc);
+                    default:  /* NPCINV(pc) */;  // 删除DPI-C调用
                 endcase
             end
             TYPE_U: begin
