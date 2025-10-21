@@ -368,13 +368,12 @@ module IFU (
     assign imem_bready = 1'b0;
 
     assign ifu_req_ready = imem_arready;
+    always @(posedge clk) ifu_resp_valid <= imem_rvalid;
     always @(posedge clk) begin
         if (reset) begin
-            ifu_resp_valid <= 1'b0;
             ifu_rdata <= 32'h0;
             ifu_error <= 1'b0;
         end else if (imem_rvalid) begin
-            ifu_resp_valid <= 1'b1;
             ifu_rdata <= imem_rdata;
             ifu_error <= imem_rresp;
         end
