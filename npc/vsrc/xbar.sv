@@ -9,10 +9,10 @@ module xbar #(
     parameter logic [31:0] SLAVE_BASE[SLAVE_NUM] = '{32'ha00003f8, 32'h80000000},
     parameter logic [31:0] SLAVE_SIZE[SLAVE_NUM] = '{32'h00000004, 32'h08000000}
 ) (
-    input logic         clk,
-    input logic         reset,
-          axi_if.slave  m,                // 1 个 Master (从crossbar角度看是slave接口)
-          axi_if.master s    [SLAVE_NUM]  // n 个 Slave (从crossbar角度看是master接口)
+    input logic              clk,
+    input logic              reset,
+          axi_lite_if.slave  m,                // 1 个 Master (从crossbar角度看是slave接口)
+          axi_lite_if.master s    [SLAVE_NUM]  // n 个 Slave (从crossbar角度看是master接口)
 );
 
     // 定义读状态枚举

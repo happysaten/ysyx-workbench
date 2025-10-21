@@ -8,7 +8,7 @@ module uart #(
 ) (
     input logic      clk,
     input logic      reset,
-    axi_if.slave     s  // 使用interface替代所有独立的AXI信号
+    axi_lite_if.slave     s  // 使用interface替代所有独立的AXI信号
 );
 
     // 定义读状态枚举
