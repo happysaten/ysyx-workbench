@@ -138,7 +138,8 @@ module axi_arbiter (
 
     // 读地址通道
     assign s_arvalid = (read_state == IDLE_READ) && (m0_arvalid || m1_arvalid);
-    assign s_araddr = m0_arvalid ? m0_araddr : m1_araddr;
+    // assign s_araddr = m0_arvalid ? m0_araddr : m1_araddr;
+    assign s_araddr = m1_arvalid ? m1_araddr : m0_araddr;
     assign m0_arready = (read_state == IDLE_READ) ? s_arready : 1'b0;
     assign m1_arready = (read_state == IDLE_READ) ? (s_arready && !m0_arvalid) : 1'b0;
 
@@ -154,7 +155,8 @@ module axi_arbiter (
 
     // 写地址通道
     assign s_awvalid = (write_state == IDLE_WRITE) && (m0_awvalid || m1_awvalid);
-    assign s_awaddr = m0_awvalid ? m0_awaddr : m1_awaddr;
+    // assign s_awaddr = m0_awvalid ? m0_awaddr : m1_awaddr;
+    assign s_awaddr = m1_awvalid ? m1_awaddr : m0_awaddr;
     assign m0_awready = (write_state == IDLE_WRITE) ? s_awready : 1'b0;
     assign m1_awready = (write_state == IDLE_WRITE) ? (s_awready && !m0_awvalid) : 1'b0;
 
