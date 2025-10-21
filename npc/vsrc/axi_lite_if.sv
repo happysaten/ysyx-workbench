@@ -1,4 +1,4 @@
-interface axi_lite_if (input logic clk, input logic reset);
+interface axi_lite_if;
 
     // Read address channel (AR)
     logic        arvalid;
