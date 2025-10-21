@@ -853,55 +853,93 @@ module MEM (
     input               mem_bready,
     output logic        mem_bresp
 );
-    typedef enum logic [2:0] {
-        IDLE,
-        RWAIT,  // 读等待
-        RRESP,  // 读响应
-        WWAIT,  // 写等待
-        WRESP   // 写响应
-    } state_t;
-    state_t state, next_state;
+    // 读通道状态机
+    typedef enum logic [1:0] {
+        RD_IDLE,
+        RD_WAIT,
+        RD_RESP
+    } rd_state_t;
+    rd_state_t rd_state, rd_next_state;
 
+    // 写通道状态机
+    typedef enum logic [1:0] {
+        WR_IDLE,
+        WR_WAIT,
+        WR_RESP
+    } wr_state_t;
+    wr_state_t wr_state, wr_next_state;
+
+    // 读通道状态更新
     always @(posedge clk) begin
-        if (reset) state <= IDLE;
-        else state <= next_state;
+        if (reset) rd_state <= RD_IDLE;
+        else rd_state <= rd_next_state;
     end
 
-    logic resp_data_ready;
-
-    always_comb begin
-        unique case (state)
-            IDLE: begin
-                if (mem_awvalid && mem_awready && mem_wvalid && mem_wready)
-                    next_state = resp_data_ready ? WRESP : WWAIT;
-                else if (mem_arvalid && mem_arready) next_state = resp_data_ready ? RRESP : RWAIT;
-                else next_state = IDLE;
-            end
-            RWAIT:   next_state = resp_data_ready ? RRESP : RWAIT;
-            RRESP:   next_state = (mem_rvalid && mem_rready) ? IDLE : RRESP;
-            WWAIT:   next_state = resp_data_ready ? WRESP : WWAIT;
-            WRESP:   next_state = (mem_bvalid && mem_bready) ? IDLE : WRESP;
-            default: next_state = IDLE;
-        endcase
+    // 写通道状态更新
+    always @(posedge clk) begin
+        if (reset) wr_state <= WR_IDLE;
+        else wr_state <= wr_next_state;
     end
 
-    logic random_bit;
+    logic rd_resp_ready, wr_resp_ready;
+    logic rd_random_bit, wr_random_bit;
+
+    // 读通道随机延迟生成器
     lfsr8 #(
         .TAPS(8'b01010110)
-    ) u_mem_resp_lfsr (
+    ) u_rd_resp_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
-        .out  (random_bit)
+        .out  (rd_random_bit)
     );
 
-    // 读写请求仲裁（写优先）
-    assign mem_rvalid = (state == RRESP);
-    assign mem_bvalid = (state == WRESP);
-    assign mem_arready = (state == IDLE) && !(mem_awvalid && mem_wvalid);
-    assign mem_awready = (state == IDLE);
-    assign mem_wready = (state == IDLE);
-    assign resp_data_ready = random_bit;
+    // 写通道随机延迟生成器
+    lfsr8 #(
+        .TAPS(8'b10111000)
+    ) u_wr_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (wr_random_bit)
+    );
+
+    assign rd_resp_ready = rd_random_bit;
+    assign wr_resp_ready = wr_random_bit;
+
+    // 读通道状态机
+    always_comb begin
+        unique case (rd_state)
+            RD_IDLE: begin
+                rd_next_state = (mem_arvalid && mem_arready) ? (rd_resp_ready ? RD_RESP : RD_WAIT) : RD_IDLE;
+            end
+            RD_WAIT: rd_next_state = rd_resp_ready ? RD_RESP : RD_WAIT;
+            RD_RESP: rd_next_state = (mem_rvalid && mem_rready) ? RD_IDLE : RD_RESP;
+            default: rd_next_state = RD_IDLE;
+        endcase
+    end
+
+    // 写通道状态机
+    always_comb begin
+        unique case (wr_state)
+            WR_IDLE: begin
+                wr_next_state = (mem_awvalid && mem_awready && mem_wvalid && mem_wready) ?
+                                (wr_resp_ready ? WR_RESP : WR_WAIT) : WR_IDLE;
+            end
+            WR_WAIT: wr_next_state = wr_resp_ready ? WR_RESP : WR_WAIT;
+            WR_RESP: wr_next_state = (mem_bvalid && mem_bready) ? WR_IDLE : WR_RESP;
+            default: wr_next_state = WR_IDLE;
+        endcase
+    end
+
+    // 读通道握手信号
+    assign mem_arready = (rd_state == RD_IDLE);
+    assign mem_rvalid  = (rd_state == RD_RESP);
+
+    // 写通道握手信号
+    assign mem_awready = (wr_state == WR_IDLE);
+    assign mem_wready  = (wr_state == WR_IDLE);
+    assign mem_bvalid  = (wr_state == WR_RESP);
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -910,8 +948,13 @@ module MEM (
         input byte wmask
     );
 
+    // 读事务处理
     always @(posedge clk) begin
         if (mem_arvalid && mem_arready) mem_rdata <= pmem_read_npc(mem_araddr);
+    end
+
+    // 写事务处理
+    always @(posedge clk) begin
         if (mem_wvalid && mem_wready) pmem_write_npc(mem_awaddr, mem_wdata, mem_wmask);
     end
 

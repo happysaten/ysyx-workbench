@@ -81,99 +81,97 @@ module axi_arbiter (
 
     // 定义读状态枚举
     typedef enum logic [1:0] {
-        IDLE_READ,
-        M0_READ,
-        M1_READ
-    } read_state_t;
+        IDLE_RD,
+        M0_RD,
+        M1_RD
+    } rd_state_t;
 
-    read_state_t read_state, next_read_state;
+    rd_state_t rd_state, next_rd_state;
 
     // 定义写状态枚举
     typedef enum logic [2:0] {
-        IDLE_WRITE,
-        M0_WRITE,
-        M0_AWRITE,
-        M1_AWRITE,
-        M1_WRITE
-    } write_state_t;
+        IDLE_WR,
+        M0_WR,
+        M0_AWR,
+        M1_AWR,
+        M1_WR
+    } wr_state_t;
 
-    write_state_t write_state, next_write_state;
+    wr_state_t wr_state, next_wr_state;
 
     // 状态机更新逻辑
     always_ff @(posedge clk) begin
         if (reset) begin
-            read_state  <= IDLE_READ;
-            write_state <= IDLE_WRITE;
+            rd_state <= IDLE_RD;
+            wr_state <= IDLE_WR;
         end else begin
-            read_state  <= next_read_state;
-            write_state <= next_write_state;
+            rd_state <= next_rd_state;
+            wr_state <= next_wr_state;
         end
     end
 
     // 读状态机next逻辑
     always_comb begin
-        unique case (read_state)
-            IDLE_READ:
-            next_read_state = (m0_arvalid&&m0_arready) ? M0_READ :
-                                         (m1_arvalid&&m1_arready) ? M1_READ : IDLE_READ;
-            M0_READ: next_read_state = (s_rvalid && m0_rready) ? IDLE_READ : M0_READ;
-            M1_READ: next_read_state = (s_rvalid && m1_rready) ? IDLE_READ : M1_READ;
+        unique case (rd_state)
+            IDLE_RD:
+            next_rd_state = (m0_arvalid&&m0_arready) ? M0_RD :
+                                         (m1_arvalid&&m1_arready) ? M1_RD : IDLE_RD;
+            M0_RD: next_rd_state = (s_rvalid && m0_rready) ? IDLE_RD : M0_RD;
+            M1_RD: next_rd_state = (s_rvalid && m1_rready) ? IDLE_RD : M1_RD;
         endcase
     end
 
     // 写状态机next逻辑
     always_comb begin
-        unique case (write_state)
-            IDLE_WRITE:
-            next_write_state = (m0_awvalid && m0_awready) ? (m0_wvalid && m0_wready ? M0_WRITE : M0_AWRITE) :
-                                         (m1_awvalid && m1_awready) ? (m1_wvalid && m1_wready ? M1_WRITE : M1_AWRITE) : IDLE_WRITE;
-            M0_AWRITE: next_write_state = (m0_wvalid && m0_wready) ? M0_WRITE : M0_AWRITE;
-            M0_WRITE: next_write_state = (s_bvalid && m0_bready) ? IDLE_WRITE : M0_WRITE;
-            M1_AWRITE: next_write_state = (m1_wvalid && m1_wready) ? M1_WRITE : M1_AWRITE;
-            M1_WRITE: next_write_state = (s_bvalid && m1_bready) ? IDLE_WRITE : M1_WRITE;
-            default: next_write_state = IDLE_WRITE;
+        unique case (wr_state)
+            IDLE_WR:
+            next_wr_state = (m0_awvalid && m0_awready) ? (m0_wvalid && m0_wready ? M0_WR : M0_AWR) :
+                                         (m1_awvalid && m1_awready) ? (m1_wvalid && m1_wready ? M1_WR : M1_AWR) : IDLE_WR;
+            M0_AWR: next_wr_state = (m0_wvalid && m0_wready) ? M0_WR : M0_AWR;
+            M0_WR: next_wr_state = (s_bvalid && m0_bready) ? IDLE_WR : M0_WR;
+            M1_AWR: next_wr_state = (m1_wvalid && m1_wready) ? M1_WR : M1_AWR;
+            M1_WR: next_wr_state = (s_bvalid && m1_bready) ? IDLE_WR : M1_WR;
+            default: next_wr_state = IDLE_WR;
         endcase
     end
 
 
     // 读地址通道
-    assign s_arvalid = (read_state == IDLE_READ) && (m0_arvalid || m1_arvalid);
+    assign s_arvalid = (rd_state == IDLE_RD) && (m0_arvalid || m1_arvalid);
     // assign s_araddr = m0_arvalid ? m0_araddr : m1_araddr;
     assign s_araddr = m1_arvalid ? m1_araddr : m0_araddr;
-    assign m0_arready = (read_state == IDLE_READ) ? s_arready : 1'b0;
-    assign m1_arready = (read_state == IDLE_READ) ? (s_arready && !m0_arvalid) : 1'b0;
+    assign m0_arready = (rd_state == IDLE_RD) ? s_arready : 1'b0;
+    assign m1_arready = (rd_state == IDLE_RD) ? (s_arready && !m0_arvalid) : 1'b0;
 
     // 读数据通道
-    assign m0_rvalid = (read_state == M0_READ) ? s_rvalid : 1'b0;
-    assign m1_rvalid = (read_state == M1_READ) ? s_rvalid : 1'b0;
-    assign s_rready  = (read_state == M0_READ) ? m0_rready :
-                       (read_state == M1_READ) ? m1_rready : 1'b0;
+    assign m0_rvalid = (rd_state == M0_RD) ? s_rvalid : 1'b0;
+    assign m1_rvalid = (rd_state == M1_RD) ? s_rvalid : 1'b0;
+    assign s_rready = (rd_state == M0_RD) ? m0_rready : (rd_state == M1_RD) ? m1_rready : 1'b0;
     assign m0_rdata = s_rdata;
     assign m1_rdata = s_rdata;
-    assign m0_rresp = (read_state == M0_READ) ? s_rresp : 1'b0;
-    assign m1_rresp = (read_state == M1_READ) ? s_rresp : 1'b0;
+    assign m0_rresp = (rd_state == M0_RD) ? s_rresp : 1'b0;
+    assign m1_rresp = (rd_state == M1_RD) ? s_rresp : 1'b0;
 
     // 写地址通道
-    assign s_awvalid = (write_state == IDLE_WRITE) && (m0_awvalid || m1_awvalid);
+    assign s_awvalid = (wr_state == IDLE_WR) && (m0_awvalid || m1_awvalid);
     // assign s_awaddr = m0_awvalid ? m0_awaddr : m1_awaddr;
     assign s_awaddr = m1_awvalid ? m1_awaddr : m0_awaddr;
-    assign m0_awready = (write_state == IDLE_WRITE) ? s_awready : 1'b0;
-    assign m1_awready = (write_state == IDLE_WRITE) ? (s_awready && !m0_awvalid) : 1'b0;
+    assign m0_awready = (wr_state == IDLE_WR) ? s_awready : 1'b0;
+    assign m1_awready = (wr_state == IDLE_WR) ? (s_awready && !m0_awvalid) : 1'b0;
 
     // 写数据通道
-    assign s_wvalid = (write_state == IDLE_WRITE || write_state == M0_AWRITE || write_state == M1_AWRITE) && (m0_wvalid || m1_wvalid);
+    assign s_wvalid = (wr_state == IDLE_WR || wr_state == M0_AWR || wr_state == M1_AWR) && (m0_wvalid || m1_wvalid);
     assign s_wdata = m0_wvalid ? m0_wdata : m1_wdata;
     assign s_wmask = m0_wvalid ? m0_wmask : m1_wmask;
-    assign m0_wready = (write_state == IDLE_WRITE || write_state == M0_AWRITE || write_state == M1_AWRITE) ? s_wready : 1'b0;
-    assign m1_wready = (write_state == IDLE_WRITE || write_state == M0_AWRITE || write_state == M1_AWRITE) ? (s_wready && !m0_wvalid) : 1'b0;
+    assign m0_wready = (wr_state == IDLE_WR || wr_state == M0_AWR || wr_state == M1_AWR) ? s_wready : 1'b0;
+    assign m1_wready = (wr_state == IDLE_WR || wr_state == M0_AWR || wr_state == M1_AWR) ? (s_wready && !m0_wvalid) : 1'b0;
 
     // 写回复通道
-    assign m0_bvalid = (write_state == M0_WRITE) ? s_bvalid : 1'b0;
-    assign m1_bvalid = (write_state == M1_WRITE) ? s_bvalid : 1'b0;
-    assign s_bready  = (write_state == M0_WRITE) ? m0_bready :
-                       (write_state == M1_WRITE) ? m1_bready : 1'b0;
-    assign m0_bresp = (write_state == M0_WRITE) ? s_bresp : 1'b0;
-    assign m1_bresp = (write_state == M1_WRITE) ? s_bresp : 1'b0;
+    assign m0_bvalid = (wr_state == M0_WR) ? s_bvalid : 1'b0;
+    assign m1_bvalid = (wr_state == M1_WR) ? s_bvalid : 1'b0;
+    assign s_bready = (wr_state == M0_WR) ? m0_bready : (wr_state == M1_WR) ? m1_bready : 1'b0;
+    assign m0_bresp = (wr_state == M0_WR) ? s_bresp : 1'b0;
+    assign m1_bresp = (wr_state == M1_WR) ? s_bresp : 1'b0;
 
 endmodule
 
