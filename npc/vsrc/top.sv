@@ -888,30 +888,20 @@ module MEM (
     end
 
     logic rd_resp_ready, wr_resp_ready;
-    logic rd_random_bit, wr_random_bit;
+    logic random_bit;
 
-    // 读通道随机延迟生成器
+    // 随机延迟生成器
     lfsr8 #(
         .TAPS(8'b01010110)
     ) u_rd_resp_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
-        .out  (rd_random_bit)
+        .out  (random_bit)
     );
 
-    // 写通道随机延迟生成器
-    lfsr8 #(
-        .TAPS(8'b10111000)
-    ) u_wr_resp_lfsr (
-        .clk  (clk),
-        .reset(reset),
-        .en   (1'b1),
-        .out  (wr_random_bit)
-    );
-
-    assign rd_resp_ready = rd_random_bit;
-    assign wr_resp_ready = wr_random_bit;
+    assign rd_resp_ready = random_bit;
+    assign wr_resp_ready = random_bit;
 
     // 读通道状态机
     always_comb begin
