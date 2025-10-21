@@ -2,13 +2,12 @@
 
 // AXI4-Lite仲裁器模块
 // 支持2个master和1个slave。
-
 module axi_arbiter (
     input logic       clk,
     input logic       reset,
-    axi_if.slave      m0,  // Master 0 接口
-    axi_if.slave      m1,  // Master 1 接口
-    axi_if.master     s    // Slave 接口
+    axi_lite_if.slave      m0,  // Master 0 接口
+    axi_lite_if.slave      m1,  // Master 1 接口
+    axi_lite_if.master     s    // Slave 接口
 );
 
     // 定义读状态枚举
