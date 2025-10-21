@@ -519,8 +519,8 @@ module GPR (
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
         end else if (gpr_wen && state != RESP && next_state == RESP) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
+            write_gpr_npc(gpr_waddr, gpr_wdata);
         end
-        // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
 
@@ -528,9 +528,9 @@ module GPR (
         input logic [ 4:0] idx,
         input logic [31:0] data
     );
-    always_comb begin
-        if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
-    end
+    // always_comb begin
+    //     if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
+    // end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
