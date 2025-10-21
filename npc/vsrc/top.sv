@@ -367,11 +367,12 @@ module IFU (
     assign imem_wmask = 8'h0;
     assign imem_bready = 1'b0;
 
-    // IFU握手逻辑
     assign ifu_req_ready = imem_arready;
-    assign ifu_resp_valid = imem_rvalid;
-    assign ifu_rdata = imem_rdata;
-    assign ifu_error = imem_rresp;
+    always @(posedge clk) begin
+        ifu_resp_valid <= imem_rvalid;
+        ifu_rdata <= imem_rdata;
+        ifu_error <= imem_rresp;
+    end
 
     import "DPI-C" function void update_inst_npc(
         input int inst,
@@ -1015,8 +1016,8 @@ module LSU (
     assign dmem_bready = lsu_resp_ready;
 
     // LSU握手逻辑
-    // assign lsu_req_ready = dmem_ren ? dmem_arready : (dmem_wen ? (dmem_awready && dmem_wready) : 1'b1);
-    assign lsu_req_ready = 1'b1;
+    assign lsu_req_ready = dmem_ren ? dmem_arready : (dmem_wen ? (dmem_awready && dmem_wready) : 1'b1);
+    // assign lsu_req_ready = 1'b1;
     assign lsu_resp_valid = dmem_ren ? dmem_rvalid : (dmem_wen ? dmem_bvalid : lsu_req_valid);
 
     // 写掩码生成
