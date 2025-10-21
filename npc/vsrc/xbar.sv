@@ -81,6 +81,7 @@ module xbar #(
             S0_WR: next_wr_state = (s0.bvalid && m.bready) ? IDLE_WR : S0_WR;
             S1_AWR: next_wr_state = (m.wvalid && m.wready) ? S1_WR : S1_AWR;
             S1_WR: next_wr_state = (s1.bvalid && m.bready) ? IDLE_WR : S1_WR;
+            default: next_wr_state = IDLE_WR;
         endcase
     end
 
