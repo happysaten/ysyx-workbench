@@ -110,35 +110,6 @@ module top (
         .dmem_bresp  (dmem_bresp)
     );
 
-    // IFU：负责 PC 和取指
-    logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
-    logic        jump_en;
-    logic [31:0] inst;  // 当前指令, inst renamed to ifu_rdata
-    logic [31:0] dnpc;  // dnpc信号，从PCU输出
-
-    logic        reset_sync;
-    // 同步复位信号
-    always_ff @(posedge clk or posedge reset) begin
-        if (reset) reset_sync <= 1'b1;
-        else reset_sync <= 1'b0;
-    end
-    // assign reset_sync = reset;
-
-    logic ifu_resp_valid, lsu_resp_valid, gpr_resp_valid, csr_resp_valid;
-    logic ifu_req_ready, lsu_req_ready, gpr_req_ready, csr_req_ready;
-    assign npc_resp_valid = gpr_resp_valid || csr_resp_valid;
-
-    logic npc_req_valid, npc_req_valid_init;
-    always @(posedge clk) begin
-        if (reset_sync) npc_req_valid_init <= 1'b1;
-        else if (ifu_req_ready) npc_req_valid_init <= 1'b0;
-    end
-    assign npc_req_ready = ifu_req_ready;
-    assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
-
-    logic ifu_error, gpr_error, csr_error, lsu_error;
-    assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
-
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
