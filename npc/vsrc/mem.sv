@@ -1,5 +1,5 @@
 // MEM(Memory) 负责统一内存的读写访问
-import axi_lite_if::*;
+
 module MEM (
     input logic        clk,
     input logic        reset,

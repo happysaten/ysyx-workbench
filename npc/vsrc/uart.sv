@@ -2,7 +2,7 @@
 
 // AXI4-Lite UART模块
 // 作为slave设备，支持写操作输出字符
-import axi_lite_if::*;
+
 module uart #(
     parameter int UART_ADDR = 32'ha00003f8
 ) (

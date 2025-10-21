@@ -2,7 +2,7 @@
 
 // AXI4-Lite Crossbar (1 master to n slaves)
 // 根据地址范围选择从设备
-import axi_lite_if::*;
+
 module xbar #(
     parameter int SLAVE_NUM = 2,
     // 地址范围数组

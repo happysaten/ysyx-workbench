@@ -13,7 +13,7 @@ typedef enum logic [2:0] {
 
 /* verilator lint_off DECLFILENAME */
 
-import axi_lite_if::*;
+
 module top (
     input clk,  // 时钟信号
     input reset,  // 复位信号
@@ -51,24 +51,24 @@ module top (
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
     // 创建AXI接口实例
-    axi_if imem_if();  // IFU(取指)接口
-    axi_if dmem_if();  // LSU(访存)接口
-    axi_if mem_if();   // 统一内存接口
+    axi_if imem_if ();  // IFU(取指)接口
+    axi_if dmem_if ();  // LSU(访存)接口
+    axi_if mem_if ();  // 统一内存接口
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
-        .clk   (clk),
-        .reset (reset_sync),
-        .m0    (imem_if.slave),   // Master 0: IFU (取指)
-        .m1    (dmem_if.slave),   // Master 1: LSU (访存)
-        .s     (mem_if.master)    // Slave: 统一内存
+        .clk  (clk),
+        .reset(reset_sync),
+        .m0   (imem_if.slave),  // Master 0: IFU (取指)
+        .m1   (dmem_if.slave),  // Master 1: LSU (访存)
+        .s    (mem_if.master)   // Slave: 统一内存
     );
 
     // 实例化统一内存模块
     MEM u_mem (
-        .clk   (clk),
-        .reset (reset_sync),
-        .mem   (mem_if.slave)
+        .clk  (clk),
+        .reset(reset_sync),
+        .mem  (mem_if.slave)
     );
 
     IFU u_ifu (
@@ -209,23 +209,23 @@ module top (
 endmodule
 
 // IFU(Instruction Fetch Unit) 负责PC管理和取指
-import axi_lite_if::*;
+
 module IFU (
-    input               clk,
-    input               reset,
-    input               ifu_req_valid,
-    output logic        ifu_req_ready,
-    input               jump_en,
-    input        [31:0] jump_target,
-    output logic [31:0] ifu_rdata,
-    output logic        ifu_resp_valid,
-    input               ifu_resp_ready,
-    output logic [31:0] pc,
-    output logic [31:0] snpc,
-    output logic [31:0] dnpc,
-    output logic        ifu_error,
+    input                       clk,
+    input                       reset,
+    input                       ifu_req_valid,
+    output logic                ifu_req_ready,
+    input                       jump_en,
+    input                [31:0] jump_target,
+    output logic         [31:0] ifu_rdata,
+    output logic                ifu_resp_valid,
+    input                       ifu_resp_ready,
+    output logic         [31:0] pc,
+    output logic         [31:0] snpc,
+    output logic         [31:0] dnpc,
+    output logic                ifu_error,
     // IMEM接口 - 使用interface
-    axi_if.master       imem
+           axi_if.master        imem
 );
 
     // snpc / dnpc 选择逻辑
@@ -687,24 +687,24 @@ endmodule
 
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
-import axi_lite_if::*;
+
 module LSU (
-    input                clk,
-    input                reset,
-    input                lsu_req_valid,
-    output logic         lsu_req_ready,
-    input  inst_t        inst_type,
-    input         [ 6:0] opcode,
-    input         [ 2:0] funct3,
-    input         [31:0] pc,
-    input         [31:0] alu_result,
-    input         [31:0] gpr_rdata2,
-    output logic         lsu_resp_valid,
-    input                lsu_resp_ready,
-    output logic  [31:0] lsu_rdata,
-    output logic         lsu_error,
+    input                       clk,
+    input                       reset,
+    input                       lsu_req_valid,
+    output logic                lsu_req_ready,
+    input  inst_t               inst_type,
+    input                [ 6:0] opcode,
+    input                [ 2:0] funct3,
+    input                [31:0] pc,
+    input                [31:0] alu_result,
+    input                [31:0] gpr_rdata2,
+    output logic                lsu_resp_valid,
+    input                       lsu_resp_ready,
+    output logic         [31:0] lsu_rdata,
+    output logic                lsu_error,
     // DMEM接口 - 使用interface
-    axi_if.master        dmem
+           axi_if.master        dmem
 );
     import "DPI-C" function void NPCINV(input int pc);
 
