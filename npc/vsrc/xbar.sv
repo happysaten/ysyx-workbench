@@ -167,7 +167,6 @@ module xbar #(
             always_comb begin
                 s[j].wvalid = ((wr_state == IDLE_WR || wr_state == WAIT_WR) && m.awvalid && m.wvalid && !addr_err_aw && sel_slave_aw[j]) ? 1'b1 : 1'b0;
                 s[j].wdata = m.wdata;
-                s[j].wstrb = m.wstrb;
                 if ((wr_state == IDLE_WR || wr_state == WAIT_WR) && m.awvalid && m.wvalid && !addr_err_aw && sel_slave_aw[j]) begin
                     m.wready = s[j].wready;
                 end
