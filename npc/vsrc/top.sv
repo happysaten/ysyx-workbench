@@ -685,7 +685,6 @@ endmodule
 
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
-import axi_lite_if::*;
 module LSU (
     input                clk,
     input                reset,
