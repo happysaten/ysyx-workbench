@@ -2,34 +2,13 @@
 
 // AXI4-Lite UART模块
 // 作为slave设备，支持写操作输出字符
+
 module uart #(
     parameter int UART_ADDR = 32'ha00003f8
 ) (
-    input clk,
-    input reset,
-
-    // 读地址通道(AR)
-    input               s_arvalid,
-    output logic        s_arready,
-    input        [31:0] s_araddr,
-    // 读数据通道(R)
-    output logic        s_rvalid,
-    input               s_rready,
-    output logic [31:0] s_rdata,
-    output logic        s_rresp,
-    // 写地址通道(AW)
-    input               s_awvalid,
-    output logic        s_awready,
-    input        [31:0] s_awaddr,
-    // 写数据通道(W)
-    input               s_wvalid,
-    output logic        s_wready,
-    input        [31:0] s_wdata,
-    input        [ 7:0] s_wmask,
-    // 写回复通道(B)
-    output logic        s_bvalid,
-    input               s_bready,
-    output logic        s_bresp
+    input logic      clk,
+    input logic      reset,
+    axi_if.slave     s  // 使用interface替代所有独立的AXI信号
 );
 
     // 定义读状态枚举
@@ -55,8 +34,8 @@ module uart #(
     logic addr_match_aw;
     logic addr_match_ar;
 
-    assign addr_match_aw = (s_awaddr == UART_ADDR);
-    assign addr_match_ar = (s_araddr == UART_ADDR);
+    assign addr_match_aw = (s.awaddr == UART_ADDR);
+    assign addr_match_ar = (s.araddr == UART_ADDR);
 
     // 状态机更新逻辑
     always_ff @(posedge clk) begin
@@ -72,9 +51,9 @@ module uart #(
     // 读状态机next逻辑
     always_comb begin
         unique case (rd_state)
-            IDLE_RD: next_rd_state = (s_arvalid && s_arready) ? ADDR_RD : IDLE_RD;
+            IDLE_RD: next_rd_state = (s.arvalid && s.arready) ? ADDR_RD : IDLE_RD;
             ADDR_RD: next_rd_state = DATA_RD;
-            DATA_RD: next_rd_state = (s_rvalid && s_rready) ? IDLE_RD : DATA_RD;
+            DATA_RD: next_rd_state = (s.rvalid && s.rready) ? IDLE_RD : DATA_RD;
             default: next_rd_state = IDLE_RD;
         endcase
     end
@@ -83,34 +62,34 @@ module uart #(
     always_comb begin
         unique case (wr_state)
             IDLE_WR:
-            if (s_awvalid && s_awready && s_wvalid && s_wready) next_wr_state = RESP_WR;
-            else if (s_awvalid && s_awready) next_wr_state = DATA_WR;
-            else if (s_wvalid && s_wready) next_wr_state = ADDR_WR;
+            if (s.awvalid && s.awready && s.wvalid && s.wready) next_wr_state = RESP_WR;
+            else if (s.awvalid && s.awready) next_wr_state = DATA_WR;
+            else if (s.wvalid && s.wready) next_wr_state = ADDR_WR;
             else next_wr_state = IDLE_WR;
-            ADDR_WR: next_wr_state = (s_awvalid && s_awready) ? RESP_WR : ADDR_WR;
-            DATA_WR: next_wr_state = (s_wvalid && s_wready) ? RESP_WR : DATA_WR;
-            RESP_WR: next_wr_state = (s_bvalid && s_bready) ? IDLE_WR : RESP_WR;
+            ADDR_WR: next_wr_state = (s.awvalid && s.awready) ? RESP_WR : ADDR_WR;
+            DATA_WR: next_wr_state = (s.wvalid && s.wready) ? RESP_WR : DATA_WR;
+            RESP_WR: next_wr_state = (s.bvalid && s.bready) ? IDLE_WR : RESP_WR;
             default: next_wr_state = IDLE_WR;
         endcase
     end
 
     // 读地址通道
-    assign s_arready = (rd_state == IDLE_RD);
+    assign s.arready = (rd_state == IDLE_RD);
 
     // 读数据通道
-    assign s_rvalid  = (rd_state == DATA_RD);
-    assign s_rdata   = 32'h0;  // UART 读取返回0
-    assign s_rresp   = (rd_state == DATA_RD) ? (!addr_match_ar) : 1'b0;
+    assign s.rvalid  = (rd_state == DATA_RD);
+    assign s.rdata   = 32'h0;  // UART 读取返回0
+    assign s.rresp   = (rd_state == DATA_RD) ? (!addr_match_ar) : 1'b0;
 
     // 写地址通道
-    assign s_awready = (wr_state == IDLE_WR || wr_state == ADDR_WR);
+    assign s.awready = (wr_state == IDLE_WR || wr_state == ADDR_WR);
 
     // 写数据通道
-    assign s_wready  = (wr_state == IDLE_WR || wr_state == DATA_WR);
+    assign s.wready  = (wr_state == IDLE_WR || wr_state == DATA_WR);
 
     // 写回复通道
-    assign s_bvalid  = (wr_state == RESP_WR);
-    assign s_bresp   = !addr_match_aw;
+    assign s.bvalid  = (wr_state == RESP_WR);
+    assign s.bresp   = !addr_match_aw;
 
     // UART 字符输出逻辑
     logic [31:0] aw_addr_reg;
@@ -119,8 +98,8 @@ module uart #(
     always_ff @(posedge clk) begin
         if (reset) begin
             aw_addr_reg <= 32'h0;
-        end else if (s_awvalid && s_awready) begin
-            aw_addr_reg <= s_awaddr;
+        end else if (s.awvalid && s.awready) begin
+            aw_addr_reg <= s.awaddr;
         end
     end
 
@@ -128,10 +107,10 @@ module uart #(
     always_ff @(posedge clk) begin
         if (reset) begin
             serial_base <= 8'h0;
-        end else if (s_wvalid && s_wready) begin
-            if (aw_addr_reg == UART_ADDR || (s_awvalid && addr_match_aw)) begin
-                serial_base <= s_wdata[7:0];
-                $write("%c", s_wdata[7:0]);
+        end else if (s.wvalid && s.wready) begin
+            if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
+                serial_base <= s.wdata[7:0];
+                $write("%c", s.wdata[7:0]);
             end
         end
     end
