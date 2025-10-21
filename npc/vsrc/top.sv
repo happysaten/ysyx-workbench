@@ -267,7 +267,6 @@ module top (
     );
 
     // LSU：负责加载和存储指令的内存访问
-    logic [31:0] lsu_rdata;  // 加载数据
     LSU u_lsu (
         .clk(clk),
         .reset(reset_sync),
