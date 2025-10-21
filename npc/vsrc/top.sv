@@ -355,7 +355,7 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     // IMEM访问控制 - 只使用读通道
-    assign imem_araddr = dnpc;
+    assign imem_araddr = pc;
     assign imem_arvalid = ifu_req_valid;
     assign imem_rready = ifu_resp_ready;
     
