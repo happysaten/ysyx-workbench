@@ -369,9 +369,15 @@ module IFU (
 
     assign ifu_req_ready = imem_arready;
     always @(posedge clk) begin
-        ifu_resp_valid <= imem_rvalid;
-        ifu_rdata <= imem_rdata;
-        ifu_error <= imem_rresp;
+        if (reset) begin
+            ifu_resp_valid <= 1'b0;
+            ifu_rdata <= 32'h0;
+            ifu_error <= 1'b0;
+        end else if (imem_rvalid) begin
+            ifu_resp_valid <= 1'b1;
+            ifu_rdata <= imem_rdata;
+            ifu_error <= imem_rresp;
+        end
     end
 
     import "DPI-C" function void update_inst_npc(
