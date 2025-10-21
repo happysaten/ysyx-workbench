@@ -41,6 +41,8 @@ module xbar #(
 
     // 地址匹配 - 使用循环
     always_comb begin
+        sel_slave_ar = '0;
+        sel_slave_aw = '0;
         for (int i = 0; i < SLAVE_NUM; i++) begin
             sel_slave_ar[i] = (m.araddr >= SLAVE_BASE[i]) &&
                              (m.araddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
@@ -115,7 +117,9 @@ module xbar #(
     always_comb begin
         any_slave_ar_ready = 1'b0;
         for (int i = 0; i < SLAVE_NUM; i++) begin
-            any_slave_ar_ready |= (sel_slave_ar[i] && s[i].arready);
+            if (sel_slave_ar[i]) begin
+                any_slave_ar_ready |= s[i].arready;
+            end
         end
     end
     assign m.arready = (rd_state == IDLE_RD) && (any_slave_ar_ready || addr_err_ar);
@@ -127,8 +131,8 @@ module xbar #(
         m.rdata = 32'h0;
         m.rresp = 1'b1;
         for (int i = 0; i < SLAVE_NUM; i++) begin
-            any_slave_r_valid |= (rd_sel_slave[i] && s[i].rvalid);
             if (rd_sel_slave[i]) begin
+                any_slave_r_valid |= s[i].rvalid;
                 m.rdata = s[i].rdata;
                 m.rresp = s[i].rresp;
             end
@@ -141,7 +145,9 @@ module xbar #(
     always_comb begin
         any_slave_aw_ready = 1'b0;
         for (int i = 0; i < SLAVE_NUM; i++) begin
-            any_slave_aw_ready |= (sel_slave_aw[i] && s[i].awready);
+            if (sel_slave_aw[i]) begin
+                any_slave_aw_ready |= s[i].awready;
+            end
         end
     end
     assign m.awready = (wr_state == IDLE_WR) && (any_slave_aw_ready || addr_err_aw);
@@ -151,7 +157,9 @@ module xbar #(
     always_comb begin
         any_slave_w_ready = 1'b0;
         for (int i = 0; i < SLAVE_NUM; i++) begin
-            any_slave_w_ready |= (wr_sel_slave[i] && s[i].wready);
+            if (wr_sel_slave[i]) begin
+                any_slave_w_ready |= s[i].wready;
+            end
         end
     end
     assign m.wready = (wr_state == ROUTE_WR) && (any_slave_w_ready || wr_addr_err);
@@ -162,36 +170,36 @@ module xbar #(
         any_slave_b_valid = 1'b0;
         m.bresp = 1'b1;
         for (int i = 0; i < SLAVE_NUM; i++) begin
-            any_slave_b_valid |= (wr_sel_slave[i] && s[i].bvalid);
             if (wr_sel_slave[i]) begin
+                any_slave_b_valid |= s[i].bvalid;
                 m.bresp = s[i].bresp;
             end
         end
     end
     assign m.bvalid = (wr_state == RESP_WR) && (any_slave_b_valid || wr_addr_err);
 
-    // Slave接口 - 参数化
-    genvar i;
+    // Slave接口 - 使用generate参数化
+    genvar gi;
     generate
-        for (i = 0; i < SLAVE_NUM; i++) begin : slave_gen
+        for (gi = 0; gi < SLAVE_NUM; gi++) begin : slave_gen
             // 读地址通道
-            assign s[i].arvalid = (rd_state == IDLE_RD) && m.arvalid && sel_slave_ar[i];
-            assign s[i].araddr  = m.araddr;
+            assign s[gi].arvalid = (rd_state == IDLE_RD) && m.arvalid && sel_slave_ar[gi];
+            assign s[gi].araddr  = m.araddr;
 
             // 读数据通道
-            assign s[i].rready  = (rd_state == DATA_RD) && m.rready && rd_sel_slave[i];
+            assign s[gi].rready  = (rd_state == DATA_RD) && m.rready && rd_sel_slave[gi];
 
             // 写地址通道
-            assign s[i].awvalid = (wr_state == IDLE_WR) && m.awvalid && sel_slave_aw[i];
-            assign s[i].awaddr  = m.awaddr;
+            assign s[gi].awvalid = (wr_state == IDLE_WR) && m.awvalid && sel_slave_aw[gi];
+            assign s[gi].awaddr  = m.awaddr;
 
             // 写数据通道
-            assign s[i].wvalid  = (wr_state == ROUTE_WR) && m.wvalid && wr_sel_slave[i];
-            assign s[i].wdata   = m.wdata;
-            assign s[i].wmask   = m.wmask;
+            assign s[gi].wvalid  = (wr_state == ROUTE_WR) && m.wvalid && wr_sel_slave[gi];
+            assign s[gi].wdata   = m.wdata;
+            assign s[gi].wmask   = m.wmask;
 
             // 写回复通道
-            assign s[i].bready  = (wr_state == RESP_WR) && m.bready && wr_sel_slave[i];
+            assign s[gi].bready  = (wr_state == RESP_WR) && m.bready && wr_sel_slave[gi];
         end
     endgenerate
 
