@@ -53,9 +53,8 @@ module top (
     axi_lite_if imem_if ();  // IFU(取指)接口
     axi_lite_if dmem_if ();  // LSU(访存)接口
     axi_lite_if arbiter_if ();  // 仲裁器输出接口
-
-    // 创建xbar的slave接口数组
-    axi_lite_if xbar_slaves[2] ();
+    axi_lite_if uart_if ();  // UART接口
+    axi_lite_if mem_if ();  // 统一内存接口
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
@@ -67,15 +66,12 @@ module top (
     );
 
     // 实例化Crossbar
-    xbar #(
-        .SLAVE_NUM (2),
-        .SLAVE_BASE('{32'ha00003f8, 32'h80000000}),
-        .SLAVE_SIZE('{32'h00000004, 32'h08000000})
-    ) u_xbar (
+    xbar u_xbar (
         .clk  (clk),
         .reset(reset_sync),
         .m    (arbiter_if.slave),
-        .s    (xbar_slaves)
+        .s0   (uart_if.master),    // Slave 0: UART
+        .s1   (mem_if.master)      // Slave 1: 统一内存
     );
 
     // 实例化UART模块
@@ -84,14 +80,14 @@ module top (
     ) u_uart (
         .clk  (clk),
         .reset(reset_sync),
-        .s    (xbar_slaves[0].slave)
+        .s    (uart_if.slave)
     );
 
     // 实例化统一内存模块
     MEM u_mem (
         .clk  (clk),
         .reset(reset_sync),
-        .mem  (xbar_slaves[1].slave)
+        .mem  (mem_if.slave)
     );
 
     IFU u_ifu (
