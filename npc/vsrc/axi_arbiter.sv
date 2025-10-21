@@ -131,6 +131,7 @@ module axi_arbiter (
             M0_WRITE: next_write_state = (s_bvalid && m0_bready) ? IDLE_WRITE : M0_WRITE;
             M1_AWRITE: next_write_state = (m1_wvalid && m1_wready) ? M1_WRITE : M1_AWRITE;
             M1_WRITE: next_write_state = (s_bvalid && m1_bready) ? IDLE_WRITE : M1_WRITE;
+            default: next_write_state = IDLE_WRITE;
         endcase
     end
 
