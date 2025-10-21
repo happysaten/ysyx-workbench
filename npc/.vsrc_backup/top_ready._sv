@@ -50,110 +50,6 @@ module top (
     logic ifu_error, gpr_error, csr_error, lsu_error;
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
-    // IFU(取指)接口信号
-    logic imem_arvalid, imem_arready, imem_rvalid, imem_rready;
-    logic imem_awvalid, imem_awready, imem_wvalid, imem_wready, imem_bvalid, imem_bready;
-    logic [31:0] imem_araddr, imem_awaddr, imem_wdata, imem_rdata;
-    logic [7:0] imem_wmask;
-    logic imem_rresp, imem_bresp;
-
-    // LSU(访存)接口信号
-    logic dmem_arvalid, dmem_arready, dmem_rvalid, dmem_rready;
-    logic dmem_awvalid, dmem_awready, dmem_wvalid, dmem_wready, dmem_bvalid, dmem_bready;
-    logic [31:0] dmem_araddr, dmem_awaddr, dmem_wdata, dmem_rdata;
-    logic [7:0] dmem_wmask;
-    logic dmem_rresp, dmem_bresp;
-
-    // MEM接口信号(从仲裁器到统一内存)
-    logic mem_arvalid, mem_arready, mem_rvalid, mem_rready;
-    logic mem_awvalid, mem_awready, mem_wvalid, mem_wready, mem_bvalid, mem_bready;
-    logic [31:0] mem_araddr, mem_awaddr, mem_wdata, mem_rdata;
-    logic [7:0] mem_wmask;
-    logic mem_rresp, mem_bresp;
-
-    // 实例化AXI仲裁器
-    axi_arbiter u_arbiter (
-        .clk(clk),
-        .reset(reset_sync),
-        // Master 0: IFU (取指)
-        .m0_arvalid(imem_arvalid),
-        .m0_arready(imem_arready),
-        .m0_araddr(imem_araddr),
-        .m0_rvalid(imem_rvalid),
-        .m0_rready(imem_rready),
-        .m0_rdata(imem_rdata),
-        .m0_rresp(imem_rresp),
-        .m0_awvalid(imem_awvalid),
-        .m0_awready(imem_awready),
-        .m0_awaddr(imem_awaddr),
-        .m0_wvalid(imem_wvalid),
-        .m0_wready(imem_wready),
-        .m0_wdata(imem_wdata),
-        .m0_wmask(imem_wmask),
-        .m0_bvalid(imem_bvalid),
-        .m0_bready(imem_bready),
-        .m0_bresp(imem_bresp),
-        // Master 1: LSU (访存)
-        .m1_arvalid(dmem_arvalid),
-        .m1_arready(dmem_arready),
-        .m1_araddr(dmem_araddr),
-        .m1_rvalid(dmem_rvalid),
-        .m1_rready(dmem_rready),
-        .m1_rdata(dmem_rdata),
-        .m1_rresp(dmem_rresp),
-        .m1_awvalid(dmem_awvalid),
-        .m1_awready(dmem_awready),
-        .m1_awaddr(dmem_awaddr),
-        .m1_wvalid(dmem_wvalid),
-        .m1_wready(dmem_wready),
-        .m1_wdata(dmem_wdata),
-        .m1_wmask(dmem_wmask),
-        .m1_bvalid(dmem_bvalid),
-        .m1_bready(dmem_bready),
-        .m1_bresp(dmem_bresp),
-        // Slave: 统一内存
-        .s_arvalid(mem_arvalid),
-        .s_arready(mem_arready),
-        .s_araddr(mem_araddr),
-        .s_rvalid(mem_rvalid),
-        .s_rready(mem_rready),
-        .s_rdata(mem_rdata),
-        .s_rresp(mem_rresp),
-        .s_awvalid(mem_awvalid),
-        .s_awready(mem_awready),
-        .s_awaddr(mem_awaddr),
-        .s_wvalid(mem_wvalid),
-        .s_wready(mem_wready),
-        .s_wdata(mem_wdata),
-        .s_wmask(mem_wmask),
-        .s_bvalid(mem_bvalid),
-        .s_bready(mem_bready),
-        .s_bresp(mem_bresp)
-    );
-
-    // 实例化统一内存模块
-    MEM u_mem (
-        .clk(clk),
-        .reset(reset_sync),
-        .mem_arvalid(mem_arvalid),
-        .mem_arready(mem_arready),
-        .mem_araddr(mem_araddr),
-        .mem_rvalid(mem_rvalid),
-        .mem_rready(mem_rready),
-        .mem_rdata(mem_rdata),
-        .mem_rresp(mem_rresp),
-        .mem_awvalid(mem_awvalid),
-        .mem_awready(mem_awready),
-        .mem_awaddr(mem_awaddr),
-        .mem_wvalid(mem_wvalid),
-        .mem_wready(mem_wready),
-        .mem_wdata(mem_wdata),
-        .mem_wmask(mem_wmask),
-        .mem_bvalid(mem_bvalid),
-        .mem_bready(mem_bready),
-        .mem_bresp(mem_bresp)
-    );
-
     IFU u_ifu (
         .clk(clk),
         .reset(reset_sync),
@@ -167,21 +63,7 @@ module top (
         .pc(pc),
         .snpc(snpc),
         .dnpc(dnpc),
-        .ifu_error(ifu_error),
-        // IMEM接口
-        .imem_arvalid(imem_arvalid),
-        .imem_arready(imem_arready),
-        .imem_araddr(imem_araddr),
-        .imem_rvalid(imem_rvalid),
-        .imem_rready(imem_rready),
-        .imem_rdata(imem_rdata),
-        .imem_rresp(imem_rresp),
-        .imem_awvalid(imem_awvalid),
-        .imem_awaddr(imem_awaddr),
-        .imem_wvalid(imem_wvalid),
-        .imem_wdata(imem_wdata),
-        .imem_wmask(imem_wmask),
-        .imem_bready(imem_bready)
+        .ifu_error(ifu_error)
     );
 
     // IDU：负责指令解码
@@ -282,25 +164,7 @@ module top (
         .lsu_resp_valid(lsu_resp_valid),
         .lsu_resp_ready(gpr_req_ready && csr_req_ready),
         .lsu_rdata(lsu_rdata),
-        .lsu_error(lsu_error),
-        // DMEM接口
-        .dmem_arvalid(dmem_arvalid),
-        .dmem_arready(dmem_arready),
-        .dmem_araddr(dmem_araddr),
-        .dmem_rvalid(dmem_rvalid),
-        .dmem_rready(dmem_rready),
-        .dmem_rdata(dmem_rdata),
-        .dmem_rresp(dmem_rresp),
-        .dmem_awvalid(dmem_awvalid),
-        .dmem_awready(dmem_awready),
-        .dmem_awaddr(dmem_awaddr),
-        .dmem_wvalid(dmem_wvalid),
-        .dmem_wready(dmem_wready),
-        .dmem_wdata(dmem_wdata),
-        .dmem_wmask(dmem_wmask),
-        .dmem_bvalid(dmem_bvalid),
-        .dmem_bready(dmem_bready),
-        .dmem_bresp(dmem_bresp)
+        .lsu_error(lsu_error)
     );
 
     // WBU：负责写回GPR
@@ -333,64 +197,77 @@ module IFU (
     output logic [31:0] pc,
     output logic [31:0] snpc,
     output logic [31:0] dnpc,
-    output logic        ifu_error,
-    // IMEM接口
-    output logic        imem_arvalid,
-    input               imem_arready,
-    output logic [31:0] imem_araddr,
-    input               imem_rvalid,
-    output logic        imem_rready,
-    input        [31:0] imem_rdata,
-    input               imem_rresp,
-    output logic        imem_awvalid,
-    output logic [31:0] imem_awaddr,
-    output logic        imem_wvalid,
-    output logic [31:0] imem_wdata,
-    output logic [ 7:0] imem_wmask,
-    output logic        imem_bready
+    output logic        ifu_error
 );
+    typedef enum logic [1:0] {
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
+
+    always @(posedge clk) begin
+        if (reset) state <= IDLE;
+        else state <= next_state;
+    end
+
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
+    end
+
+    logic random_bit0, random_bit1;
+    lfsr8 #(
+        .TAPS(8'b10101010)
+    ) u_ifu_req_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit0)
+    );
+    lfsr8 #(
+        .TAPS(8'b10111010)
+    ) u_ifu_resp_lfsr (
+        .clk  (clk),
+        .reset(reset),
+        .en   (1'b1),
+        .out  (random_bit1)
+    );
+
+    assign ifu_resp_valid  = state == RESP;
+    assign ifu_req_ready   = state == IDLE && random_bit0;
+    assign resp_data_ready = random_bit1;
+    assign req_fire        = ifu_req_valid && ifu_req_ready;
+    assign resp_fire       = ifu_resp_valid && ifu_resp_ready;
+
+    // DPI 接口：从内存读取指令并上报 instruction + next pc
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    import "DPI-C" function void update_inst_npc(
+        input int inst,
+        input int dnpc
+    );
+
+    localparam int RESET_PC = 32'h80000000;
+    // PC 寄存器更新
+    always_ff @(posedge clk) begin
+        if (reset) pc <= RESET_PC - 4;
+        else if (state != RESP && next_state == RESP) pc <= dnpc;
+    end
 
     // snpc / dnpc 选择逻辑
     assign snpc = pc + 4;
     assign dnpc = jump_en ? jump_target : snpc;
 
-    // IMEM访问控制 - 只使用读通道
-    assign imem_araddr = dnpc;
-    assign imem_arvalid = ifu_req_valid;
-    assign imem_rready = ifu_resp_ready;
-
-    // 写通道全部置为无效
-    assign imem_awvalid = 1'b0;
-    assign imem_awaddr = 32'h0;
-    assign imem_wvalid = 1'b0;
-    assign imem_wdata = 32'h0;
-    assign imem_wmask = 8'h0;
-    assign imem_bready = 1'b0;
-
-    assign ifu_req_ready = imem_arready;
-    always @(posedge clk) ifu_resp_valid <= imem_rvalid;
-    always @(posedge clk) begin
-        if (reset) begin
-            ifu_rdata <= 32'h0;
-            ifu_error <= 1'b0;
-        end else if (imem_rvalid) begin
-            ifu_rdata <= imem_rdata;
-            ifu_error <= imem_rresp;
-        end
-    end
-
-    import "DPI-C" function void update_inst_npc(
-        input int inst,
-        input int dnpc
-    );
-    localparam int RESET_PC = 32'h80000000;
-
-    // PC 寄存器更新 - 握手成功时更新
-    always_ff @(posedge clk) begin
-        if (reset) pc <= RESET_PC - 4;
-        else if (ifu_req_valid && ifu_req_ready) pc <= dnpc;
-    end
+    // 指令读取逻辑
+    always @(posedge clk) if (state != RESP && next_state == RESP) ifu_rdata <= pmem_read_npc(dnpc);
     always_comb if (ifu_resp_valid) update_inst_npc(ifu_rdata, dnpc);
+
+    assign ifu_error = 0;  // 赋值为0
 
 endmodule
 
@@ -518,8 +395,8 @@ module GPR (
             for (int i = 0; i < 32; i++) regfile[i] <= 32'h0;  // 复位时清零所有寄存器
         end else if (gpr_wen && state != RESP && next_state == RESP) begin  // 修改：添加valid条件
             regfile[gpr_waddr] <= gpr_wdata;
-            write_gpr_npc(gpr_waddr, gpr_wdata);
         end
+        // write_gpr_npc(waddr, wdata);  // 更新DPI-C接口寄存器
     end
 
 
@@ -527,9 +404,9 @@ module GPR (
         input logic [ 4:0] idx,
         input logic [31:0] data
     );
-    // always_comb begin
-    //     if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
-    // end
+    always_comb begin
+        if (gpr_wen && state != RESP && next_state == RESP) write_gpr_npc(gpr_waddr, gpr_wdata);
+    end
 
     always_comb begin
         gpr_rdata1 = (gpr_raddr1 == 5'b0) ? 32'h0 : regfile[gpr_raddr1];
@@ -832,110 +709,58 @@ module lfsr8 #(
 endmodule
 
 
-// MEM(Memory) 负责统一内存的读写访问
-module MEM (
+// PMEM(Physical Memory) 负责物理内存的读写访问
+module PMEM (
     input               clk,
     input               reset,
-    // 读地址通道(AR)
-    input               mem_arvalid,
-    output logic        mem_arready,
-    input        [31:0] mem_araddr,
-    // 读数据通道(R)
-    output logic        mem_rvalid,
-    input               mem_rready,
-    output logic [31:0] mem_rdata,
-    output logic        mem_rresp,
-    // 写地址通道(AW)
-    input               mem_awvalid,
-    output logic        mem_awready,
-    input        [31:0] mem_awaddr,
-    // 写数据通道(W)
-    input               mem_wvalid,
-    output logic        mem_wready,
-    input        [31:0] mem_wdata,
-    input        [ 7:0] mem_wmask,
-    // 写回复通道(B)
-    output logic        mem_bvalid,
-    input               mem_bready,
-    output logic        mem_bresp
+    input               pmem_req_valid,
+    output logic        pmem_req_ready,
+    input        [31:0] pmem_addr,
+    input               pmem_wen,
+    input        [31:0] pmem_wdata,
+    input        [ 7:0] pmem_wmask,
+    output logic        pmem_resp_valid,
+    input               pmem_resp_ready,
+    output logic [31:0] pmem_rdata,
+    output logic        pmem_error
 );
-    // 读通道状态机
     typedef enum logic [1:0] {
-        RD_IDLE,
-        RD_WAIT,
-        RD_RESP
-    } rd_state_t;
-    rd_state_t rd_state, rd_next_state;
+        IDLE,
+        WAIT,
+        RESP
+    } state_t;
+    state_t state, next_state;
 
-    // 写通道状态机
-    typedef enum logic [1:0] {
-        WR_IDLE,
-        WR_WAIT,
-        WR_RESP
-    } wr_state_t;
-    wr_state_t wr_state, wr_next_state;
-
-    // 读通道状态更新
     always @(posedge clk) begin
-        if (reset) rd_state <= RD_IDLE;
-        else rd_state <= rd_next_state;
+        if (reset) state <= IDLE;
+        else state <= next_state;
     end
 
-    // 写通道状态更新
-    always @(posedge clk) begin
-        if (reset) wr_state <= WR_IDLE;
-        else wr_state <= wr_next_state;
+    logic resp_data_ready, req_fire, resp_fire;
+    always_comb begin
+        unique case (state)
+            IDLE: next_state = req_fire ? (resp_data_ready ? RESP : WAIT) : IDLE;
+            WAIT: next_state = resp_data_ready ? RESP : WAIT;
+            RESP: next_state = resp_fire ? IDLE : RESP;
+            default: next_state = IDLE;
+        endcase
     end
 
-    logic rd_resp_ready, wr_resp_ready;
     logic random_bit;
-
-    // 随机延迟生成器
     lfsr8 #(
         .TAPS(8'b01010110)
-    ) u_rd_resp_lfsr (
+    ) u_pmem_resp_lfsr (
         .clk  (clk),
         .reset(reset),
         .en   (1'b1),
         .out  (random_bit)
     );
 
-    assign rd_resp_ready = random_bit;
-    assign wr_resp_ready = random_bit;
-
-    // 读通道状态机
-    always_comb begin
-        unique case (rd_state)
-            RD_IDLE: begin
-                rd_next_state = (mem_arvalid && mem_arready) ? (rd_resp_ready ? RD_RESP : RD_WAIT) : RD_IDLE;
-            end
-            RD_WAIT: rd_next_state = rd_resp_ready ? RD_RESP : RD_WAIT;
-            RD_RESP: rd_next_state = (mem_rvalid && mem_rready) ? RD_IDLE : RD_RESP;
-            default: rd_next_state = RD_IDLE;
-        endcase
-    end
-
-    // 写通道状态机
-    always_comb begin
-        unique case (wr_state)
-            WR_IDLE: begin
-                wr_next_state = (mem_awvalid && mem_awready && mem_wvalid && mem_wready) ?
-                                (wr_resp_ready ? WR_RESP : WR_WAIT) : WR_IDLE;
-            end
-            WR_WAIT: wr_next_state = wr_resp_ready ? WR_RESP : WR_WAIT;
-            WR_RESP: wr_next_state = (mem_bvalid && mem_bready) ? WR_IDLE : WR_RESP;
-            default: wr_next_state = WR_IDLE;
-        endcase
-    end
-
-    // 读通道握手信号
-    assign mem_arready = (rd_state == RD_IDLE);
-    assign mem_rvalid  = (rd_state == RD_RESP);
-
-    // 写通道握手信号
-    assign mem_awready = (wr_state == WR_IDLE);
-    assign mem_wready  = (wr_state == WR_IDLE);
-    assign mem_bvalid  = (wr_state == WR_RESP);
+    assign pmem_resp_valid = state == RESP;
+    assign pmem_req_ready  = state == IDLE;
+    assign resp_data_ready = random_bit;
+    assign req_fire        = pmem_req_valid && pmem_req_ready;
+    assign resp_fire       = pmem_resp_valid && pmem_resp_ready;
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -944,18 +769,14 @@ module MEM (
         input byte wmask
     );
 
-    // 读事务处理
     always @(posedge clk) begin
-        if (mem_arvalid && mem_arready) mem_rdata <= pmem_read_npc(mem_araddr);
+        if (state != RESP && next_state == RESP) begin
+            if (pmem_wen) pmem_write_npc(pmem_addr, pmem_wdata, pmem_wmask);
+            else pmem_rdata <= pmem_read_npc(pmem_addr);
+        end
     end
 
-    // 写事务处理
-    always @(posedge clk) begin
-        if (mem_wvalid && mem_wready) pmem_write_npc(mem_awaddr, mem_wdata, mem_wmask);
-    end
-
-    assign mem_rresp = 0;
-    assign mem_bresp = 0;
+    assign pmem_error = 0;
 
 endmodule
 
@@ -974,56 +795,58 @@ module LSU (
     output logic         lsu_resp_valid,
     input                lsu_resp_ready,
     output logic  [31:0] lsu_rdata,
-    output logic         lsu_error,
-    // DMEM接口
-    output logic         dmem_arvalid,
-    input                dmem_arready,
-    output logic  [31:0] dmem_araddr,
-    input                dmem_rvalid,
-    output logic         dmem_rready,
-    input         [31:0] dmem_rdata,
-    input                dmem_rresp,
-    output logic         dmem_awvalid,
-    input                dmem_awready,
-    output logic  [31:0] dmem_awaddr,
-    output logic         dmem_wvalid,
-    input                dmem_wready,
-    output logic  [31:0] dmem_wdata,
-    output logic  [ 7:0] dmem_wmask,
-    input                dmem_bvalid,
-    output logic         dmem_bready,
-    input                dmem_bresp
+    output logic         lsu_error
 );
     import "DPI-C" function void NPCINV(input int pc);
 
-    // LSU根据指令决定是否访问DMEM
-    logic dmem_ren, dmem_wen;
-    assign dmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
-    assign dmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
+    // PMEM接口信号
+    logic pmem_req_valid, pmem_req_ready;
+    logic pmem_wen;
+    logic [31:0] pmem_addr, pmem_wdata, pmem_rdata;
+    logic [7:0] pmem_wmask;
+    logic pmem_resp_valid, pmem_resp_ready;
+    logic pmem_error;
 
-    assign dmem_araddr = alu_result;
-    assign dmem_awaddr = alu_result;
-    assign dmem_wdata = gpr_rdata2;
-    assign dmem_arvalid = lsu_req_valid && dmem_ren;
-    assign dmem_awvalid = lsu_req_valid && dmem_wen;
-    assign dmem_wvalid = lsu_req_valid && dmem_wen;
-    assign dmem_rready = lsu_resp_ready;
-    assign dmem_bready = lsu_resp_ready;
+    // 实例化PMEM模块
+    PMEM u_pmem (
+        .clk            (clk),
+        .reset          (reset),
+        .pmem_req_valid (pmem_req_valid),
+        .pmem_req_ready (pmem_req_ready),
+        .pmem_addr      (pmem_addr),
+        .pmem_wen       (pmem_wen),
+        .pmem_wdata     (pmem_wdata),
+        .pmem_wmask     (pmem_wmask),
+        .pmem_resp_valid(pmem_resp_valid),
+        .pmem_resp_ready(pmem_resp_ready),
+        .pmem_rdata     (pmem_rdata),
+        .pmem_error     (pmem_error)
+    );
+
+    // LSU根据指令决定是否访问PMEM
+    logic pmem_req, pmem_ren;
+    assign pmem_ren        = (inst_type == TYPE_I && opcode == 7'b0000011);
+    assign pmem_wen        = (inst_type == TYPE_S && opcode == 7'b0100011);
+    assign pmem_req        = pmem_ren || pmem_wen;
+
+    assign pmem_addr       = alu_result;
+    assign pmem_wdata      = gpr_rdata2;
+    assign pmem_req_valid  = lsu_req_valid && pmem_req;
+    assign pmem_resp_ready = lsu_resp_ready;
 
     // LSU握手逻辑
-    assign lsu_req_ready = dmem_ren ? dmem_arready : (dmem_wen ? (dmem_awready && dmem_wready) : 1'b1);
-    // assign lsu_req_ready = 1'b1;
-    assign lsu_resp_valid = dmem_ren ? dmem_rvalid : (dmem_wen ? dmem_bvalid : lsu_req_valid);
+    assign lsu_req_ready   = pmem_req ? pmem_req_ready : 1'b1;
+    assign lsu_resp_valid  = pmem_req ? pmem_resp_valid : lsu_req_valid;
 
     // 写掩码生成
     always_comb begin
         unique case (funct3)
-            3'b000: dmem_wmask = 8'h1;  // SB
-            3'b001: dmem_wmask = 8'h3;  // SH
-            3'b010: dmem_wmask = 8'hF;  // SW
+            3'b000: pmem_wmask = 8'h1;  // SB
+            3'b001: pmem_wmask = 8'h3;  // SH
+            3'b010: pmem_wmask = 8'hF;  // SW
             default: begin
-                dmem_wmask = 8'h0;
-                if (dmem_wen) NPCINV(pc);
+                pmem_wmask = 8'h0;
+                if (pmem_wen) NPCINV(pc);
             end
         endcase
     end
@@ -1031,19 +854,19 @@ module LSU (
     // 读数据扩展
     always_comb begin
         unique case (funct3)
-            3'b000: lsu_rdata = {{24{dmem_rdata[7]}}, dmem_rdata[7:0]};  // LB
-            3'b010: lsu_rdata = dmem_rdata;  // LW
-            3'b001: lsu_rdata = {{16{dmem_rdata[15]}}, dmem_rdata[15:0]};  // LH
-            3'b101: lsu_rdata = {16'b0, dmem_rdata[15:0]};  // LHU
-            3'b100: lsu_rdata = {24'b0, dmem_rdata[7:0]};  // LBU
+            3'b000: lsu_rdata = {{24{pmem_rdata[7]}}, pmem_rdata[7:0]};  // LB
+            3'b010: lsu_rdata = pmem_rdata;  // LW
+            3'b001: lsu_rdata = {{16{pmem_rdata[15]}}, pmem_rdata[15:0]};  // LH
+            3'b101: lsu_rdata = {16'b0, pmem_rdata[15:0]};  // LHU
+            3'b100: lsu_rdata = {24'b0, pmem_rdata[7:0]};  // LBU
             default: begin
                 lsu_rdata = 32'h0;
-                if (dmem_ren) NPCINV(pc);
+                if (pmem_ren) NPCINV(pc);
             end
         endcase
     end
 
-    assign lsu_error = dmem_rresp | dmem_bresp;
+    assign lsu_error = pmem_error;
 
 endmodule
 
