@@ -1016,8 +1016,8 @@ module LSU (
     assign dmem_bready = lsu_resp_ready;
 
     // LSU握手逻辑
-    assign lsu_req_ready = dmem_ren ? dmem_arready : (dmem_wen ? (dmem_awready && dmem_wready) : 1'b1);
-    // assign lsu_req_ready = 1'b1;
+    // assign lsu_req_ready = dmem_ren ? dmem_arready : (dmem_wen ? (dmem_awready && dmem_wready) : 1'b1);
+    assign lsu_req_ready = 1'b1;
     assign lsu_resp_valid = dmem_ren ? dmem_rvalid : (dmem_wen ? dmem_bvalid : lsu_req_valid);
 
     // 写掩码生成
