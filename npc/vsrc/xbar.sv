@@ -1,84 +1,18 @@
 /* verilator lint_off DECLFILENAME */
 
-// AXI4-Lite Crossbar (1 master to 2 slaves)
+// AXI4-Lite Crossbar (1 master to n slaves)
 // 根据地址范围选择从设备
+import axi_lite_if::*;
 module xbar #(
-    parameter int SLAVE0_BASE = 32'ha00003f8,  // 串口位置
-    parameter int SLAVE0_SIZE = 32'h00000004,  // 4B
-    parameter int SLAVE1_BASE = 32'h80000000,
-    parameter int SLAVE1_SIZE = 32'h08000000   // 128MB
+    parameter int SLAVE_NUM = 2,
+    // 地址范围数组
+    parameter logic [31:0] SLAVE_BASE[SLAVE_NUM] = '{32'ha00003f8, 32'h80000000},
+    parameter logic [31:0] SLAVE_SIZE[SLAVE_NUM] = '{32'h00000004, 32'h08000000}
 ) (
-    input clk,
-    input reset,
-
-    // Master接口 - 读地址通道(AR)
-    input               m_arvalid,
-    output logic        m_arready,
-    input        [31:0] m_araddr,
-    // Master接口 - 读数据通道(R)
-    output logic        m_rvalid,
-    input               m_rready,
-    output logic [31:0] m_rdata,
-    output logic        m_rresp,
-    // Master接口 - 写地址通道(AW)
-    input               m_awvalid,
-    output logic        m_awready,
-    input        [31:0] m_awaddr,
-    // Master接口 - 写数据通道(W)
-    input               m_wvalid,
-    output logic        m_wready,
-    input        [31:0] m_wdata,
-    input        [ 7:0] m_wmask,
-    // Master接口 - 写回复通道(B)
-    output logic        m_bvalid,
-    input               m_bready,
-    output logic        m_bresp,
-
-    // Slave0接口 - 读地址通道(AR)
-    output logic        s0_arvalid,
-    input               s0_arready,
-    output logic [31:0] s0_araddr,
-    // Slave0接口 - 读数据通道(R)
-    input               s0_rvalid,
-    output logic        s0_rready,
-    input        [31:0] s0_rdata,
-    input               s0_rresp,
-    // Slave0接口 - 写地址通道(AW)
-    output logic        s0_awvalid,
-    input               s0_awready,
-    output logic [31:0] s0_awaddr,
-    // Slave0接口 - 写数据通道(W)
-    output logic        s0_wvalid,
-    input               s0_wready,
-    output logic [31:0] s0_wdata,
-    output logic [ 7:0] s0_wmask,
-    // Slave0接口 - 写回复通道(B)
-    input               s0_bvalid,
-    output logic        s0_bready,
-    input               s0_bresp,
-
-    // Slave1接口 - 读地址通道(AR)
-    output logic        s1_arvalid,
-    input               s1_arready,
-    output logic [31:0] s1_araddr,
-    // Slave1接口 - 读数据通道(R)
-    input               s1_rvalid,
-    output logic        s1_rready,
-    input        [31:0] s1_rdata,
-    input               s1_rresp,
-    // Slave1接口 - 写地址通道(AW)
-    output logic        s1_awvalid,
-    input               s1_awready,
-    output logic [31:0] s1_awaddr,
-    // Slave1接口 - 写数据通道(W)
-    output logic        s1_wvalid,
-    input               s1_wready,
-    output logic [31:0] s1_wdata,
-    output logic [ 7:0] s1_wmask,
-    // Slave1接口 - 写回复通道(B)
-    input               s1_bvalid,
-    output logic        s1_bready,
-    input               s1_bresp
+    input logic         clk,
+    input logic         reset,
+          axi_if.slave  m,                // 1 个 Master (从crossbar角度看是slave接口)
+          axi_if.master s    [SLAVE_NUM]  // n 个 Slave (从crossbar角度看是master接口)
 );
 
     // 定义读状态枚举
@@ -99,22 +33,29 @@ module xbar #(
 
     wr_state_t wr_state, next_wr_state;
 
-    // 地址匹配逻辑
-    logic sel_slave0_ar, sel_slave1_ar;
-    logic sel_slave0_aw, sel_slave1_aw;
+    // 地址匹配逻辑 - 参数化
+    logic [SLAVE_NUM-1:0] sel_slave_ar;
+    logic [SLAVE_NUM-1:0] sel_slave_aw;
     logic addr_err_ar, addr_err_aw;
 
-    assign sel_slave0_ar = (m_araddr >= SLAVE0_BASE) && (m_araddr < (SLAVE0_BASE + SLAVE0_SIZE));
-    assign sel_slave1_ar = (m_araddr >= SLAVE1_BASE) && (m_araddr < (SLAVE1_BASE + SLAVE1_SIZE));
-    assign addr_err_ar   = !(sel_slave0_ar || sel_slave1_ar);
 
-    assign sel_slave0_aw = (m_awaddr >= SLAVE0_BASE) && (m_awaddr < (SLAVE0_BASE + SLAVE0_SIZE));
-    assign sel_slave1_aw = (m_awaddr >= SLAVE1_BASE) && (m_awaddr < (SLAVE1_BASE + SLAVE1_SIZE));
-    assign addr_err_aw   = !(sel_slave0_aw || sel_slave1_aw);
+    // 地址匹配 - 使用循环
+    always_comb begin
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            sel_slave_ar[i] = (m.araddr >= SLAVE_BASE[i]) &&
+                             (m.araddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
+            sel_slave_aw[i] = (m.awaddr >= SLAVE_BASE[i]) &&
+                             (m.awaddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
+        end
+        addr_err_ar = !(|sel_slave_ar);
+        addr_err_aw = !(|sel_slave_aw);
+    end
 
-    // 保存路由选择
-    logic rd_sel_slave0, rd_sel_slave1, rd_addr_err;
-    logic wr_sel_slave0, wr_sel_slave1, wr_addr_err;
+    // 保存路由选择 - 参数化
+    logic [SLAVE_NUM-1:0] rd_sel_slave;
+    logic [SLAVE_NUM-1:0] wr_sel_slave;
+    logic rd_addr_err;
+    logic wr_addr_err;
 
     // 状态机更新逻辑
     always_ff @(posedge clk) begin
@@ -130,9 +71,9 @@ module xbar #(
     // 读状态机next逻辑
     always_comb begin
         unique case (rd_state)
-            IDLE_RD:  next_rd_state = (m_arvalid && m_arready) ? ROUTE_RD : IDLE_RD;
+            IDLE_RD:  next_rd_state = (m.arvalid && m.arready) ? ROUTE_RD : IDLE_RD;
             ROUTE_RD: next_rd_state = DATA_RD;
-            DATA_RD:  next_rd_state = (m_rvalid && m_rready) ? IDLE_RD : DATA_RD;
+            DATA_RD:  next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : DATA_RD;
             default:  next_rd_state = IDLE_RD;
         endcase
     end
@@ -140,9 +81,9 @@ module xbar #(
     // 写状态机next逻辑
     always_comb begin
         unique case (wr_state)
-            IDLE_WR:  next_wr_state = (m_awvalid && m_awready) ? ROUTE_WR : IDLE_WR;
-            ROUTE_WR: next_wr_state = (m_wvalid && m_wready) ? RESP_WR : ROUTE_WR;
-            RESP_WR:  next_wr_state = (m_bvalid && m_bready) ? IDLE_WR : RESP_WR;
+            IDLE_WR:  next_wr_state = (m.awvalid && m.awready) ? ROUTE_WR : IDLE_WR;
+            ROUTE_WR: next_wr_state = (m.wvalid && m.wready) ? RESP_WR : ROUTE_WR;
+            RESP_WR:  next_wr_state = (m.bvalid && m.bready) ? IDLE_WR : RESP_WR;
             default:  next_wr_state = IDLE_WR;
         endcase
     end
@@ -150,98 +91,108 @@ module xbar #(
     // 保存读路由选择
     always_ff @(posedge clk) begin
         if (reset) begin
-            rd_sel_slave0 <= 1'b0;
-            rd_sel_slave1 <= 1'b0;
-            rd_addr_err   <= 1'b0;
-        end else if (m_arvalid && m_arready) begin
-            rd_sel_slave0 <= sel_slave0_ar;
-            rd_sel_slave1 <= sel_slave1_ar;
-            rd_addr_err   <= addr_err_ar;
+            rd_sel_slave <= '0;
+            rd_addr_err  <= 1'b0;
+        end else if (m.arvalid && m.arready) begin
+            rd_sel_slave <= sel_slave_ar;
+            rd_addr_err  <= addr_err_ar;
         end
     end
 
     // 保存写路由选择
     always_ff @(posedge clk) begin
         if (reset) begin
-            wr_sel_slave0 <= 1'b0;
-            wr_sel_slave1 <= 1'b0;
-            wr_addr_err   <= 1'b0;
-        end else if (m_awvalid && m_awready) begin
-            wr_sel_slave0 <= sel_slave0_aw;
-            wr_sel_slave1 <= sel_slave1_aw;
-            wr_addr_err   <= addr_err_aw;
+            wr_sel_slave <= '0;
+            wr_addr_err  <= 1'b0;
+        end else if (m.awvalid && m.awready) begin
+            wr_sel_slave <= sel_slave_aw;
+            wr_addr_err  <= addr_err_aw;
         end
     end
 
-    // Master读地址通道
-    assign m_arready = (rd_state == IDLE_RD) && 
-                       ((sel_slave0_ar && s0_arready) || 
-                        (sel_slave1_ar && s1_arready) || 
-                        addr_err_ar);
+    // Master读地址通道 - 参数化
+    logic any_slave_ar_ready;
+    always_comb begin
+        any_slave_ar_ready = 1'b0;
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            any_slave_ar_ready |= (sel_slave_ar[i] && s[i].arready);
+        end
+    end
+    assign m.arready = (rd_state == IDLE_RD) && (any_slave_ar_ready || addr_err_ar);
 
-    // Master读数据通道
-    assign m_rvalid = (rd_state == DATA_RD) && 
-                      ((rd_sel_slave0 && s0_rvalid) || 
-                       (rd_sel_slave1 && s1_rvalid) || 
-                       rd_addr_err);
-    assign m_rdata = rd_sel_slave0 ? s0_rdata : rd_sel_slave1 ? s1_rdata : 32'h0;
-    assign m_rresp = rd_sel_slave0 ? s0_rresp : rd_sel_slave1 ? s1_rresp : 1'b1;
+    // Master读数据通道 - 参数化
+    logic any_slave_r_valid;
+    always_comb begin
+        any_slave_r_valid = 1'b0;
+        m.rdata = 32'h0;
+        m.rresp = 1'b1;
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            any_slave_r_valid |= (rd_sel_slave[i] && s[i].rvalid);
+            if (rd_sel_slave[i]) begin
+                m.rdata = s[i].rdata;
+                m.rresp = s[i].rresp;
+            end
+        end
+    end
+    assign m.rvalid = (rd_state == DATA_RD) && (any_slave_r_valid || rd_addr_err);
 
-    // Master写地址通道
-    assign m_awready = (wr_state == IDLE_WR) && 
-                       ((sel_slave0_aw && s0_awready) || 
-                        (sel_slave1_aw && s1_awready) || 
-                        addr_err_aw);
+    // Master写地址通道 - 参数化
+    logic any_slave_aw_ready;
+    always_comb begin
+        any_slave_aw_ready = 1'b0;
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            any_slave_aw_ready |= (sel_slave_aw[i] && s[i].awready);
+        end
+    end
+    assign m.awready = (wr_state == IDLE_WR) && (any_slave_aw_ready || addr_err_aw);
 
-    // Master写数据通道
-    assign m_wready = (wr_state == ROUTE_WR) && 
-                      ((wr_sel_slave0 && s0_wready) || 
-                       (wr_sel_slave1 && s1_wready) || 
-                       wr_addr_err);
+    // Master写数据通道 - 参数化
+    logic any_slave_w_ready;
+    always_comb begin
+        any_slave_w_ready = 1'b0;
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            any_slave_w_ready |= (wr_sel_slave[i] && s[i].wready);
+        end
+    end
+    assign m.wready = (wr_state == ROUTE_WR) && (any_slave_w_ready || wr_addr_err);
 
-    // Master写回复通道
-    assign m_bvalid = (wr_state == RESP_WR) && 
-                      ((wr_sel_slave0 && s0_bvalid) || 
-                       (wr_sel_slave1 && s1_bvalid) || 
-                       wr_addr_err);
-    assign m_bresp = wr_sel_slave0 ? s0_bresp : wr_sel_slave1 ? s1_bresp : 1'b1;
+    // Master写回复通道 - 参数化
+    logic any_slave_b_valid;
+    always_comb begin
+        any_slave_b_valid = 1'b0;
+        m.bresp = 1'b1;
+        for (int i = 0; i < SLAVE_NUM; i++) begin
+            any_slave_b_valid |= (wr_sel_slave[i] && s[i].bvalid);
+            if (wr_sel_slave[i]) begin
+                m.bresp = s[i].bresp;
+            end
+        end
+    end
+    assign m.bvalid = (wr_state == RESP_WR) && (any_slave_b_valid || wr_addr_err);
 
-    // Slave0读地址通道
-    assign s0_arvalid = (rd_state == IDLE_RD) && m_arvalid && sel_slave0_ar;
-    assign s0_araddr = m_araddr;
+    // Slave接口 - 参数化
+    genvar i;
+    generate
+        for (i = 0; i < SLAVE_NUM; i++) begin : slave_gen
+            // 读地址通道
+            assign s[i].arvalid = (rd_state == IDLE_RD) && m.arvalid && sel_slave_ar[i];
+            assign s[i].araddr  = m.araddr;
 
-    // Slave0读数据通道
-    assign s0_rready = (rd_state == DATA_RD) && m_rready && rd_sel_slave0;
+            // 读数据通道
+            assign s[i].rready  = (rd_state == DATA_RD) && m.rready && rd_sel_slave[i];
 
-    // Slave0写地址通道
-    assign s0_awvalid = (wr_state == IDLE_WR) && m_awvalid && sel_slave0_aw;
-    assign s0_awaddr = m_awaddr;
+            // 写地址通道
+            assign s[i].awvalid = (wr_state == IDLE_WR) && m.awvalid && sel_slave_aw[i];
+            assign s[i].awaddr  = m.awaddr;
 
-    // Slave0写数据通道
-    assign s0_wvalid = (wr_state == ROUTE_WR) && m_wvalid && wr_sel_slave0;
-    assign s0_wdata = m_wdata;
-    assign s0_wmask = m_wmask;
+            // 写数据通道
+            assign s[i].wvalid  = (wr_state == ROUTE_WR) && m.wvalid && wr_sel_slave[i];
+            assign s[i].wdata   = m.wdata;
+            assign s[i].wmask   = m.wmask;
 
-    // Slave0写回复通道
-    assign s0_bready = (wr_state == RESP_WR) && m_bready && wr_sel_slave0;
-
-    // Slave1读地址通道
-    assign s1_arvalid = (rd_state == IDLE_RD) && m_arvalid && sel_slave1_ar;
-    assign s1_araddr = m_araddr;
-
-    // Slave1读数据通道
-    assign s1_rready = (rd_state == DATA_RD) && m_rready && rd_sel_slave1;
-
-    // Slave1写地址通道
-    assign s1_awvalid = (wr_state == IDLE_WR) && m_awvalid && sel_slave1_aw;
-    assign s1_awaddr = m_awaddr;
-
-    // Slave1写数据通道
-    assign s1_wvalid = (wr_state == ROUTE_WR) && m_wvalid && wr_sel_slave1;
-    assign s1_wdata = m_wdata;
-    assign s1_wmask = m_wmask;
-
-    // Slave1写回复通道
-    assign s1_bready = (wr_state == RESP_WR) && m_bready && wr_sel_slave1;
+            // 写回复通道
+            assign s[i].bready  = (wr_state == RESP_WR) && m.bready && wr_sel_slave[i];
+        end
+    endgenerate
 
 endmodule
