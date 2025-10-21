@@ -27,7 +27,7 @@ module xbar #(
     rd_state_t rd_state, next_rd_state;
 
     // 定义写状态枚举
-    typedef enum logic {
+    typedef enum logic [2:0]{
         IDLE_WR,
         S0_WR,
         S0_AWR,
