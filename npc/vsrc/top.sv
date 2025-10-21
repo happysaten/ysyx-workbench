@@ -171,17 +171,17 @@ module top (
         // IMEM接口
         .imem_arvalid(imem_arvalid),
         .imem_arready(imem_arready),
-        .imem_araddr (imem_araddr),
-        .imem_rvalid (imem_rvalid),
-        .imem_rready (imem_rready),
-        .imem_rdata  (imem_rdata),
-        .imem_rresp  (imem_rresp),
+        .imem_araddr(imem_araddr),
+        .imem_rvalid(imem_rvalid),
+        .imem_rready(imem_rready),
+        .imem_rdata(imem_rdata),
+        .imem_rresp(imem_rresp),
         .imem_awvalid(imem_awvalid),
-        .imem_awaddr (imem_awaddr),
-        .imem_wvalid (imem_wvalid),
-        .imem_wdata  (imem_wdata),
-        .imem_wmask  (imem_wmask),
-        .imem_bready (imem_bready)
+        .imem_awaddr(imem_awaddr),
+        .imem_wvalid(imem_wvalid),
+        .imem_wdata(imem_wdata),
+        .imem_wmask(imem_wmask),
+        .imem_bready(imem_bready)
     );
 
     // IDU：负责指令解码
@@ -286,21 +286,21 @@ module top (
         // DMEM接口
         .dmem_arvalid(dmem_arvalid),
         .dmem_arready(dmem_arready),
-        .dmem_araddr (dmem_araddr),
-        .dmem_rvalid (dmem_rvalid),
-        .dmem_rready (dmem_rready),
-        .dmem_rdata  (dmem_rdata),
-        .dmem_rresp  (dmem_rresp),
+        .dmem_araddr(dmem_araddr),
+        .dmem_rvalid(dmem_rvalid),
+        .dmem_rready(dmem_rready),
+        .dmem_rdata(dmem_rdata),
+        .dmem_rresp(dmem_rresp),
         .dmem_awvalid(dmem_awvalid),
         .dmem_awready(dmem_awready),
-        .dmem_awaddr (dmem_awaddr),
-        .dmem_wvalid (dmem_wvalid),
-        .dmem_wready (dmem_wready),
-        .dmem_wdata  (dmem_wdata),
-        .dmem_wmask  (dmem_wmask),
-        .dmem_bvalid (dmem_bvalid),
-        .dmem_bready (dmem_bready),
-        .dmem_bresp  (dmem_bresp)
+        .dmem_awaddr(dmem_awaddr),
+        .dmem_wvalid(dmem_wvalid),
+        .dmem_wready(dmem_wready),
+        .dmem_wdata(dmem_wdata),
+        .dmem_wmask(dmem_wmask),
+        .dmem_bvalid(dmem_bvalid),
+        .dmem_bready(dmem_bready),
+        .dmem_bresp(dmem_bresp)
     );
 
     // WBU：负责写回GPR
@@ -355,10 +355,10 @@ module IFU (
     assign dnpc = jump_en ? jump_target : snpc;
 
     // IMEM访问控制 - 只使用读通道
-    assign imem_araddr = pc;
+    assign imem_araddr = dnpc;
     assign imem_arvalid = ifu_req_valid;
     assign imem_rready = ifu_resp_ready;
-    
+
     // 写通道全部置为无效
     assign imem_awvalid = 1'b0;
     assign imem_awaddr = 32'h0;
@@ -911,12 +911,8 @@ module MEM (
     );
 
     always @(posedge clk) begin
-        if ((state == RWAIT && next_state == RRESP) || (state == IDLE && next_state == RRESP)) begin
-            mem_rdata <= pmem_read_npc(mem_araddr);
-        end
-        if ((state == WWAIT && next_state == WRESP) || (state == IDLE && next_state == WRESP)) begin
-            pmem_write_npc(mem_awaddr, mem_wdata, mem_wmask);
-        end
+        if (mem_arvalid && mem_arready) mem_rdata <= pmem_read_npc(mem_araddr);
+        if (mem_wvalid && mem_wready) pmem_write_npc(mem_awaddr, mem_wdata, mem_wmask);
     end
 
     assign mem_rresp = 0;
