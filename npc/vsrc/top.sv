@@ -83,7 +83,7 @@ module top (
         .clk  (clk),
         .reset(reset_sync),
         // .s    (uart_if.slave)
-        .s    (xbar_if.slave[0])
+        .s    (xbar_if[0].slave)
     );
 
     // 实例化统一内存模块
@@ -91,7 +91,7 @@ module top (
         .clk  (clk),
         .reset(reset_sync),
         // .s  (mem_if.slave)
-        .s(xbar_if.slave[1])
+        .s(xbar_if[1].slave)
     );
 
     IFU u_ifu (
