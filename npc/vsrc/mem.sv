@@ -2,7 +2,7 @@
 module MEM (
     input logic             clk,
     input logic             reset,
-          axi_lite_if.slave s     // 使用interface替代所有独立的AXI信号
+          axi_lite_if.slave s       // 使用interface替代所有独立的AXI信号
 );
     // 读通道状态机
     typedef enum logic [1:0] {

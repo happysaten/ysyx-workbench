@@ -100,6 +100,13 @@ module clint #(
                         addr_match_hi_reg ? mtime[63:32] : 32'h0) : 32'h0;
     assign s.rresp = (rd_state == WAIT_RRESP) && (!addr_match_ar) ? 2'b10 : 2'b00;  // SLVERR or OKAY
 
+    import "DPI-C" function int pmem_read_npc(input int raddr);
+    always_comb begin
+        if(rd_state == WAIT_RRESP) begin
+            pmem_read_npc(s.araddr);
+        end
+    end
+
     // 写地址通道
     assign s.awready = (wr_state == IDLE_WR);
 
