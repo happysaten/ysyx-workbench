@@ -101,7 +101,7 @@ module uart #(
         end else if (s.wvalid && s.wready) begin
             if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
                 serial_base <= s.wdata[7:0];
-                $write("%c", s.wdata[7:0]+1'b1);
+                $write("%c", s.wdata[7:0]);
             end
         end
     end
