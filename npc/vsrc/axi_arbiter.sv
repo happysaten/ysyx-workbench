@@ -20,9 +20,11 @@ module axi_arbiter (
     rd_state_t rd_state, next_rd_state;
 
     // 定义写状态枚举
-    typedef enum logic [1:0] {
+    typedef enum logic [2:0] {
         IDLE_WR,
+        M0_WAIT_WDATA,
         M0_WAIT_WRESP,
+        M1_WAIT_WDATA,
         M1_WAIT_WRESP
     } wr_state_t;
 
@@ -54,9 +56,11 @@ module axi_arbiter (
     always_comb begin
         unique case (wr_state)
             IDLE_WR:
-            next_wr_state = (m0.awvalid && m0.awready) ? M0_WAIT_WRESP :
-                           (m1.awvalid && m1.awready) ? M1_WAIT_WRESP : IDLE_WR;
+            next_wr_state = (m0.awvalid && m0.awready) ? (m0.wvalid && m0.wready ? M0_WAIT_WRESP : M0_WAIT_WDATA) :
+                           (m1.awvalid && m1.awready) ? (m1.wvalid && m1.wready ? M1_WAIT_WRESP : M1_WAIT_WDATA) : IDLE_WR;
+            M0_WAIT_WDATA: next_wr_state = (m0.wvalid && m0.wready) ? M0_WAIT_WRESP : M0_WAIT_WDATA;
             M0_WAIT_WRESP: next_wr_state = (s.bvalid && m0.bready) ? IDLE_WR : M0_WAIT_WRESP;
+            M1_WAIT_WDATA: next_wr_state = (m1.wvalid && m1.wready) ? M1_WAIT_WRESP : M1_WAIT_WDATA;
             M1_WAIT_WRESP: next_wr_state = (s.bvalid && m1.bready) ? IDLE_WR : M1_WAIT_WRESP;
             default: next_wr_state = IDLE_WR;
         endcase
@@ -88,8 +92,8 @@ module axi_arbiter (
     assign s.wvalid = (wr_state == IDLE_WR || wr_state == M0_WAIT_WRESP || wr_state == M1_WAIT_WRESP) && (m0.wvalid || m1.wvalid);
     assign s.wdata = (m0.wvalid && m0.wready) ? m0.wdata : m1.wdata;
     assign s.wmask = (m0.wvalid && m0.wready) ? m0.wmask : m1.wmask;
-    assign m0.wready = (wr_state == IDLE_WR || wr_state == M0_WAIT_WRESP) ? s.wready : 1'b0;
-    assign m1.wready = (wr_state == IDLE_WR || wr_state == M1_WAIT_WRESP) ? (s.wready && !m0.wvalid) : 1'b0;
+    assign m0.wready = (wr_state == IDLE_WR || wr_state == M0_WAIT_WDATA || wr_state == M0_WAIT_WRESP) ? s.wready : 1'b0;
+    assign m1.wready = (wr_state == IDLE_WR || wr_state == M1_WAIT_WDATA || wr_state == M1_WAIT_WRESP) ? (s.wready && !m0.wvalid) : 1'b0;
 
     // 写回复通道
     assign m0.bvalid = (wr_state == M0_WAIT_WRESP) ? s.bvalid : 1'b0;
