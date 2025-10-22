@@ -95,7 +95,7 @@ module clint #(
         end
     end
     assign s.rvalid  = (rd_state == WAIT_RRESP);
-    assign s.rdata   = (addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0);
+    assign s.rdata   = addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0;
     assign s.rresp   = addr_match_ar ? 2'b00 : 2'b10;  // OKAY or SLVERR
 
     // import "DPI-C" function int pmem_read_npc(input int raddr);
