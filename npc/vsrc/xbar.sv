@@ -204,11 +204,18 @@ module xbar #(
 
     assign m.bvalid = |s_bvalid_vec;
 
+    logic [NUM_SLAVES-1:0][1:0] bresp_array;
+    generate
+        for (i = 0; i < NUM_SLAVES; i++) begin : gen_bresp_array
+            assign bresp_array[i] = s[i].bresp;
+        end
+    endgenerate
+
     always_comb begin
         m.bresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (wr_slave_sel[j]) begin
-                m.bresp = s[j].bresp;
+                m.bresp = bresp_array[j];
             end
         end
     end
