@@ -9,7 +9,7 @@ interface axi_lite_if;
     logic        rvalid;
     logic        rready;
     logic [31:0] rdata;
-    logic        rresp;
+    logic [ 1:0] rresp;
 
     // Write address channel (AW)
     logic        awvalid;
@@ -25,25 +25,25 @@ interface axi_lite_if;
     // Write response channel (B)
     logic        bvalid;
     logic        bready;
-    logic        bresp;
+    logic [ 1:0] bresp;
 
     // Master 端口方向（CPU 或 XBAR 上游）
-    modport master (
+    modport master(
         output arvalid, araddr, rready,
         output awvalid, awaddr,
-        output wvalid,  wdata,  wmask,
+        output wvalid, wdata, wmask,
         output bready,
 
-        input  arready, rvalid, rdata, rresp,
-        input  awready, wready, bvalid, bresp
+        input arready, rvalid, rdata, rresp,
+        input awready, wready, bvalid, bresp
     );
 
     // Slave 端口方向（UART/MEM等外设或 XBAR 下游）
-    modport slave (
-        input  arvalid, araddr, rready,
-        input  awvalid, awaddr,
-        input  wvalid,  wdata,  wmask,
-        input  bready,
+    modport slave(
+        input arvalid, araddr, rready,
+        input awvalid, awaddr,
+        input wvalid, wdata, wmask,
+        input bready,
 
         output arready, rvalid, rdata, rresp,
         output awready, wready, bvalid, bresp

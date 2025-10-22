@@ -156,8 +156,8 @@ module MEM (
         end
     end
 
-    assign mem.rresp = 0;
-    assign mem.bresp = 0;
+    assign mem.rresp = 2'b00;
+    assign mem.bresp = 2'b00;
 
 endmodule
 

@@ -97,7 +97,7 @@ module xbar #(
     assign s0.rready = (rd_state == S0_RD) ? m.rready : 1'b0;
     assign s1.rready = (rd_state == S1_RD) ? m.rready : 1'b0;
     assign m.rdata = (rd_state == S0_RD) ? s0.rdata : s1.rdata;
-    assign m.rresp = (rd_state == S0_RD) ? s0.rresp : (rd_state == S1_RD) ? s1.rresp : 1'b0;
+    assign m.rresp = (rd_state == S0_RD) ? s0.rresp : (rd_state == S1_RD) ? s1.rresp : 2'b00;
 
     // 写地址通道
     assign s0.awvalid = (wr_state == IDLE_WR) && m.awvalid && addr_match_wr[0];
@@ -120,6 +120,6 @@ module xbar #(
     assign m.bvalid = (wr_state == S0_WAIT_WRESP) ? s0.bvalid : (wr_state == S1_WAIT_WRESP) ? s1.bvalid : 1'b0;
     assign s0.bready = (wr_state == S0_WAIT_WRESP) ? m.bready : 1'b0;
     assign s1.bready = (wr_state == S1_WAIT_WRESP) ? m.bready : 1'b0;
-    assign m.bresp = (wr_state == S0_WAIT_WRESP) ? s0.bresp : (wr_state == S1_WAIT_WRESP) ? s1.bresp : 1'b0;
+    assign m.bresp = (wr_state == S0_WAIT_WRESP) ? s0.bresp : (wr_state == S1_WAIT_WRESP) ? s1.bresp : 2'b00;
 
 endmodule

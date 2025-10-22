@@ -79,8 +79,8 @@ module axi_arbiter (
     assign s.rready = (rd_state == M0_WAIT_RRESP) ? m0.rready : (rd_state == M1_WAIT_RRESP) ? m1.rready : 1'b0;
     assign m0.rdata = s.rdata;
     assign m1.rdata = s.rdata;
-    assign m0.rresp = (rd_state == M0_WAIT_RRESP) ? s.rresp : 1'b0;
-    assign m1.rresp = (rd_state == M1_WAIT_RRESP) ? s.rresp : 1'b0;
+    assign m0.rresp = (rd_state == M0_WAIT_RRESP) ? s.rresp : 2'b00;
+    assign m1.rresp = (rd_state == M1_WAIT_RRESP) ? s.rresp : 2'b00;
 
     // 写地址通道
     assign s.awvalid = (wr_state == IDLE_WR) && (m0.awvalid || m1.awvalid);
@@ -99,8 +99,8 @@ module axi_arbiter (
     assign m0.bvalid = (wr_state == M0_WAIT_WRESP) ? s.bvalid : 1'b0;
     assign m1.bvalid = (wr_state == M1_WAIT_WRESP) ? s.bvalid : 1'b0;
     assign s.bready = (wr_state == M0_WAIT_WRESP) ? m0.bready : (wr_state == M1_WAIT_WRESP) ? m1.bready : 1'b0;
-    assign m0.bresp = (wr_state == M0_WAIT_WRESP) ? s.bresp : 1'b0;
-    assign m1.bresp = (wr_state == M1_WAIT_WRESP) ? s.bresp : 1'b0;
+    assign m0.bresp = (wr_state == M0_WAIT_WRESP) ? s.bresp : 2'b00;
+    assign m1.bresp = (wr_state == M1_WAIT_WRESP) ? s.bresp : 2'b00;
 
 endmodule
 
