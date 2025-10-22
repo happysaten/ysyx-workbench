@@ -93,7 +93,7 @@ module uart #(
             aw_addr_reg <= 32'h0;
         end else if (s.awvalid && s.awready) begin
             aw_addr_reg <= s.awaddr;
-            // difftest_skip_ref();
+            difftest_skip_ref();
         end
     end
 
@@ -105,7 +105,7 @@ module uart #(
             if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
                 serial_base <= s.wdata[7:0];
                 $write("%c", s.wdata[7:0]);
-                difftest_skip_ref();
+                // difftest_skip_ref();
             end
         end
     end
