@@ -49,13 +49,17 @@ module top (
     logic ifu_error, gpr_error, csr_error, lsu_error;
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
+    // Crossbar 参数定义
+    localparam int XBAR_NUM_SLAVES = 3;
+    localparam logic [2:0][31:0] XBAR_SLAVE_BASE = {32'ha0000048, 32'ha00003f8, 32'h80000000};
+    localparam logic [2:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h4, 32'h08000000};
     // 创建AXI接口实例
     axi_lite_if imem_if ();  // IFU(取指)接口
     axi_lite_if dmem_if ();  // LSU(访存)接口
     axi_lite_if arbiter_if ();  // 仲裁器输出接口
     // axi_lite_if uart_if ();  // UART接口
     // axi_lite_if mem_if ();  // 统一内存接口
-    axi_lite_if xbar_if[3] ();
+    axi_lite_if xbar_if[XBAR_NUM_SLAVES] ();
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
@@ -68,9 +72,9 @@ module top (
 
     // 实例化Crossbar
     xbar #(
-        .NUM_SLAVES(3),
-        .SLAVE_BASE({32'ha0000048, 32'ha00003f8, 32'h80000000}),
-        .SLAVE_SIZE({32'h8, 32'h4, 32'h08000000})
+        .NUM_SLAVES(XBAR_NUM_SLAVES),
+        .SLAVE_BASE(XBAR_SLAVE_BASE),
+        .SLAVE_SIZE(XBAR_SLAVE_SIZE)
     ) u_xbar (
         .clk  (clk),
         .reset(reset_sync),

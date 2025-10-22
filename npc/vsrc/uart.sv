@@ -86,11 +86,14 @@ module uart #(
     logic [31:0] aw_addr_reg;
     logic [ 7:0] serial_base;  // 模拟C代码中的serial_base[0]
 
+    import "DPI-C" function void difftest_skip_ref();
+
     always_ff @(posedge clk) begin
         if (reset) begin
             aw_addr_reg <= 32'h0;
         end else if (s.awvalid && s.awready) begin
             aw_addr_reg <= s.awaddr;
+            difftest_skip_ref();
         end
     end
 
@@ -102,6 +105,7 @@ module uart #(
             if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
                 serial_base <= s.wdata[7:0];
                 $write("%c", s.wdata[7:0]);
+                difftest_skip_ref();
             end
         end
     end

@@ -44,11 +44,8 @@ module clint #(
 
     // mtime每周期加1
     always_ff @(posedge clk) begin
-        if (reset) begin
-            mtime <= 64'h0;
-        end else begin
-            mtime <= mtime + 64'h1;
-        end
+        if (reset) mtime <= '0;
+        else mtime <= mtime + 1'b1;
     end
 
     // 状态机更新逻辑
