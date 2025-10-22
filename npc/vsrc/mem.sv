@@ -2,7 +2,7 @@
 module MEM (
     input logic             clk,
     input logic             reset,
-          axi_lite_if.slave mem     // 使用interface替代所有独立的AXI信号
+          axi_lite_if.slave s     // 使用interface替代所有独立的AXI信号
 );
     // 读通道状态机
     typedef enum logic [1:0] {
@@ -53,10 +53,10 @@ module MEM (
     always_comb begin
         unique case (rd_state)
             IDLE_RD: begin
-                rd_next_state = (mem.arvalid && mem.arready) ? (rd_resp_ready ? RESP_RD : WAIT_RD) : IDLE_RD;
+                rd_next_state = (s.arvalid && s.arready) ? (rd_resp_ready ? RESP_RD : WAIT_RD) : IDLE_RD;
             end
             WAIT_RD: rd_next_state = rd_resp_ready ? RESP_RD : WAIT_RD;
-            RESP_RD: rd_next_state = (mem.rvalid && mem.rready) ? IDLE_RD : RESP_RD;
+            RESP_RD: rd_next_state = (s.rvalid && s.rready) ? IDLE_RD : RESP_RD;
             default: rd_next_state = IDLE_RD;
         endcase
     end
@@ -65,10 +65,10 @@ module MEM (
     always_comb begin
         unique case (wr_state)
             IDLE_WR: begin
-                if (mem.awvalid && mem.awready && mem.wvalid && mem.wready) begin
+                if (s.awvalid && s.awready && s.wvalid && s.wready) begin
                     // 地址和数据同时到达
                     wr_next_state = wr_resp_ready ? RESP_WR : WAIT_WR;
-                end else if (mem.awvalid && mem.awready) begin
+                end else if (s.awvalid && s.awready) begin
                     // 只有地址到达
                     wr_next_state = WAIT_WDATA;
                 end else begin
@@ -77,23 +77,23 @@ module MEM (
             end
             WAIT_WDATA: begin
                 // 等待数据到达
-                wr_next_state = (mem.wvalid && mem.wready) ?
+                wr_next_state = (s.wvalid && s.wready) ?
                                 (wr_resp_ready ? RESP_WR : WAIT_WR) : WAIT_WDATA;
             end
             WAIT_WR: wr_next_state = wr_resp_ready ? RESP_WR : WAIT_WR;
-            RESP_WR: wr_next_state = (mem.bvalid && mem.bready) ? IDLE_WR : RESP_WR;
+            RESP_WR: wr_next_state = (s.bvalid && s.bready) ? IDLE_WR : RESP_WR;
             default: wr_next_state = IDLE_WR;
         endcase
     end
 
     // 读通道握手信号
-    assign mem.arready = (rd_state == IDLE_RD);
-    assign mem.rvalid  = (rd_state == RESP_RD);
+    assign s.arready = (rd_state == IDLE_RD);
+    assign s.rvalid  = (rd_state == RESP_RD);
 
     // 写通道握手信号
-    assign mem.awready = (wr_state == IDLE_WR);
-    assign mem.wready  = (wr_state == IDLE_WR) || (wr_state == WAIT_WDATA);
-    assign mem.bvalid  = (wr_state == RESP_WR);
+    assign s.awready = (wr_state == IDLE_WR);
+    assign s.wready  = (wr_state == IDLE_WR) || (wr_state == WAIT_WDATA);
+    assign s.bvalid  = (wr_state == RESP_WR);
 
     import "DPI-C" function int pmem_read_npc(input int raddr);
     import "DPI-C" function void pmem_write_npc(
@@ -104,7 +104,7 @@ module MEM (
 
     // 读事务处理
     always @(posedge clk) begin
-        if (mem.arvalid && mem.arready) mem.rdata <= pmem_read_npc(mem.araddr);
+        if (s.arvalid && s.arready) s.rdata <= pmem_read_npc(s.araddr);
     end
 
     logic [31:0] wr_addr_reg;
@@ -117,8 +117,8 @@ module MEM (
         if (reset) begin
             wr_addr_reg <= 32'h0;
             wr_addr_received <= 1'b0;
-        end else if (mem.awvalid && mem.awready) begin
-            wr_addr_reg <= mem.awaddr;
+        end else if (s.awvalid && s.awready) begin
+            wr_addr_reg <= s.awaddr;
             wr_addr_received <= 1'b1;
         end else if (wr_state == IDLE_WR) begin
             wr_addr_received <= 1'b0;
@@ -131,9 +131,9 @@ module MEM (
             wr_data_reg <= 32'h0;
             wr_mask_reg <= 8'h0;
             wr_data_received <= 1'b0;
-        end else if (mem.wvalid && mem.wready) begin
-            wr_data_reg <= mem.wdata;
-            wr_mask_reg <= mem.wmask;
+        end else if (s.wvalid && s.wready) begin
+            wr_data_reg <= s.wdata;
+            wr_mask_reg <= s.wmask;
             wr_data_received <= 1'b1;
         end else if (wr_state == IDLE_WR) begin
             wr_data_received <= 1'b0;
@@ -145,19 +145,19 @@ module MEM (
     logic [31:0] final_wdata;
     logic [ 7:0] final_wmask;
 
-    assign final_waddr = wr_addr_received ? wr_addr_reg : mem.awaddr;
-    assign final_wdata = wr_data_received ? wr_data_reg : mem.wdata;
-    assign final_wmask = wr_data_received ? wr_mask_reg : mem.wmask;
+    assign final_waddr = wr_addr_received ? wr_addr_reg : s.awaddr;
+    assign final_wdata = wr_data_received ? wr_data_reg : s.wdata;
+    assign final_wmask = wr_data_received ? wr_mask_reg : s.wmask;
 
     always @(posedge clk) begin
-        if ((wr_state == WAIT_WDATA && mem.wvalid && mem.wready) ||
-            (wr_state == IDLE_WR && mem.awvalid && mem.awready && mem.wvalid && mem.wready)) begin
+        if ((wr_state == WAIT_WDATA && s.wvalid && s.wready) ||
+            (wr_state == IDLE_WR && s.awvalid && s.awready && s.wvalid && s.wready)) begin
             pmem_write_npc(final_waddr, final_wdata, final_wmask);
         end
     end
 
-    assign mem.rresp = 2'b00;
-    assign mem.bresp = 2'b00;
+    assign s.rresp = 2'b00;
+    assign s.bresp = 2'b00;
 
 endmodule
 

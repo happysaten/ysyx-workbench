@@ -90,7 +90,7 @@ module top (
     MEM u_mem (
         .clk  (clk),
         .reset(reset_sync),
-        // .mem  (mem_if.slave)
+        // .s  (mem_if.slave)
         .s(xbar_if.slave[1])
     );
 
