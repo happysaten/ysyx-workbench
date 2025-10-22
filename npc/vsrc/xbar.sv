@@ -79,9 +79,6 @@ module xbar #(
     end
 
     // 读状态机next逻辑
-    logic rd_complete;
-    assign rd_complete = |(rd_slave_sel & {NUM_SLAVES{m.rready}} & 
-                           {s[NUM_SLAVES-1].rvalid, s[NUM_SLAVES-2].rvalid, s[NUM_SLAVES-3:0].rvalid});
 
     always_comb begin
         case (rd_state)
@@ -93,7 +90,7 @@ module xbar #(
                 end
             end
             BUSY_RD: begin
-                next_rd_state = rd_complete ? IDLE_RD : BUSY_RD;
+                next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : BUSY_RD;
             end
             default: next_rd_state = IDLE_RD;
         endcase
@@ -103,8 +100,7 @@ module xbar #(
     logic wr_addr_fire, wr_data_fire, wr_resp_fire;
     assign wr_addr_fire = m.awvalid && m.awready;
     assign wr_data_fire = m.wvalid && m.wready;
-    assign wr_resp_fire = |(wr_slave_sel & {NUM_SLAVES{m.bready}} & 
-                            {s[NUM_SLAVES-1].bvalid, s[NUM_SLAVES-2].bvalid, s[NUM_SLAVES-3:0].bvalid});
+    assign wr_resp_fire = m.bvalid && m.bready;
 
     always_comb begin
         case (wr_state)
