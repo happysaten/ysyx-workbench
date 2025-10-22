@@ -145,14 +145,22 @@ module xbar #(
 
     assign m.rvalid = |s_rvalid_vec;
 
-    // 数据复用(使用归约)
+    logic [NUM_SLAVES-1:0][31:0] rdata_array;
+    logic [NUM_SLAVES-1:0][ 1:0] rresp_array;
+    generate
+        for (i = 0; i < NUM_SLAVES; i++) begin : gen_rdata_array
+            assign rdata_array[i] = s[i].rdata;
+            assign rresp_array[i] = s[i].rresp;
+        end
+    endgenerate
+
     always_comb begin
         m.rdata = '0;
         m.rresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (rd_slave_sel[j]) begin
-                m.rdata = s[j].rdata;
-                m.rresp = s[j].rresp;
+                m.rdata = rdata_array[j];
+                m.rresp = rresp_array[j];
             end
         end
     end
