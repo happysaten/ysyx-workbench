@@ -135,8 +135,6 @@ module xbar #(
 
     // 读数据通道
     logic [NUM_SLAVES-1:0] s_rvalid_vec;
-    logic [DATA_WIDTH-1:0] s_rdata_mux;
-    logic [1:0] s_rresp_mux;
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_data
@@ -149,17 +147,15 @@ module xbar #(
 
     // 数据复用(使用归约)
     always_comb begin
-        s_rdata_mux = '0;
-        s_rresp_mux = 2'b00;
+        m.rdata = '0;
+        m.rresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (rd_slave_sel[j]) begin
-                s_rdata_mux = s_rdata_mux | s[j].rdata;
-                s_rresp_mux = s_rresp_mux | s[j].rresp;
+                m.rdata = s[j].rdata;
+                m.rresp = s[j].rresp;
             end
         end
     end
-    assign m.rdata = s_rdata_mux;
-    assign m.rresp = s_rresp_mux;
 
     // ============ 写通道连接 ============
     // 写地址通道
@@ -190,7 +186,6 @@ module xbar #(
 
     // 写回复通道
     logic [NUM_SLAVES-1:0] s_bvalid_vec;
-    logic [1:0] s_bresp_mux;
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_resp
@@ -201,15 +196,13 @@ module xbar #(
 
     assign m.bvalid = |s_bvalid_vec;
 
-    // 响应复用(使用归约)
     always_comb begin
-        s_bresp_mux = 2'b00;
+        m.bresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (wr_slave_sel[j]) begin
-                s_bresp_mux = s_bresp_mux | s[j].bresp;
+                m.bresp = s[j].bresp;
             end
         end
     end
-    assign m.bresp = s_bresp_mux;
 
 endmodule
