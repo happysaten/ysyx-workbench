@@ -69,7 +69,7 @@ module top (
     // 实例化Crossbar
     xbar #(
         .NUM_SLAVES(3),
-        .SLAVE_BASE({32'h0a000048, 32'ha00003f8, 32'h80000000}),
+        .SLAVE_BASE({32'ha0000048, 32'ha00003f8, 32'h80000000}),
         .SLAVE_SIZE({32'h8, 32'h4, 32'h08000000})
     ) u_xbar (
         .clk  (clk),
@@ -99,7 +99,7 @@ module top (
     );
 
     clint #(
-        .MTIME_ADDR(32'h0a000048)
+        .MTIME_ADDR(32'ha0000048)
     ) u_clint (
         .clk  (clk),
         .reset(reset_sync),

@@ -4,7 +4,7 @@
 // 作为slave设备，提供只读的mtime寄存器
 
 module clint #(
-    parameter int MTIME_ADDR = 32'h0a000048  // mtime基地址（8字节对齐）
+    parameter int MTIME_ADDR = 32'ha0000048  // mtime基地址（8字节对齐）
 ) (
     input logic             clk,
     input logic             reset,
