@@ -1,10 +1,10 @@
 /* verilator lint_off DECLFILENAME */
 
-// AXI4-Lite UART模块
-// 作为slave设备，支持写操作输出字符
+// AXI4-Lite CLINT模块
+// 作为slave设备，提供只读的mtime寄存器
 
-module uart #(
-    parameter int UART_ADDR = 32'ha00003f8
+module clint #(
+    parameter int MTIME_ADDR = 32'h0a000048  // mtime基地址（8字节对齐）
 ) (
     input logic             clk,
     input logic             reset,
@@ -31,9 +31,25 @@ module uart #(
     // 地址匹配信号
     logic addr_match_aw;
     logic addr_match_ar;
+    logic addr_match_lo;
+    logic addr_match_hi;
 
-    assign addr_match_aw = (s.awaddr == UART_ADDR);
-    assign addr_match_ar = (s.araddr == UART_ADDR);
+    assign addr_match_lo = (s.araddr == MTIME_ADDR);  // mtime低32位
+    assign addr_match_hi = (s.araddr == MTIME_ADDR + 4);  // mtime高32位
+    assign addr_match_ar = addr_match_lo || addr_match_hi;
+    assign addr_match_aw = 1'b0;  // CLINT不支持写操作
+
+    // 64位mtime寄存器
+    logic [63:0] mtime;
+
+    // mtime每周期加1
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            mtime <= 64'h0;
+        end else begin
+            mtime <= mtime + 64'h1;
+        end
+    end
 
     // 状态机更新逻辑
     always_ff @(posedge clk) begin
@@ -67,43 +83,31 @@ module uart #(
     // 读地址通道
     assign s.arready = (rd_state == IDLE_RD);
 
-    // 读数据通道
-    assign s.rvalid  = (rd_state == WAIT_RRESP);
-    assign s.rdata   = 32'h0;  // UART 读取返回0
-    assign s.rresp   = (rd_state == WAIT_RRESP) ? (!addr_match_ar) : 1'b0;
+    // 读数据通道 - 根据地址返回mtime的低32位或高32位
+    logic addr_match_lo_reg, addr_match_hi_reg;
+    always @(posedge clk) begin
+        if (reset) begin
+            addr_match_lo_reg <= 1'b0;
+            addr_match_hi_reg <= 1'b0;
+        end else if (s.arvalid && s.arready) begin
+            addr_match_lo_reg <= addr_match_lo;
+            addr_match_hi_reg <= addr_match_hi;
+        end
+    end
+    assign s.rvalid = (rd_state == WAIT_RRESP);
+    assign s.rdata   = (rd_state == WAIT_RRESP) ?
+                       (addr_match_lo_reg? mtime[31:0] :
+                        addr_match_hi_reg ? mtime[63:32] : 32'h0) : 32'h0;
+    assign s.rresp = (rd_state == WAIT_RRESP) && (!addr_match_ar) ? 2'b10 : 2'b00;  // SLVERR or OKAY
 
     // 写地址通道
     assign s.awready = (wr_state == IDLE_WR);
 
     // 写数据通道
-    assign s.wready  = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
+    assign s.wready = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
 
-    // 写回复通道
-    assign s.bvalid  = (wr_state == WAIT_WRESP);
-    assign s.bresp   = !addr_match_aw;
-
-    // UART 字符输出逻辑
-    logic [31:0] aw_addr_reg;
-    logic [ 7:0] serial_base;  // 模拟C代码中的serial_base[0]
-
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            aw_addr_reg <= 32'h0;
-        end else if (s.awvalid && s.awready) begin
-            aw_addr_reg <= s.awaddr;
-        end
-    end
-
-    // 写入数据到寄存器
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            serial_base <= 8'h0;
-        end else if (s.wvalid && s.wready) begin
-            if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
-                serial_base <= s.wdata[7:0];
-                $write("%c", s.wdata[7:0]);
-            end
-        end
-    end
+    // 写回复通道 - CLINT不支持写操作，返回错误
+    assign s.bvalid = (wr_state == WAIT_WRESP);
+    assign s.bresp = 2'b10;  // SLVERR - 从设备错误
 
 endmodule

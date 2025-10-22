@@ -27,12 +27,12 @@ module xbar #(
     rd_state_t rd_state, next_rd_state;
 
     // 定义写状态枚举
-    typedef enum logic [2:0]{
+    typedef enum logic [2:0] {
         IDLE_WR,
-        S0_WR,
-        S0_AWR,
-        S1_AWR,
-        S1_WR
+        S0_WAIT_WDATA,
+        S0_WAIT_WRESP,
+        S1_WAIT_WDATA,
+        S1_WAIT_WRESP
     } wr_state_t;
 
     wr_state_t wr_state, next_wr_state;
@@ -74,13 +74,13 @@ module xbar #(
             IDLE_WR:
             next_wr_state = (m.awvalid && m.awready) ?
                 (addr_match_wr[0] ?
-                    (m.wvalid && m.wready ? S0_WR : S0_AWR) :
+                    (m.wvalid && m.wready ? S0_WAIT_WRESP : S0_WAIT_WDATA) :
                  addr_match_wr[1] ?
-                    (m.wvalid && m.wready ? S1_WR : S1_AWR) : IDLE_WR) : IDLE_WR;
-            S0_AWR: next_wr_state = (m.wvalid && m.wready) ? S0_WR : S0_AWR;
-            S0_WR: next_wr_state = (s0.bvalid && m.bready) ? IDLE_WR : S0_WR;
-            S1_AWR: next_wr_state = (m.wvalid && m.wready) ? S1_WR : S1_AWR;
-            S1_WR: next_wr_state = (s1.bvalid && m.bready) ? IDLE_WR : S1_WR;
+                    (m.wvalid && m.wready ? S1_WAIT_WRESP : S1_WAIT_WDATA) : IDLE_WR) : IDLE_WR;
+            S0_WAIT_WDATA: next_wr_state = (m.wvalid && m.wready) ? S0_WAIT_WRESP : S0_WAIT_WDATA;
+            S0_WAIT_WRESP: next_wr_state = (s0.bvalid && m.bready) ? IDLE_WR : S0_WAIT_WRESP;
+            S1_WAIT_WDATA: next_wr_state = (m.wvalid && m.wready) ? S1_WAIT_WRESP : S1_WAIT_WDATA;
+            S1_WAIT_WRESP: next_wr_state = (s1.bvalid && m.bready) ? IDLE_WR : S1_WAIT_WRESP;
             default: next_wr_state = IDLE_WR;
         endcase
     end
@@ -97,7 +97,7 @@ module xbar #(
     assign s0.rready = (rd_state == S0_RD) ? m.rready : 1'b0;
     assign s1.rready = (rd_state == S1_RD) ? m.rready : 1'b0;
     assign m.rdata = (rd_state == S0_RD) ? s0.rdata : s1.rdata;
-    assign m.rresp = (rd_state == S0_RD) ? s0.rresp : (rd_state == S1_RD) ? s1.rresp : 1'b0;
+    assign m.rresp = (rd_state == S0_RD) ? s0.rresp : (rd_state == S1_RD) ? s1.rresp : 2'b00;
 
     // 写地址通道
     assign s0.awvalid = (wr_state == IDLE_WR) && m.awvalid && addr_match_wr[0];
@@ -107,19 +107,19 @@ module xbar #(
     assign m.awready = (wr_state == IDLE_WR) && ((addr_match_wr[0] && s0.awready) || (addr_match_wr[1] && s1.awready));
 
     // 写数据通道
-    assign s0.wvalid = (wr_state == IDLE_WR || wr_state == S0_AWR) && m.wvalid && (addr_match_wr[0] || wr_state == S0_AWR);
-    assign s1.wvalid = (wr_state == IDLE_WR || wr_state == S1_AWR) && m.wvalid && (addr_match_wr[1] || wr_state == S1_AWR);
+    assign s0.wvalid = (wr_state == IDLE_WR || wr_state == S0_WAIT_WDATA) && m.wvalid && (addr_match_wr[0] || wr_state == S0_WAIT_WDATA);
+    assign s1.wvalid = (wr_state == IDLE_WR || wr_state == S1_WAIT_WDATA) && m.wvalid && (addr_match_wr[1] || wr_state == S1_WAIT_WDATA);
     assign s0.wdata = m.wdata;
     assign s1.wdata = m.wdata;
     assign s0.wmask = m.wmask;
     assign s1.wmask = m.wmask;
-    assign m.wready = ((wr_state == IDLE_WR || wr_state == S0_AWR) && s0.wready && (addr_match_wr[0] || wr_state == S0_AWR)) ||
-                      ((wr_state == IDLE_WR || wr_state == S1_AWR) && s1.wready && (addr_match_wr[1] || wr_state == S1_AWR));
+    assign m.wready = ((wr_state == IDLE_WR || wr_state == S0_WAIT_WDATA) && s0.wready && (addr_match_wr[0] || wr_state == S0_WAIT_WDATA)) ||
+                      ((wr_state == IDLE_WR || wr_state == S1_WAIT_WDATA) && s1.wready && (addr_match_wr[1] || wr_state == S1_WAIT_WDATA));
 
     // 写回复通道
-    assign m.bvalid = (wr_state == S0_WR) ? s0.bvalid : (wr_state == S1_WR) ? s1.bvalid : 1'b0;
-    assign s0.bready = (wr_state == S0_WR) ? m.bready : 1'b0;
-    assign s1.bready = (wr_state == S1_WR) ? m.bready : 1'b0;
-    assign m.bresp = (wr_state == S0_WR) ? s0.bresp : (wr_state == S1_WR) ? s1.bresp : 1'b0;
+    assign m.bvalid = (wr_state == S0_WAIT_WRESP) ? s0.bvalid : (wr_state == S1_WAIT_WRESP) ? s1.bvalid : 1'b0;
+    assign s0.bready = (wr_state == S0_WAIT_WRESP) ? m.bready : 1'b0;
+    assign s1.bready = (wr_state == S1_WAIT_WRESP) ? m.bready : 1'b0;
+    assign m.bresp = (wr_state == S0_WAIT_WRESP) ? s0.bresp : (wr_state == S1_WAIT_WRESP) ? s1.bresp : 2'b00;
 
 endmodule

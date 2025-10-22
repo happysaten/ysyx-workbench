@@ -271,7 +271,7 @@ module IFU (
             ifu_error <= 1'b0;
         end else if (imem.rvalid) begin
             ifu_rdata <= imem.rdata;
-            ifu_error <= imem.rresp;
+            ifu_error <= |imem.rresp;  // 修改：检查2位resp是否非零
         end
     end
 
@@ -771,7 +771,7 @@ module LSU (
         endcase
     end
 
-    assign lsu_error = dmem.rresp | dmem.bresp;
+    assign lsu_error = |dmem.rresp | |dmem.bresp;  // 修改：检查2位resp是否非零
 
 endmodule
 
