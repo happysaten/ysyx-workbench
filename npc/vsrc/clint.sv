@@ -94,9 +94,9 @@ module clint #(
             addr_match_hi_reg <= addr_match_hi;
         end
     end
-    assign s.rvalid = (rd_state == WAIT_RRESP);
-    assign s.rdata = (addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0);
-    assign s.rresp = addr_match_ar ? 2'b00 : 2'b10;  // OKAY or SLVERR
+    assign s.rvalid  = (rd_state == WAIT_RRESP);
+    assign s.rdata   = (addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0);
+    assign s.rresp   = addr_match_ar ? 2'b00 : 2'b10;  // OKAY or SLVERR
 
     // import "DPI-C" function int pmem_read_npc(input int raddr);
     // always_comb begin
@@ -109,10 +109,10 @@ module clint #(
     assign s.awready = (wr_state == IDLE_WR);
 
     // 写数据通道
-    assign s.wready = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
+    assign s.wready  = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
 
     // 写回复通道 - CLINT不支持写操作，返回错误
-    assign s.bvalid = (wr_state == WAIT_WRESP);
-    assign s.bresp = 2'b10;  // SLVERR - 从设备错误
+    assign s.bvalid  = (wr_state == WAIT_WRESP);
+    assign s.bresp   = 2'b10;  // SLVERR - 从设备错误
 
 endmodule

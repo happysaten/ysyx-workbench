@@ -55,7 +55,7 @@ module top (
     axi_lite_if arbiter_if ();  // 仲裁器输出接口
     // axi_lite_if uart_if ();  // UART接口
     // axi_lite_if mem_if ();  // 统一内存接口
-    axi_lite_if xbar_if[3] ();
+    axi_lite_if xbar_if[2] ();
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
@@ -68,11 +68,9 @@ module top (
 
     // 实例化Crossbar
     xbar #(
-        .NUM_SLAVES(3),
-        .ADDR_WIDTH(32),
-        .DATA_WIDTH(32),
-        .SLAVE_BASE({32'h80000000, 32'ha00003f8, 32'h0a000048}),
-        .SLAVE_SIZE({32'h08000000, 32'h00000004, 32'h00000008})
+        .NUM_SLAVES(2),
+        .SLAVE_BASE({32'h80000000, 32'ha00003f8}),
+        .SLAVE_SIZE({32'h08000000, 32'h00000004})
     ) u_xbar (
         .clk  (clk),
         .reset(reset_sync),
@@ -100,13 +98,13 @@ module top (
         .s    (xbar_if[1].slave)
     );
 
-    clint #(
-        .MTIME_ADDR(32'h0a000048)
-    ) u_clint (
-        .clk  (clk),
-        .reset(reset_sync),
-        .s    (xbar_if[2].slave)
-    );
+    // clint #(
+    //     .MTIME_ADDR(32'h0a000048)
+    // ) u_clint (
+    //     .clk  (clk),
+    //     .reset(reset_sync),
+    //     .s    (xbar_if[2].slave)
+    // );
 
     IFU u_ifu (
         .clk           (clk),
