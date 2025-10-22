@@ -4,7 +4,7 @@
 // 作为slave设备，提供只读的mtime寄存器
 
 module clint #(
-    parameter int MTIME_ADDR = 32'h0a000048  // mtime基地址（8字节对齐）
+    parameter int MTIME_ADDR = 32'ha0000048  // mtime基地址（8字节对齐）
 ) (
     input logic             clk,
     input logic             reset,
@@ -44,11 +44,8 @@ module clint #(
 
     // mtime每周期加1
     always_ff @(posedge clk) begin
-        if (reset) begin
-            mtime <= 64'h0;
-        end else begin
-            mtime <= mtime + 64'h1;
-        end
+        if (reset) mtime <= '0;
+        else mtime <= mtime + 1'b1;
     end
 
     // 状态机更新逻辑
@@ -94,20 +91,25 @@ module clint #(
             addr_match_hi_reg <= addr_match_hi;
         end
     end
-    assign s.rvalid = (rd_state == WAIT_RRESP);
-    assign s.rdata   = (rd_state == WAIT_RRESP) ?
-                       (addr_match_lo_reg? mtime[31:0] :
-                        addr_match_hi_reg ? mtime[63:32] : 32'h0) : 32'h0;
-    assign s.rresp = (rd_state == WAIT_RRESP) && (!addr_match_ar) ? 2'b10 : 2'b00;  // SLVERR or OKAY
+    assign s.rvalid  = (rd_state == WAIT_RRESP);
+    assign s.rdata   = addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0;
+    assign s.rresp   = addr_match_ar ? 2'b00 : 2'b10;  // OKAY or SLVERR
+
+    // import "DPI-C" function int pmem_read_npc(input int raddr);
+    // always_comb begin
+    //     if(rd_state == WAIT_RRESP) begin
+    //         s.rdata = pmem_read_npc(s.araddr);
+    //     end
+    // end
 
     // 写地址通道
     assign s.awready = (wr_state == IDLE_WR);
 
     // 写数据通道
-    assign s.wready = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
+    assign s.wready  = (wr_state == IDLE_WR || wr_state == WAIT_WDATA);
 
     // 写回复通道 - CLINT不支持写操作，返回错误
-    assign s.bvalid = (wr_state == WAIT_WRESP);
-    assign s.bresp = 2'b10;  // SLVERR - 从设备错误
+    assign s.bvalid  = (wr_state == WAIT_WRESP);
+    assign s.bresp   = 2'b10;  // SLVERR - 从设备错误
 
 endmodule

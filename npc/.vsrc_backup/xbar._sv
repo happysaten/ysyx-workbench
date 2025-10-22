@@ -2,246 +2,124 @@
 
 // AXI4-Lite Crossbar (1 master to 2 slaves)
 // 根据地址范围选择从设备
+// 假定写地址和写数据同时到达
+
 module xbar #(
     parameter int SLAVE0_BASE = 32'ha00003f8,  // 串口位置
     parameter int SLAVE0_SIZE = 32'h00000004,  // 4B
     parameter int SLAVE1_BASE = 32'h80000000,
     parameter int SLAVE1_SIZE = 32'h08000000   // 128MB
 ) (
-    input clk,
-    input reset,
-
-    // Master接口 - 读地址通道(AR)
-    input               m_arvalid,
-    output logic        m_arready,
-    input        [31:0] m_araddr,
-    // Master接口 - 读数据通道(R)
-    output logic        m_rvalid,
-    input               m_rready,
-    output logic [31:0] m_rdata,
-    output logic        m_rresp,
-    // Master接口 - 写地址通道(AW)
-    input               m_awvalid,
-    output logic        m_awready,
-    input        [31:0] m_awaddr,
-    // Master接口 - 写数据通道(W)
-    input               m_wvalid,
-    output logic        m_wready,
-    input        [31:0] m_wdata,
-    input        [ 7:0] m_wmask,
-    // Master接口 - 写回复通道(B)
-    output logic        m_bvalid,
-    input               m_bready,
-    output logic        m_bresp,
-
-    // Slave0接口 - 读地址通道(AR)
-    output logic        s0_arvalid,
-    input               s0_arready,
-    output logic [31:0] s0_araddr,
-    // Slave0接口 - 读数据通道(R)
-    input               s0_rvalid,
-    output logic        s0_rready,
-    input        [31:0] s0_rdata,
-    input               s0_rresp,
-    // Slave0接口 - 写地址通道(AW)
-    output logic        s0_awvalid,
-    input               s0_awready,
-    output logic [31:0] s0_awaddr,
-    // Slave0接口 - 写数据通道(W)
-    output logic        s0_wvalid,
-    input               s0_wready,
-    output logic [31:0] s0_wdata,
-    output logic [ 7:0] s0_wmask,
-    // Slave0接口 - 写回复通道(B)
-    input               s0_bvalid,
-    output logic        s0_bready,
-    input               s0_bresp,
-
-    // Slave1接口 - 读地址通道(AR)
-    output logic        s1_arvalid,
-    input               s1_arready,
-    output logic [31:0] s1_araddr,
-    // Slave1接口 - 读数据通道(R)
-    input               s1_rvalid,
-    output logic        s1_rready,
-    input        [31:0] s1_rdata,
-    input               s1_rresp,
-    // Slave1接口 - 写地址通道(AW)
-    output logic        s1_awvalid,
-    input               s1_awready,
-    output logic [31:0] s1_awaddr,
-    // Slave1接口 - 写数据通道(W)
-    output logic        s1_wvalid,
-    input               s1_wready,
-    output logic [31:0] s1_wdata,
-    output logic [ 7:0] s1_wmask,
-    // Slave1接口 - 写回复通道(B)
-    input               s1_bvalid,
-    output logic        s1_bready,
-    input               s1_bresp
+    input logic              clk,
+    input logic              reset,
+          axi_lite_if.slave  m,      // 1 个 Master (从crossbar角度看是slave接口)
+          axi_lite_if.master s0,     // Slave 0 接口
+          axi_lite_if.master s1      // Slave 1 接口
 );
 
     // 定义读状态枚举
     typedef enum logic [1:0] {
         IDLE_RD,
-        ROUTE_RD,
-        DATA_RD
+        S0_RD,
+        S1_RD
     } rd_state_t;
 
     rd_state_t rd_state, next_rd_state;
 
     // 定义写状态枚举
-    typedef enum logic [1:0] {
+    typedef enum logic [2:0] {
         IDLE_WR,
-        ROUTE_WR,
-        RESP_WR
+        S0_WAIT_WDATA,
+        S0_WAIT_WRESP,
+        S1_WAIT_WDATA,
+        S1_WAIT_WRESP
     } wr_state_t;
 
     wr_state_t wr_state, next_wr_state;
 
-    // 地址匹配逻辑
-    logic sel_slave0_ar, sel_slave1_ar;
-    logic sel_slave0_aw, sel_slave1_aw;
-    logic addr_err_ar, addr_err_aw;
-
-    assign sel_slave0_ar = (m_araddr >= SLAVE0_BASE) && (m_araddr < (SLAVE0_BASE + SLAVE0_SIZE));
-    assign sel_slave1_ar = (m_araddr >= SLAVE1_BASE) && (m_araddr < (SLAVE1_BASE + SLAVE1_SIZE));
-    assign addr_err_ar   = !(sel_slave0_ar || sel_slave1_ar);
-
-    assign sel_slave0_aw = (m_awaddr >= SLAVE0_BASE) && (m_awaddr < (SLAVE0_BASE + SLAVE0_SIZE));
-    assign sel_slave1_aw = (m_awaddr >= SLAVE1_BASE) && (m_awaddr < (SLAVE1_BASE + SLAVE1_SIZE));
-    assign addr_err_aw   = !(sel_slave0_aw || sel_slave1_aw);
-
-    // 保存路由选择
-    logic rd_sel_slave0, rd_sel_slave1, rd_addr_err;
-    logic wr_sel_slave0, wr_sel_slave1, wr_addr_err;
-
-    // 状态机更新逻辑
+    // ============ 读通道状态机 ============
     always_ff @(posedge clk) begin
-        if (reset) begin
-            rd_state <= IDLE_RD;
-            wr_state <= IDLE_WR;
-        end else begin
-            rd_state <= next_rd_state;
-            wr_state <= next_wr_state;
-        end
+        if (reset) rd_state <= IDLE_RD;
+        else rd_state <= next_rd_state;
+
     end
+
+    // ============ 写通道状态机 ============
+    always_ff @(posedge clk) begin
+        if (reset) wr_state <= IDLE_WR;
+        else wr_state <= next_wr_state;
+    end
+
+    logic [1:0] addr_match_rd, addr_match_wr;
+    assign addr_match_rd[0] = (m.araddr >= SLAVE0_BASE) && (m.araddr < (SLAVE0_BASE + SLAVE0_SIZE));
+    assign addr_match_rd[1] = (m.araddr >= SLAVE1_BASE) && (m.araddr < (SLAVE1_BASE + SLAVE1_SIZE));
+    assign addr_match_wr[0] = (m.awaddr >= SLAVE0_BASE) && (m.awaddr < (SLAVE0_BASE + SLAVE0_SIZE));
+    assign addr_match_wr[1] = (m.awaddr >= SLAVE1_BASE) && (m.awaddr < (SLAVE1_BASE + SLAVE1_SIZE));
 
     // 读状态机next逻辑
     always_comb begin
         unique case (rd_state)
-            IDLE_RD:  next_rd_state = (m_arvalid && m_arready) ? ROUTE_RD : IDLE_RD;
-            ROUTE_RD: next_rd_state = DATA_RD;
-            DATA_RD:  next_rd_state = (m_rvalid && m_rready) ? IDLE_RD : DATA_RD;
-            default:  next_rd_state = IDLE_RD;
+            IDLE_RD:
+            next_rd_state = (m.arvalid && m.arready) ?
+                (addr_match_rd[0] ? S0_RD :
+                 addr_match_rd[1] ? S1_RD : IDLE_RD) : IDLE_RD;
+            S0_RD: next_rd_state = (s0.rvalid && m.rready) ? IDLE_RD : S0_RD;
+            S1_RD: next_rd_state = (s1.rvalid && m.rready) ? IDLE_RD : S1_RD;
         endcase
     end
 
     // 写状态机next逻辑
     always_comb begin
         unique case (wr_state)
-            IDLE_WR:  next_wr_state = (m_awvalid && m_awready) ? ROUTE_WR : IDLE_WR;
-            ROUTE_WR: next_wr_state = (m_wvalid && m_wready) ? RESP_WR : ROUTE_WR;
-            RESP_WR:  next_wr_state = (m_bvalid && m_bready) ? IDLE_WR : RESP_WR;
-            default:  next_wr_state = IDLE_WR;
+            IDLE_WR:
+            next_wr_state = (m.awvalid && m.awready) ?
+                (addr_match_wr[0] ?
+                    (m.wvalid && m.wready ? S0_WAIT_WRESP : S0_WAIT_WDATA) :
+                 addr_match_wr[1] ?
+                    (m.wvalid && m.wready ? S1_WAIT_WRESP : S1_WAIT_WDATA) : IDLE_WR) : IDLE_WR;
+            S0_WAIT_WDATA: next_wr_state = (m.wvalid && m.wready) ? S0_WAIT_WRESP : S0_WAIT_WDATA;
+            S0_WAIT_WRESP: next_wr_state = (s0.bvalid && m.bready) ? IDLE_WR : S0_WAIT_WRESP;
+            S1_WAIT_WDATA: next_wr_state = (m.wvalid && m.wready) ? S1_WAIT_WRESP : S1_WAIT_WDATA;
+            S1_WAIT_WRESP: next_wr_state = (s1.bvalid && m.bready) ? IDLE_WR : S1_WAIT_WRESP;
+            default: next_wr_state = IDLE_WR;
         endcase
     end
 
-    // 保存读路由选择
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            rd_sel_slave0 <= 1'b0;
-            rd_sel_slave1 <= 1'b0;
-            rd_addr_err   <= 1'b0;
-        end else if (m_arvalid && m_arready) begin
-            rd_sel_slave0 <= sel_slave0_ar;
-            rd_sel_slave1 <= sel_slave1_ar;
-            rd_addr_err   <= addr_err_ar;
-        end
-    end
+    // 读地址通道
+    assign s0.arvalid = (rd_state == IDLE_RD) && m.arvalid && addr_match_rd[0];
+    assign s1.arvalid = (rd_state == IDLE_RD) && m.arvalid && addr_match_rd[1];
+    assign s0.araddr = m.araddr;
+    assign s1.araddr = m.araddr;
+    assign m.arready = (rd_state == IDLE_RD) && ((addr_match_rd[0] && s0.arready) || (addr_match_rd[1] && s1.arready));
 
-    // 保存写路由选择
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            wr_sel_slave0 <= 1'b0;
-            wr_sel_slave1 <= 1'b0;
-            wr_addr_err   <= 1'b0;
-        end else if (m_awvalid && m_awready) begin
-            wr_sel_slave0 <= sel_slave0_aw;
-            wr_sel_slave1 <= sel_slave1_aw;
-            wr_addr_err   <= addr_err_aw;
-        end
-    end
+    // 读数据通道
+    assign m.rvalid = (rd_state == S0_RD) ? s0.rvalid : (rd_state == S1_RD) ? s1.rvalid : 1'b0;
+    assign s0.rready = (rd_state == S0_RD) ? m.rready : 1'b0;
+    assign s1.rready = (rd_state == S1_RD) ? m.rready : 1'b0;
+    assign m.rdata = (rd_state == S0_RD) ? s0.rdata : s1.rdata;
+    assign m.rresp = (rd_state == S0_RD) ? s0.rresp : s1.rresp;
 
-    // Master读地址通道
-    assign m_arready = (rd_state == IDLE_RD) && 
-                       ((sel_slave0_ar && s0_arready) || 
-                        (sel_slave1_ar && s1_arready) || 
-                        addr_err_ar);
+    // 写地址通道
+    assign s0.awvalid = (wr_state == IDLE_WR) && m.awvalid && addr_match_wr[0];
+    assign s1.awvalid = (wr_state == IDLE_WR) && m.awvalid && addr_match_wr[1];
+    assign s0.awaddr = m.awaddr;
+    assign s1.awaddr = m.awaddr;
+    assign m.awready = (wr_state == IDLE_WR) && ((addr_match_wr[0] && s0.awready) || (addr_match_wr[1] && s1.awready));
 
-    // Master读数据通道
-    assign m_rvalid = (rd_state == DATA_RD) && 
-                      ((rd_sel_slave0 && s0_rvalid) || 
-                       (rd_sel_slave1 && s1_rvalid) || 
-                       rd_addr_err);
-    assign m_rdata = rd_sel_slave0 ? s0_rdata : rd_sel_slave1 ? s1_rdata : 32'h0;
-    assign m_rresp = rd_sel_slave0 ? s0_rresp : rd_sel_slave1 ? s1_rresp : 1'b1;
+    // 写数据通道
+    assign s0.wvalid = (wr_state == IDLE_WR || wr_state == S0_WAIT_WDATA) && m.wvalid && (addr_match_wr[0] || wr_state == S0_WAIT_WDATA);
+    assign s1.wvalid = (wr_state == IDLE_WR || wr_state == S1_WAIT_WDATA) && m.wvalid && (addr_match_wr[1] || wr_state == S1_WAIT_WDATA);
+    assign s0.wdata = m.wdata;
+    assign s1.wdata = m.wdata;
+    assign s0.wmask = m.wmask;
+    assign s1.wmask = m.wmask;
+    assign m.wready = ((wr_state == IDLE_WR || wr_state == S0_WAIT_WDATA) && s0.wready && (addr_match_wr[0] || wr_state == S0_WAIT_WDATA)) ||
+                      ((wr_state == IDLE_WR || wr_state == S1_WAIT_WDATA) && s1.wready && (addr_match_wr[1] || wr_state == S1_WAIT_WDATA));
 
-    // Master写地址通道
-    assign m_awready = (wr_state == IDLE_WR) && 
-                       ((sel_slave0_aw && s0_awready) || 
-                        (sel_slave1_aw && s1_awready) || 
-                        addr_err_aw);
-
-    // Master写数据通道
-    assign m_wready = (wr_state == ROUTE_WR) && 
-                      ((wr_sel_slave0 && s0_wready) || 
-                       (wr_sel_slave1 && s1_wready) || 
-                       wr_addr_err);
-
-    // Master写回复通道
-    assign m_bvalid = (wr_state == RESP_WR) && 
-                      ((wr_sel_slave0 && s0_bvalid) || 
-                       (wr_sel_slave1 && s1_bvalid) || 
-                       wr_addr_err);
-    assign m_bresp = wr_sel_slave0 ? s0_bresp : wr_sel_slave1 ? s1_bresp : 1'b1;
-
-    // Slave0读地址通道
-    assign s0_arvalid = (rd_state == IDLE_RD) && m_arvalid && sel_slave0_ar;
-    assign s0_araddr = m_araddr;
-
-    // Slave0读数据通道
-    assign s0_rready = (rd_state == DATA_RD) && m_rready && rd_sel_slave0;
-
-    // Slave0写地址通道
-    assign s0_awvalid = (wr_state == IDLE_WR) && m_awvalid && sel_slave0_aw;
-    assign s0_awaddr = m_awaddr;
-
-    // Slave0写数据通道
-    assign s0_wvalid = (wr_state == ROUTE_WR) && m_wvalid && wr_sel_slave0;
-    assign s0_wdata = m_wdata;
-    assign s0_wmask = m_wmask;
-
-    // Slave0写回复通道
-    assign s0_bready = (wr_state == RESP_WR) && m_bready && wr_sel_slave0;
-
-    // Slave1读地址通道
-    assign s1_arvalid = (rd_state == IDLE_RD) && m_arvalid && sel_slave1_ar;
-    assign s1_araddr = m_araddr;
-
-    // Slave1读数据通道
-    assign s1_rready = (rd_state == DATA_RD) && m_rready && rd_sel_slave1;
-
-    // Slave1写地址通道
-    assign s1_awvalid = (wr_state == IDLE_WR) && m_awvalid && sel_slave1_aw;
-    assign s1_awaddr = m_awaddr;
-
-    // Slave1写数据通道
-    assign s1_wvalid = (wr_state == ROUTE_WR) && m_wvalid && wr_sel_slave1;
-    assign s1_wdata = m_wdata;
-    assign s1_wmask = m_wmask;
-
-    // Slave1写回复通道
-    assign s1_bready = (wr_state == RESP_WR) && m_bready && wr_sel_slave1;
+    // 写回复通道
+    assign m.bvalid = (wr_state == S0_WAIT_WRESP) ? s0.bvalid : (wr_state == S1_WAIT_WRESP) ? s1.bvalid : 1'b0;
+    assign s0.bready = (wr_state == S0_WAIT_WRESP) ? m.bready : 1'b0;
+    assign s1.bready = (wr_state == S1_WAIT_WRESP) ? m.bready : 1'b0;
+    assign m.bresp = (wr_state == S0_WAIT_WRESP) ? s0.bresp : s1.bresp;
 
 endmodule
