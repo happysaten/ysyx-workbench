@@ -5,8 +5,8 @@
 
 module xbar #(
     parameter int NUM_SLAVES = 2,
-    parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_BASE = {32'h80000000, 32'ha00003f8},
-    parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_SIZE = {32'h08000000, 32'h00000004}
+    parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_BASE = {32'ha00003f8, 32'h80000000},
+    parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_SIZE = {32'h00000004, 32'h08000000}
 ) (
     input logic              clk,
     input logic              reset,
