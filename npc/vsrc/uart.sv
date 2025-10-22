@@ -64,6 +64,8 @@ module uart #(
         endcase
     end
 
+    import "DPI-C" function void difftest_skip_ref();
+
     // 读地址通道
     assign s.arready = (rd_state == IDLE_RD);
 
@@ -71,6 +73,7 @@ module uart #(
     assign s.rvalid  = (rd_state == WAIT_RRESP);
     assign s.rdata   = 32'h0;  // UART 读取返回0
     assign s.rresp   = (rd_state == WAIT_RRESP) ? (!addr_match_ar) : 1'b0;
+    always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
 
     // 写地址通道
     assign s.awready = (wr_state == IDLE_WR);
@@ -86,14 +89,12 @@ module uart #(
     logic [31:0] aw_addr_reg;
     logic [ 7:0] serial_base;  // 模拟C代码中的serial_base[0]
 
-    import "DPI-C" function void difftest_skip_ref();
-
     always_ff @(posedge clk) begin
         if (reset) begin
             aw_addr_reg <= 32'h0;
         end else if (s.awvalid && s.awready) begin
             aw_addr_reg <= s.awaddr;
-            // difftest_skip_ref();
+            difftest_skip_ref();
         end
     end
 
@@ -105,7 +106,7 @@ module uart #(
             if (aw_addr_reg == UART_ADDR || (s.awvalid && addr_match_aw)) begin
                 serial_base <= s.wdata[7:0];
                 $write("%c", s.wdata[7:0]);
-                // difftest_skip_ref();
+                difftest_skip_ref();
             end
         end
     end

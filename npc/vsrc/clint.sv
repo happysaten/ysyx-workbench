@@ -77,6 +77,8 @@ module clint #(
         endcase
     end
 
+    import "DPI-C" function void difftest_skip_ref();
+
     // 读地址通道
     assign s.arready = (rd_state == IDLE_RD);
 
@@ -95,6 +97,8 @@ module clint #(
     assign s.rdata   = addr_match_lo_reg ? mtime[31:0] : addr_match_hi_reg ? mtime[63:32] : 32'h0;
     assign s.rresp   = addr_match_ar ? 2'b00 : 2'b10;  // OKAY or SLVERR
 
+    always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
+
     // import "DPI-C" function int pmem_read_npc(input int raddr);
     // always_comb begin
     //     if(rd_state == WAIT_RRESP) begin
@@ -111,5 +115,6 @@ module clint #(
     // 写回复通道 - CLINT不支持写操作，返回错误
     assign s.bvalid  = (wr_state == WAIT_WRESP);
     assign s.bresp   = 2'b10;  // SLVERR - 从设备错误
+    always_comb if (wr_state == WAIT_WRESP) difftest_skip_ref();
 
 endmodule
