@@ -69,8 +69,8 @@ module top (
     // 实例化Crossbar
     xbar #(
         .NUM_SLAVES(2),
-        .SLAVE_BASE({32'h80000000, 32'ha00003f8}),
-        .SLAVE_SIZE({32'h08000000, 32'h00000004})
+        .SLAVE_BASE({32'ha00003f8,32'h80000000}),
+        .SLAVE_SIZE({32'h00000004,32'h08000000})
     ) u_xbar (
         .clk  (clk),
         .reset(reset_sync),
