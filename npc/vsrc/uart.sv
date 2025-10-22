@@ -93,7 +93,7 @@ module uart #(
             aw_addr_reg <= 32'h0;
         end else if (s.awvalid && s.awready) begin
             aw_addr_reg <= s.awaddr;
-            difftest_skip_ref();
+            // difftest_skip_ref();
         end
     end
 
