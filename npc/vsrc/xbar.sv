@@ -23,9 +23,8 @@ module xbar #(
     rd_state_t rd_state, next_rd_state;
 
     // 定义写状态
-    typedef enum logic [2:0] {
+    typedef enum logic [1:0] {
         IDLE_WR,
-        WAIT_WDATA,
         WAIT_WRESP
     } wr_state_t;
 
@@ -95,22 +94,18 @@ module xbar #(
     end
 
     // 写状态机next逻辑
-    logic wr_addr_fire, wr_data_fire, wr_resp_fire;
+    logic wr_addr_fire, wr_resp_fire;
     assign wr_addr_fire = m.awvalid && m.awready;
-    assign wr_data_fire = m.wvalid && m.wready;
     assign wr_resp_fire = m.bvalid && m.bready;
 
     always_comb begin
         case (wr_state)
             IDLE_WR: begin
                 if (wr_addr_fire && |addr_match_wr) begin
-                    next_wr_state = wr_data_fire ? WAIT_WRESP : WAIT_WDATA;
+                    next_wr_state = WAIT_WRESP;
                 end else begin
                     next_wr_state = IDLE_WR;
                 end
-            end
-            WAIT_WDATA: begin
-                next_wr_state = wr_data_fire ? WAIT_WRESP : WAIT_WDATA;
             end
             WAIT_WRESP: begin
                 next_wr_state = wr_resp_fire ? IDLE_WR : WAIT_WRESP;
@@ -179,9 +174,7 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_wready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_data
-            assign s[i].wvalid = ((wr_state == IDLE_WR) || (wr_state == WAIT_WDATA)) && 
-                                m.wvalid && 
-                                ((wr_state == IDLE_WR) ? addr_match_wr[i] : wr_slave_sel[i]);
+            assign s[i].wvalid = m.wvalid && ((wr_state == IDLE_WR) ? addr_match_wr[i] : wr_slave_sel[i]);
             assign s[i].wdata = m.wdata;
             assign s[i].wmask = m.wmask;
             assign s_wready_vec[i] = ((wr_state == IDLE_WR) ? addr_match_wr[i] : wr_slave_sel[i]) && 
