@@ -23,7 +23,7 @@ module clint #(
     // 地址匹配信号
     logic addr_match_ar;
 
-    assign addr_match_ar = (s.araddr >= MTIME_ADDR) && (s.araddr < MTIME_ADDR + CLINT_SIZE);
+    assign addr_match_ar = (s.araddr >= MTIME_ADDR) && (s.araddr < MTIME_ADDR + MTIME_SIZE);
 
     // mtime寄存器 - 固定为64位
     logic [63:0] mtime;
