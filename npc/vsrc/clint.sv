@@ -70,7 +70,8 @@ module clint #(
         end
     end
     // always_comb assert (addr_offset == 32'h0 || addr_offset == 32'h4);
-    always_comb assert (0);
+    // always_comb assert (0);
+    always_comb $error("hello");
 
     assign s.rvalid = (rd_state == WAIT_RRESP);
     assign s.rdata  = addr_match_ar_reg ? mtime[addr_offset*8+:32] : 32'h0;
