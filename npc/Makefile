@@ -15,7 +15,7 @@ verilator:
 	# 提交git
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 	@echo "Generating Verilator sources..."
-	verilator --cc --build -j 0 -Wall \
+	verilator --cc --build -j 0 -Wall –-assert \
 		--top-module top \
 		--trace-fst \
 		-CFLAGS "$(CVCFLAGS) -I$(NSIM_HOME)/include" \
