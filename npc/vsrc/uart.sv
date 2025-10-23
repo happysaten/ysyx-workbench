@@ -76,6 +76,7 @@ module uart #(
             WAIT_WDATA: next_wr_state = (s.wvalid && s.wready) ? WAIT_WRESP : WAIT_WDATA;
             WAIT_WADDR: next_wr_state = (s.awvalid && s.awready) ? WAIT_WRESP : WAIT_WADDR;
             WAIT_WRESP: next_wr_state = (s.bvalid && s.bready) ? IDLE_WR : WAIT_WRESP;
+            default: next_wr_state = IDLE_WR;
         endcase
     end
 
