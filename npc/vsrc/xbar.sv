@@ -35,8 +35,8 @@ module xbar #(
     logic [NUM_SLAVES-1:0] addr_match_wr;
 
     // 选中的slave索引(one-hot编码)
-    logic [NUM_SLAVES-1:0] rd_slave_sel;
-    logic [NUM_SLAVES-1:0] wr_slave_sel;
+    logic [NUM_SLAVES-1:0] addr_match_rd_reg;
+    logic [NUM_SLAVES-1:0] addr_match_wr_reg;
 
     // 生成地址匹配逻辑
     genvar i;
@@ -69,29 +69,29 @@ module xbar #(
 
     // ============ 读通道状态机 ============
     always_ff @(posedge clk) begin
-        if (reset) begin
-            rd_state <= IDLE_RD;
-            rd_slave_sel <= '0;
-        end else begin
-            rd_state <= next_rd_state;
-            if (m.arvalid && m.arready) begin
-                rd_slave_sel <= addr_match_rd;
-            end
-        end
+        if (reset) rd_state <= IDLE_RD;
+        else rd_state <= next_rd_state;
     end
+
+    always_ff @(posedge clk) begin
+        if (reset) addr_match_rd_reg <= '0;
+        else if(m.arvalid && m.arready) addr_match_rd_reg <= addr_match_rd;
+        else if(m.rvalid && m.rready) addr_match_rd_reg <= '0;
+    end
+
 
     // ============ 写通道状态机 ============
     always_ff @(posedge clk) begin
-        if (reset) begin
-            wr_state <= IDLE_WR;
-            wr_slave_sel <= '0;
-        end else begin
-            wr_state <= next_wr_state;
-            if (m.awvalid && m.awready) begin
-                wr_slave_sel <= addr_match_wr;
-            end
-        end
+        if (reset) wr_state <= IDLE_WR;
+        else wr_state <= next_wr_state;
     end
+
+    always_ff @(posedge clk) begin
+        if (reset) addr_match_wr_reg <= '0;
+        else if(m.awvalid && m.awready) addr_match_wr_reg <= addr_match_wr;
+        else if(m.bvalid && m.bready) addr_match_wr_reg <= '0;
+    end
+
 
     // 读状态机next逻辑
 
@@ -137,8 +137,8 @@ module xbar #(
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_data
-            assign s[i].rready = (rd_state == WAIT_RRESP) && rd_slave_sel[i] && m.rready;
-            assign s_rvalid_vec[i] = rd_slave_sel[i] && s[i].rvalid;
+            assign s[i].rready = (rd_state == WAIT_RRESP) && addr_match_rd_reg[i] && m.rready;
+            assign s_rvalid_vec[i] = addr_match_rd_reg[i] && s[i].rvalid;
         end
     endgenerate
 
@@ -157,7 +157,7 @@ module xbar #(
         m.rdata = '0;
         m.rresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
-            if (rd_slave_sel[j]) begin
+            if (addr_match_rd_reg[j]) begin
                 m.rdata = rdata_array[j];
                 m.rresp = rresp_array[j];
             end
@@ -180,11 +180,10 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_wready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_data
-            assign s[i].wvalid = m.wvalid && ((wr_state == IDLE_WR) ? addr_match_wr[i] : wr_slave_sel[i]);
+            assign s[i].wvalid = m.wvalid && ((wr_state == IDLE_WR) ? addr_match_wr[i] : addr_match_wr_reg[i]);
             assign s[i].wdata = m.wdata;
             assign s[i].wmask = m.wmask;
-            assign s_wready_vec[i] = ((wr_state == IDLE_WR) ? addr_match_wr[i] : wr_slave_sel[i]) && 
-                                     s[i].wready;
+            assign s_wready_vec[i] = s[i].wready&&((wr_state == IDLE_WR) ? addr_match_wr[i] : addr_match_wr_reg[i]);
         end
     endgenerate
     assign m.wready = |s_wready_vec;
@@ -194,8 +193,8 @@ module xbar #(
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_resp
-            assign s[i].bready = (wr_state == WAIT_WRESP) && wr_slave_sel[i] && m.bready;
-            assign s_bvalid_vec[i] = wr_slave_sel[i] && s[i].bvalid;
+            assign s[i].bready = (wr_state == WAIT_WRESP) && addr_match_wr_reg[i] && m.bready;
+            assign s_bvalid_vec[i] = addr_match_wr_reg[i] && s[i].bvalid;
         end
     endgenerate
 
@@ -211,7 +210,7 @@ module xbar #(
     always_comb begin
         m.bresp = 2'b00;
         for (int j = 0; j < NUM_SLAVES; j++) begin
-            if (wr_slave_sel[j]) begin
+            if (addr_match_wr_reg[j]) begin
                 m.bresp = bresp_array[j];
             end
         end
