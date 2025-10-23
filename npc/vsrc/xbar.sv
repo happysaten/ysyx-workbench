@@ -75,8 +75,8 @@ module xbar #(
 
     always_ff @(posedge clk) begin
         if (reset) addr_match_rd_reg <= '0;
-        else if(m.arvalid && m.arready) addr_match_rd_reg <= addr_match_rd;
-        else if(m.rvalid && m.rready) addr_match_rd_reg <= '0;
+        else if (m.arvalid && m.arready) addr_match_rd_reg <= addr_match_rd;
+        else if (m.rvalid && m.rready) addr_match_rd_reg <= '0;
     end
 
 
@@ -88,8 +88,8 @@ module xbar #(
 
     always_ff @(posedge clk) begin
         if (reset) addr_match_wr_reg <= '0;
-        else if(m.awvalid && m.awready) addr_match_wr_reg <= addr_match_wr;
-        else if(m.bvalid && m.bready) addr_match_wr_reg <= '0;
+        else if (m.awvalid && m.awready) addr_match_wr_reg <= addr_match_wr;
+        else if (m.bvalid && m.bready) addr_match_wr_reg <= '0;
     end
 
 
@@ -137,7 +137,7 @@ module xbar #(
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_data
-            assign s[i].rready = (rd_state == WAIT_RRESP) && addr_match_rd_reg[i] && m.rready;
+            assign s[i].rready = addr_match_rd_reg[i] && m.rready;
             assign s_rvalid_vec[i] = addr_match_rd_reg[i] && s[i].rvalid;
         end
     endgenerate
@@ -180,10 +180,10 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_wready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_data
-            assign s[i].wvalid = m.wvalid && ((wr_state == IDLE_WR) ? addr_match_wr[i] : addr_match_wr_reg[i]);
+            assign s[i].wvalid = m.wvalid && addr_match_wr_reg[i];
             assign s[i].wdata = m.wdata;
             assign s[i].wmask = m.wmask;
-            assign s_wready_vec[i] = s[i].wready&&((wr_state == IDLE_WR) ? addr_match_wr[i] : addr_match_wr_reg[i]);
+            assign s_wready_vec[i] = s[i].wready && addr_match_wr_reg[i];
         end
     endgenerate
     assign m.wready = |s_wready_vec;
@@ -193,7 +193,7 @@ module xbar #(
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_resp
-            assign s[i].bready = (wr_state == WAIT_WRESP) && addr_match_wr_reg[i] && m.bready;
+            assign s[i].bready = addr_match_wr_reg[i] && m.bready;
             assign s_bvalid_vec[i] = addr_match_wr_reg[i] && s[i].bvalid;
         end
     endgenerate
