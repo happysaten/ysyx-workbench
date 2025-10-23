@@ -5,7 +5,7 @@
 
 module clint #(
     parameter int MTIME_ADDR = 32'ha0000048,  // mtime基地址
-    parameter int CLINT_SIZE = 32'h8          // CLINT地址空间大小
+    parameter int MTIME_SIZE = 32'h8          // CLINT地址空间大小
 ) (
     input logic             clk,
     input logic             reset,
