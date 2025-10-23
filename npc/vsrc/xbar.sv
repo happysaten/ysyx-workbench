@@ -17,7 +17,7 @@ module xbar #(
     // 定义读状态
     typedef enum logic [1:0] {
         IDLE_RD,
-        BUSY_RD
+        WAIT_RRESP
     } rd_state_t;
 
     rd_state_t rd_state, next_rd_state;
@@ -99,13 +99,13 @@ module xbar #(
         case (rd_state)
             IDLE_RD: begin
                 if (m.arvalid && |addr_match_rd) begin
-                    next_rd_state = BUSY_RD;
+                    next_rd_state = WAIT_RRESP;
                 end else begin
                     next_rd_state = IDLE_RD;
                 end
             end
-            BUSY_RD: begin
-                next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : BUSY_RD;
+            WAIT_RRESP: begin
+                next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : WAIT_RRESP;
             end
             default: next_rd_state = IDLE_RD;
         endcase
@@ -149,7 +149,7 @@ module xbar #(
 
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_data
-            assign s[i].rready = (rd_state == BUSY_RD) && rd_slave_sel[i] && m.rready;
+            assign s[i].rready = (rd_state == WAIT_RRESP) && rd_slave_sel[i] && m.rready;
             assign s_rvalid_vec[i] = rd_slave_sel[i] && s[i].rvalid;
         end
     endgenerate

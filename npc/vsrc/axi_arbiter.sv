@@ -85,7 +85,10 @@ module axi_arbiter (
     assign m1.awready = (wr_state == IDLE_WR) ? (s.awready && !m0.awvalid) : 1'b0;
 
     // 写数据通道
-    assign s.wvalid = (wr_state == IDLE_WR || wr_state == M0_WAIT_WRESP || wr_state == M1_WAIT_WRESP) && (m0.wvalid || m1.wvalid);
+    assign s.wvalid = (wr_state == IDLE_WR ?
+                       (m0.wvalid || m1.wvalid) :
+                       (wr_state == M0_WAIT_WRESP) ? m0.wvalid :
+                       m1.wvalid);
     assign s.wdata = (m0.wvalid && m0.wready) ? m0.wdata : m1.wdata;
     assign s.wmask = (m0.wvalid && m0.wready) ? m0.wmask : m1.wmask;
     assign m0.wready = (wr_state == IDLE_WR || wr_state == M0_WAIT_WRESP) ? s.wready : 1'b0;
