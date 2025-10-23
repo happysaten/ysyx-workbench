@@ -95,7 +95,7 @@ module top (
     // 实例化UART模块
     uart #(
         .UART_ADDR(XBAR_SLAVE_BASE[1]),
-        .SIZE(XBAR_SLAVE_SIZE[1])
+        .UART_SIZE(XBAR_SLAVE_SIZE[1])
 
     ) u_uart (
         .clk  (clk),
