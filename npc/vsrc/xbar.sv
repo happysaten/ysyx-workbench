@@ -74,7 +74,7 @@ module xbar #(
             rd_slave_sel <= '0;
         end else begin
             rd_state <= next_rd_state;
-            if (rd_state == IDLE_RD && m.arvalid && m.arready) begin
+            if (m.arvalid && m.arready) begin
                 rd_slave_sel <= addr_match_rd;
             end
         end
@@ -87,7 +87,7 @@ module xbar #(
             wr_slave_sel <= '0;
         end else begin
             wr_state <= next_wr_state;
-            if (wr_state == IDLE_WR && m.awvalid && m.awready) begin
+            if (m.awvalid && m.awready) begin
                 wr_slave_sel <= addr_match_wr;
             end
         end
@@ -98,11 +98,7 @@ module xbar #(
     always_comb begin
         case (rd_state)
             IDLE_RD: begin
-                if (m.arvalid && |addr_match_rd) begin
-                    next_rd_state = WAIT_RRESP;
-                end else begin
-                    next_rd_state = IDLE_RD;
-                end
+                next_rd_state = (m.arvalid && m.arready) ? WAIT_RRESP : IDLE_RD;
             end
             WAIT_RRESP: begin
                 next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : WAIT_RRESP;
@@ -112,21 +108,13 @@ module xbar #(
     end
 
     // 写状态机next逻辑
-    logic wr_addr_fire, wr_resp_fire;
-    assign wr_addr_fire = m.awvalid && m.awready;
-    assign wr_resp_fire = m.bvalid && m.bready;
-
     always_comb begin
         case (wr_state)
             IDLE_WR: begin
-                if (wr_addr_fire && |addr_match_wr) begin
-                    next_wr_state = WAIT_WRESP;
-                end else begin
-                    next_wr_state = IDLE_WR;
-                end
+                next_wr_state = (m.awvalid && m.awready) ? WAIT_WRESP : IDLE_WR;
             end
             WAIT_WRESP: begin
-                next_wr_state = wr_resp_fire ? IDLE_WR : WAIT_WRESP;
+                next_wr_state = (m.bvalid && m.bready) ? IDLE_WR : WAIT_WRESP;
             end
             default: next_wr_state = IDLE_WR;
         endcase
@@ -137,12 +125,12 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_arready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_addr
-            assign s[i].arvalid = (rd_state == IDLE_RD) && m.arvalid && addr_match_rd[i];
+            assign s[i].arvalid = m.arvalid && addr_match_rd[i];
             assign s[i].araddr = m.araddr;
-            assign s_arready_vec[i] = addr_match_rd[i] && s[i].arready;
+            assign s_arready_vec[i] = s[i].arready && addr_match_rd[i];
         end
     endgenerate
-    assign m.arready = (rd_state == IDLE_RD) && |s_arready_vec;
+    assign m.arready = |s_arready_vec;
 
     // 读数据通道
     logic [NUM_SLAVES-1:0] s_rvalid_vec;
@@ -181,12 +169,12 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_awready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_addr
-            assign s[i].awvalid = (wr_state == IDLE_WR) && m.awvalid && addr_match_wr[i];
+            assign s[i].awvalid = m.awvalid && addr_match_wr[i];
             assign s[i].awaddr = m.awaddr;
-            assign s_awready_vec[i] = addr_match_wr[i] && s[i].awready;
+            assign s_awready_vec[i] = s[i].awready && addr_match_wr[i];
         end
     endgenerate
-    assign m.awready = (wr_state == IDLE_WR) && |s_awready_vec;
+    assign m.awready = |s_awready_vec;
 
     // 写数据通道
     logic [NUM_SLAVES-1:0] s_wready_vec;
