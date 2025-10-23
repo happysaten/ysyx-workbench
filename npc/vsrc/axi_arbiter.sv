@@ -89,7 +89,8 @@ module axi_arbiter (
     assign s.wdata = (m0.wvalid && m0.wready) ? m0.wdata : m1.wdata;
     assign s.wmask = (m0.wvalid && m0.wready) ? m0.wmask : m1.wmask;
     assign m0.wready = (wr_state == IDLE_WR || wr_state == M0_WAIT_WRESP) ? s.wready : 1'b0;
-    assign m1.wready = (wr_state == IDLE_WR || wr_state == M1_WAIT_WRESP) ? (s.wready && !m0.wvalid) : 1'b0;
+    assign m1.wready = (wr_state == IDLE_WR) ? (s.wready && !m0.wvalid) :
+                       (wr_state == M1_WAIT_WRESP) ? s.wready : 1'b0;
 
     // 写回复通道
     assign m0.bvalid = (wr_state == M0_WAIT_WRESP) ? s.bvalid : 1'b0;

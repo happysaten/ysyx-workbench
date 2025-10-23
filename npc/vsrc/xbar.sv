@@ -40,14 +40,33 @@ module xbar #(
 
     // 生成地址匹配逻辑
     genvar i;
-    generate
-        for (i = 0; i < NUM_SLAVES; i++) begin : gen_addr_match
-            assign addr_match_rd[i] = (m.araddr >= SLAVE_BASE[i]) && 
-                                     (m.araddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
-            assign addr_match_wr[i] = (m.awaddr >= SLAVE_BASE[i]) && 
-                                     (m.awaddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
+    // generate
+    //     for (i = 0; i < NUM_SLAVES; i++) begin : gen_addr_match
+    //         assign addr_match_rd[i] = (m.araddr >= SLAVE_BASE[i]) && 
+    //                                  (m.araddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
+    //         assign addr_match_wr[i] = (m.awaddr >= SLAVE_BASE[i]) && 
+    //                                  (m.awaddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
+    //     end
+    // endgenerate
+    always_comb begin
+        addr_match_rd = '0;
+        for (int j = 0; j < NUM_SLAVES; j++) begin
+            if ((m.araddr >= SLAVE_BASE[j]) && (m.araddr < (SLAVE_BASE[j] + SLAVE_SIZE[j]))) begin
+                addr_match_rd[j] = 1'b1;
+                break;
+            end
         end
-    endgenerate
+    end
+
+    always_comb begin
+        addr_match_wr = '0;
+        for (int j = 0; j < NUM_SLAVES; j++) begin
+            if ((m.awaddr >= SLAVE_BASE[j]) && (m.awaddr < (SLAVE_BASE[j] + SLAVE_SIZE[j]))) begin
+                addr_match_wr[j] = 1'b1;
+                break;
+            end
+        end
+    end
 
     // ============ 读通道状态机 ============
     always_ff @(posedge clk) begin
