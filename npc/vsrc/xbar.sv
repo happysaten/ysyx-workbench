@@ -48,6 +48,8 @@ module xbar #(
     //                                  (m.awaddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
     //     end
     // endgenerate
+
+    // 生成地址匹配逻辑（独热编码）
     always_comb begin
         addr_match_rd = '0;
         for (int j = 0; j < NUM_SLAVES; j++) begin
@@ -56,9 +58,6 @@ module xbar #(
                 break;
             end
         end
-    end
-
-    always_comb begin
         addr_match_wr = '0;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if ((m.awaddr >= SLAVE_BASE[j]) && (m.awaddr < (SLAVE_BASE[j] + SLAVE_SIZE[j]))) begin
