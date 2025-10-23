@@ -98,7 +98,7 @@ module uart #(
     assign s.rdata  = 32'h0;  // UART 读取返回0
     assign s.rresp  = addr_match_ar_reg ? 2'b00 : 2'b10;  // OKAY or SLVERR
     // always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
-    always_comb if (rd_state == WAIT_RRESP) $fatal("do not support read");
+    always_comb if (rd_state == WAIT_RRESP) $error("do not support read");
 
     logic [31:0] wr_addr_reg;
     logic [31:0] wr_data_reg;
@@ -175,7 +175,7 @@ module uart #(
                     $write("%c", final_wdata[7:0]);
                     difftest_skip_ref();
                 end else begin
-                    $fatal("do not support offset = %h", final_waddr - UART_ADDR);
+                    $error("do not support offset = %h", final_waddr - UART_ADDR);
                 end
             end
         end
