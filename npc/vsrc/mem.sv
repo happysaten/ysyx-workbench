@@ -13,9 +13,10 @@ module MEM (
     rd_state_t rd_state, rd_next_state;
 
     // 写通道状态机
-    typedef enum logic [1:0] {
+    typedef enum logic [2:0] {
         IDLE_WR,
         WAIT_WDATA,
+        WAIT_WADDR,
         WAIT_WR,
         RESP_WR
     } wr_state_t;
@@ -71,6 +72,9 @@ module MEM (
                 end else if (s.awvalid && s.awready) begin
                     // 只有地址到达
                     wr_next_state = WAIT_WDATA;
+                end else if (s.wvalid && s.wready) begin
+                    // 只有数据到达
+                    wr_next_state = WAIT_WADDR;
                 end else begin
                     wr_next_state = IDLE_WR;
                 end
@@ -79,6 +83,11 @@ module MEM (
                 // 等待数据到达
                 wr_next_state = (s.wvalid && s.wready) ?
                                 (wr_resp_ready ? RESP_WR : WAIT_WR) : WAIT_WDATA;
+            end
+            WAIT_WADDR: begin
+                // 等待地址到达
+                wr_next_state = (s.awvalid && s.awready) ?
+                                (wr_resp_ready ? RESP_WR : WAIT_WR) : WAIT_WADDR;
             end
             WAIT_WR: wr_next_state = wr_resp_ready ? RESP_WR : WAIT_WR;
             RESP_WR: wr_next_state = (s.bvalid && s.bready) ? IDLE_WR : RESP_WR;
@@ -91,7 +100,7 @@ module MEM (
     assign s.rvalid  = (rd_state == RESP_RD);
 
     // 写通道握手信号
-    assign s.awready = (wr_state == IDLE_WR);
+    assign s.awready = (wr_state == IDLE_WR) || (wr_state == WAIT_WADDR);
     assign s.wready  = (wr_state == IDLE_WR) || (wr_state == WAIT_WDATA);
     assign s.bvalid  = (wr_state == RESP_WR);
 
@@ -143,15 +152,20 @@ module MEM (
     // 写事务处理
     logic [31:0] final_waddr;
     logic [31:0] final_wdata;
-    logic [ 7:0] final_wmask;
+    logic [7:0] final_wmask;
+    logic write_complete;
 
     assign final_waddr = wr_addr_received ? wr_addr_reg : s.awaddr;
     assign final_wdata = wr_data_received ? wr_data_reg : s.wdata;
     assign final_wmask = wr_data_received ? wr_mask_reg : s.wmask;
 
+    // 检测写地址和写数据是否都已到达
+    assign write_complete = (wr_state == WAIT_WDATA && s.wvalid && s.wready) ||
+                           (wr_state == WAIT_WADDR && s.awvalid && s.awready) ||
+                           (wr_state == IDLE_WR && s.awvalid && s.awready && s.wvalid && s.wready);
+
     always @(posedge clk) begin
-        if ((wr_state == WAIT_WDATA && s.wvalid && s.wready) ||
-            (wr_state == IDLE_WR && s.awvalid && s.awready && s.wvalid && s.wready)) begin
+        if (write_complete) begin
             pmem_write_npc(final_waddr, final_wdata, final_wmask);
         end
     end

@@ -52,7 +52,7 @@ module top (
     // Crossbar 参数定义
     localparam int XBAR_NUM_SLAVES = 3;
     localparam logic [2:0][31:0] XBAR_SLAVE_BASE = {32'ha0000048, 32'ha00003f8, 32'h80000000};
-    localparam logic [2:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h4, 32'h08000000};
+    localparam logic [2:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
     // 创建AXI接口实例
     axi_lite_if imem_if ();  // IFU(取指)接口
     axi_lite_if dmem_if ();  // LSU(访存)接口
@@ -94,7 +94,9 @@ module top (
 
     // 实例化UART模块
     uart #(
-        .UART_ADDR(32'ha00003f8)
+        .UART_ADDR(XBAR_SLAVE_BASE[1]),
+        .UART_SIZE(XBAR_SLAVE_SIZE[1])
+
     ) u_uart (
         .clk  (clk),
         .reset(reset_sync),
@@ -103,7 +105,8 @@ module top (
     );
 
     clint #(
-        .MTIME_ADDR(32'ha0000048)
+        .MTIME_ADDR(XBAR_SLAVE_BASE[2]),
+        .MTIME_SIZE(XBAR_SLAVE_SIZE[2])
     ) u_clint (
         .clk  (clk),
         .reset(reset_sync),

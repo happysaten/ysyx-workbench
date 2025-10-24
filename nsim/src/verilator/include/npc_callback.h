@@ -13,6 +13,7 @@ void update_csrs(word_t *csrs);
 void write_csr(int idx, word_t data);
 void update_inst(word_t inst, vaddr_t dnpc);
 void ebreak(void);
+void difftest_skip_ref(void);
 
 #ifdef __cplusplus
 }

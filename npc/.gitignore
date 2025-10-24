@@ -5,10 +5,13 @@
 !*.mk
 !*.[cSh]
 !*.v
+!*._v
 !*.sv
 !*._sv
 !*.vh
+!*._vh
 !*.svh
+!*._svh
 !*.vlt
 !*.cc
 !*.cpp
