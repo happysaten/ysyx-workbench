@@ -180,10 +180,10 @@ module xbar #(
     logic [NUM_SLAVES-1:0] s_wready_vec;
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_data
-            assign s[i].wvalid = m.wvalid && addr_match_wr_reg[i];
+            assign s[i].wvalid = m.wvalid && (wr_state == IDLE_WR ? addr_match_wr[i] : addr_match_wr_reg[i]);
             assign s[i].wdata = m.wdata;
             assign s[i].wmask = m.wmask;
-            assign s_wready_vec[i] = s[i].wready && addr_match_wr_reg[i];
+            assign s_wready_vec[i] = s[i].wready && (wr_state == IDLE_WR ? addr_match_wr[i] : addr_match_wr_reg[i]);
         end
     endgenerate
     assign m.wready = |s_wready_vec;
