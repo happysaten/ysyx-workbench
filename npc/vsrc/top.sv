@@ -51,8 +51,10 @@ module top (
 
     // Crossbar 参数定义
     localparam int XBAR_NUM_SLAVES = 3;
-    localparam logic [2:0][31:0] XBAR_SLAVE_BASE = {32'ha0000048, 32'ha00003f8, 32'h80000000};
-    localparam logic [2:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
+    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_BASE = {
+        32'ha0000048, 32'ha00003f8, 32'h80000000
+    };
+    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
     // 创建AXI接口实例
     axi_lite_if imem_if ();  // IFU(取指)接口
     axi_lite_if dmem_if ();  // LSU(访存)接口
