@@ -48,14 +48,14 @@ module xbar #(
     // 生成选择信号（独热编码）
     always_comb begin
         select_rd = !(|addr_match_rd[NUM_SLAVES-1:1]);  //当全部不匹配时，选择第0个slave
-        for (int j = 1; j < NUM_SLAVES; j++) begin
+        for (int j = NUM_SLAVES - 1; j > 0; j--) begin
             if (addr_match_rd[j]) begin
                 select_rd[j] = 1'b1;
                 break;
             end
         end
         select_wr = !(|addr_match_wr[NUM_SLAVES-1:1]);
-        for (int j = 1; j < NUM_SLAVES; j++) begin
+        for (int j = NUM_SLAVES - 1; j > 0; j--) begin
             if (addr_match_wr[j]) begin
                 select_wr[j] = 1'b1;
                 break;
