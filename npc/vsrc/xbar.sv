@@ -178,7 +178,7 @@ module xbar #(
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_data
             assign s[i].wvalid = m.wvalid && (wr_state == IDLE_WR ? select_wr[i] : select_wr_reg[i]);
             assign s[i].wdata = m.wdata;
-            assign s[i].wmask = m.wmask;
+            assign s[i].wstrb = m.wstrb;
             assign s_wready_vec[i] = s[i].wready && (wr_state == IDLE_WR ? select_wr[i] : select_wr_reg[i]);
         end
     endgenerate

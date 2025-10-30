@@ -20,7 +20,7 @@ interface axi_lite_if;
     logic        wvalid;
     logic        wready;
     logic [31:0] wdata;
-    logic [ 7:0] wmask;
+    logic [ 7:0] wstrb;
 
     // Write response channel (B)
     logic        bvalid;
@@ -31,7 +31,7 @@ interface axi_lite_if;
     modport master(
         output arvalid, araddr, rready,
         output awvalid, awaddr,
-        output wvalid, wdata, wmask,
+        output wvalid, wdata, wstrb,
         output bready,
 
         input arready, rvalid, rdata, rresp,
@@ -42,7 +42,7 @@ interface axi_lite_if;
     modport slave(
         input arvalid, araddr, rready,
         input awvalid, awaddr,
-        input wvalid, wdata, wmask,
+        input wvalid, wdata, wstrb,
         input bready,
 
         output arready, rvalid, rdata, rresp,

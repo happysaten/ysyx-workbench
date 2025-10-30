@@ -142,7 +142,7 @@ module MEM (
             wr_data_received <= 1'b0;
         end else if (s.wvalid && s.wready) begin
             wr_data_reg <= s.wdata;
-            wr_mask_reg <= s.wmask;
+            wr_mask_reg <= s.wstrb;
             wr_data_received <= 1'b1;
         end else if (wr_state == IDLE_WR) begin
             wr_data_received <= 1'b0;
@@ -152,12 +152,12 @@ module MEM (
     // 写事务处理
     logic [31:0] final_waddr;
     logic [31:0] final_wdata;
-    logic [7:0] final_wmask;
+    logic [7:0] final_wstrb;
     logic write_complete;
 
     assign final_waddr = wr_addr_received ? wr_addr_reg : s.awaddr;
     assign final_wdata = wr_data_received ? wr_data_reg : s.wdata;
-    assign final_wmask = wr_data_received ? wr_mask_reg : s.wmask;
+    assign final_wstrb = wr_data_received ? wr_mask_reg : s.wstrb;
 
     // 检测写地址和写数据是否都已到达
     assign write_complete = (wr_state == WAIT_WDATA && s.wvalid && s.wready) ||
@@ -166,7 +166,7 @@ module MEM (
 
     always @(posedge clk) begin
         if (write_complete) begin
-            pmem_write_npc(final_waddr, final_wdata, final_wmask);
+            pmem_write_npc(final_waddr, final_wdata, final_wstrb);
         end
     end
 

@@ -285,7 +285,7 @@ module IFU (
     assign imem.awaddr = 32'h0;
     assign imem.wvalid = 1'b0;
     assign imem.wdata = 32'h0;
-    assign imem.wmask = 8'h0;
+    assign imem.wstrb = 8'h0;
     assign imem.bready = 1'b0;
 
     assign ifu_req_ready = imem.arready;
@@ -771,11 +771,11 @@ module LSU (
     // 写掩码生成
     always_comb begin
         unique case (funct3)
-            3'b000: dmem.wmask = 8'h1;  // SB
-            3'b001: dmem.wmask = 8'h3;  // SH
-            3'b010: dmem.wmask = 8'hF;  // SW
+            3'b000: dmem.wstrb = 8'h1;  // SB
+            3'b001: dmem.wstrb = 8'h3;  // SH
+            3'b010: dmem.wstrb = 8'hF;  // SW
             default: begin
-                dmem.wmask = 8'h0;
+                dmem.wstrb = 8'h0;
                 if (dmem_wen) NPCINV(pc);
             end
         endcase
