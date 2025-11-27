@@ -36,8 +36,10 @@ module xbar #(
 
     // 生成地址匹配逻辑
     genvar i;
+    assign addr_match_rd[0] = 1'b1;  // 默认匹配第0个slave
+    assign addr_match_wr[0] = 1'b1;  // 默认匹配第0个slave
     generate
-        for (i = 0; i < NUM_SLAVES; i++) begin : gen_addr_match
+        for (i = 1; i < NUM_SLAVES; i++) begin : gen_addr_match
             assign addr_match_rd[i] = (m.araddr >= SLAVE_BASE[i]) &&
                                      (m.araddr < (SLAVE_BASE[i] + SLAVE_SIZE[i]));
             assign addr_match_wr[i] = (m.awaddr >= SLAVE_BASE[i]) &&
@@ -45,17 +47,18 @@ module xbar #(
         end
     endgenerate
 
-    // 生成选择信号（独热编码）
+    // 生成选择信号（优先级独热编码）
     always_comb begin
-        select_rd = !(|addr_match_rd[NUM_SLAVES-1:1]);  //当全部不匹配时，选择第0个slave
-        for (int j = NUM_SLAVES - 1; j > 0; j--) begin
+        select_rd = '0;
+        // select_rd = !(|addr_match_rd[NUM_SLAVES-1:1]);  //当全部不匹配时，选择第0个slave
+        for (int j = NUM_SLAVES - 1; j >= 0; j--) begin
             if (addr_match_rd[j]) begin
                 select_rd[j] = 1'b1;
                 break;
             end
         end
-        select_wr = !(|addr_match_wr[NUM_SLAVES-1:1]);
-        for (int j = NUM_SLAVES - 1; j > 0; j--) begin
+        select_wr = '0;
+        for (int j = NUM_SLAVES - 1; j >= 0; j--) begin
             if (addr_match_wr[j]) begin
                 select_wr[j] = 1'b1;
                 break;
