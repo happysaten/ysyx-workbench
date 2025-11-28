@@ -1,8 +1,8 @@
 // MEM(Memory) 负责统一内存的读写访问
-module MEM (
+module axi4_lite_MEM (
     input logic             clk,
     input logic             reset,
-          axi4_if.slave      s       // 使用interface替代所有独立的AXI信号
+          axi4_lite_if.slave s       // 使用interface替代所有独立的AXI信号
 );
     // 读通道状态机
     typedef enum logic [1:0] {
@@ -98,7 +98,6 @@ module MEM (
     // 读通道握手信号
     assign s.arready = (rd_state == IDLE_RD);
     assign s.rvalid  = (rd_state == RESP_RD);
-    assign s.rlast   = 1'b1; // 总是单次传输
 
     // 写通道握手信号
     assign s.awready = (wr_state == IDLE_WR) || (wr_state == WAIT_WADDR);
@@ -114,27 +113,21 @@ module MEM (
 
     // 读事务处理
     always @(posedge clk) begin
-        if (s.arvalid && s.arready) begin
-            s.rdata <= pmem_read_npc(s.araddr);
-            s.rid   <= s.arid;
-        end
+        if (s.arvalid && s.arready) s.rdata <= pmem_read_npc(s.araddr);
     end
 
     logic [31:0] wr_addr_reg;
     logic [31:0] wr_data_reg;
     logic [ 7:0] wr_mask_reg;
-    logic [ 3:0] wr_id_reg;
     logic wr_addr_received, wr_data_received;
 
     // 保存写地址
     always @(posedge clk) begin
         if (reset) begin
             wr_addr_reg <= 32'h0;
-            wr_id_reg   <= 4'b0;
             wr_addr_received <= 1'b0;
         end else if (s.awvalid && s.awready) begin
             wr_addr_reg <= s.awaddr;
-            wr_id_reg   <= s.awid;
             wr_addr_received <= 1'b1;
         end else if (wr_state == IDLE_WR) begin
             wr_addr_received <= 1'b0;
@@ -179,7 +172,6 @@ module MEM (
 
     assign s.rresp = 2'b00;
     assign s.bresp = 2'b00;
-    assign s.bid   = wr_id_reg;
 
 endmodule
 

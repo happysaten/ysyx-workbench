@@ -3,13 +3,13 @@
 // AXI4-Lite CLINT模块
 // 作为slave设备，提供只读的mtime寄存器
 
-module clint #(
+module axi4_lite_clint #(
     parameter int MTIME_ADDR = 32'ha0000048,  // mtime基地址
     parameter int MTIME_SIZE = 32'h8          // CLINT地址空间大小
 ) (
-    input logic         clk,
-    input logic         reset,
-          axi4_if.slave s       // 使用interface替代所有独立的AXI信号
+    input logic             clk,
+    input logic             reset,
+          axi4_lite_if.slave s       // 使用interface替代所有独立的AXI信号
 );
 
     // 定义读状态枚举
@@ -59,17 +59,14 @@ module clint #(
     // 读数据通道 - 根据地址偏移返回mtime的相应部分
     logic addr_match_ar_reg;
     logic [31:0] addr_offset;
-    logic [3:0] rid_reg;
 
     always @(posedge clk) begin
         if (reset) begin
             addr_match_ar_reg <= 1'b0;
             addr_offset <= 32'h0;
-            rid_reg <= '0;
         end else if (s.arvalid && s.arready) begin
             addr_match_ar_reg <= addr_match_ar;
             addr_offset <= s.araddr - MTIME_ADDR;
-            rid_reg <= s.arid;
         end
     end
     always_comb begin
@@ -79,8 +76,6 @@ module clint #(
     assign s.rvalid = (rd_state == WAIT_RRESP);
     assign s.rdata  = addr_match_ar_reg ? mtime[addr_offset*8+:32] : 32'h0;
     assign s.rresp  = addr_match_ar_reg ? 2'b00 : 2'b10;  // OKAY or SLVERR
-    assign s.rlast  = 1'b1;
-    assign s.rid    = rid_reg;
 
     always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
 
@@ -89,6 +84,5 @@ module clint #(
     assign s.wready  = 1'b0;
     assign s.bvalid  = 1'b0;
     assign s.bresp   = 2'b10;  // SLVERR - 从设备错误
-    assign s.bid     = 4'b0;
 
 endmodule

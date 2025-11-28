@@ -10,8 +10,8 @@ module xbar #(
 ) (
     input logic              clk,
     input logic              reset,
-          axi_lite_if.slave  m,                 // 1 个 Master (从crossbar角度看是slave接口)
-          axi_lite_if.master s    [NUM_SLAVES]  // N 个 Slave 接口
+          axi4_lite_if.slave  m,                 // 1 个 Master (从crossbar角度看是slave接口)
+          axi4_lite_if.master s    [NUM_SLAVES]  // N 个 Slave 接口
 );
 
     // 定义读状态

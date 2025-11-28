@@ -3,13 +3,13 @@
 // AXI4-Lite UART模块
 // 作为slave设备，支持写操作输出字符
 
-module uart #(
+module axi4_lite_uart #(
     parameter int UART_ADDR = 32'ha00003f8,
     parameter int UART_SIZE = 32'h8  // UART地址空间大小
 ) (
     input logic             clk,
     input logic             reset,
-          axi4_if.slave      s       // 使用interface替代所有独立的AXI信号
+          axi4_lite_if.slave s       // 使用interface替代所有独立的AXI信号
 );
 
     // 定义读状态枚举
@@ -87,23 +87,16 @@ module uart #(
 
     // 读数据通道
     logic addr_match_ar_reg;
-    logic [3:0] rid_reg;
-
     always @(posedge clk) begin
         if (reset) begin
             addr_match_ar_reg <= 1'b0;
-            rid_reg <= 4'b0;
         end else if (s.arvalid && s.arready) begin
             addr_match_ar_reg <= addr_match_ar;
-            rid_reg <= s.arid;
         end
     end
     assign s.rvalid = (rd_state == WAIT_RRESP);
     assign s.rdata  = 32'h0;  // UART 读取返回0
     assign s.rresp  = addr_match_ar_reg ? 2'b00 : 2'b10;  // OKAY or SLVERR
-    assign s.rlast  = 1'b1;
-    assign s.rid    = rid_reg;
-
     // always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
     always_comb if (rd_state == WAIT_RRESP) $error("do not support read");
 
@@ -113,7 +106,6 @@ module uart #(
     logic addr_match_aw_reg;
     logic addr_is_base_reg;  // 是否是基地址（第一个字节）
     logic [7:0] serial_base;  // 模拟C代码中的serial_base[0]
-    logic [3:0] bid_reg;
 
     // 保存写地址
     always_ff @(posedge clk) begin
@@ -122,13 +114,11 @@ module uart #(
             wr_addr_received <= 1'b0;
             addr_match_aw_reg <= 1'b0;
             addr_is_base_reg <= 1'b0;
-            bid_reg <= 4'b0;
         end else if (s.awvalid && s.awready) begin
             wr_addr_reg <= s.awaddr;
             wr_addr_received <= 1'b1;
             addr_match_aw_reg <= addr_match_aw;
             addr_is_base_reg <= (s.awaddr == UART_ADDR);
-            bid_reg <= s.awid;
             difftest_skip_ref();
         end else if (wr_state == IDLE_WR) begin
             wr_addr_received <= 1'b0;
@@ -168,7 +158,6 @@ module uart #(
     assign s.bvalid = (wr_state == WAIT_WRESP);
     // 只有在地址匹配且是基地址时才返回OKAY，否则返回SLVERR
     assign s.bresp = (final_addr_match && final_addr_is_base) ? 2'b00 : 2'b10;
-    assign s.bid   = bid_reg;
 
     // 写入数据到寄存器
     logic write_complete;

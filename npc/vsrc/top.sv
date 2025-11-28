@@ -56,12 +56,12 @@ module top (
     };
     localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
     // 创建AXI接口实例
-    axi_lite_if imem_if ();  // IFU(取指)接口
-    axi_lite_if dmem_if ();  // LSU(访存)接口
-    axi_lite_if arbiter_if ();  // 仲裁器输出接口
-    // axi_lite_if uart_if ();  // UART接口
-    // axi_lite_if mem_if ();  // 统一内存接口
-    axi_lite_if xbar_if[XBAR_NUM_SLAVES] ();
+    axi4_if imem_if ();  // IFU(取指)接口
+    axi4_if dmem_if ();  // LSU(访存)接口
+    axi4_if arbiter_if ();  // 仲裁器输出接口
+    // axi4_lite_if uart_if ();  // UART接口
+    // axi4_lite_if mem_if ();  // 统一内存接口
+    axi4_if xbar_if[XBAR_NUM_SLAVES] ();
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
@@ -268,7 +268,7 @@ module IFU (
     output logic              [31:0] dnpc,
     output logic                     ifu_error,
     // IMEM接口 - 使用interface
-           axi_lite_if.master        imem
+           axi4_if.master             imem
 );
 
     // snpc / dnpc 选择逻辑
@@ -278,14 +278,23 @@ module IFU (
     // IMEM访问控制 - 只使用读通道
     assign imem.araddr = dnpc;
     assign imem.arvalid = ifu_req_valid;
+    assign imem.arid    = 4'b0;
+    assign imem.arlen   = 8'b0;      // Burst length = 1
+    assign imem.arsize  = 3'b010;    // 4 bytes
+    assign imem.arburst = 2'b01;     // INCR
     assign imem.rready = ifu_resp_ready;
 
     // 写通道全部置为无效
     assign imem.awvalid = 1'b0;
     assign imem.awaddr = 32'h0;
+    assign imem.awid    = 4'b0;
+    assign imem.awlen   = 8'b0;
+    assign imem.awsize  = 3'b000;
+    assign imem.awburst = 2'b00;
     assign imem.wvalid = 1'b0;
     assign imem.wdata = 32'h0;
-    assign imem.wstrb = 8'h0;
+    assign imem.wstrb = 4'h0;
+    assign imem.wlast   = 1'b0;
     assign imem.bready = 1'b0;
 
     assign ifu_req_ready = imem.arready;
@@ -746,7 +755,7 @@ module LSU (
     output logic              [31:0] lsu_rdata,
     output logic                     lsu_error,
     // DMEM接口 - 使用interface
-           axi_lite_if.master        dmem
+           axi4_if.master             dmem
 );
     import "DPI-C" function void NPCINV(input int pc);
 
@@ -755,14 +764,43 @@ module LSU (
     assign dmem_ren = (inst_type == TYPE_I && opcode == 7'b0000011);
     assign dmem_wen = (inst_type == TYPE_S && opcode == 7'b0100011);
 
-    assign dmem.araddr = alu_result;
-    assign dmem.awaddr = alu_result;
-    assign dmem.wdata = gpr_rdata2;
+    // AXI4 Size logic
+    logic [2:0] axsize;
+    always_comb begin
+        case (funct3[1:0])
+            2'b00: axsize = 3'b000; // Byte
+            2'b01: axsize = 3'b001; // Half
+            2'b10: axsize = 3'b010; // Word
+            default: axsize = 3'b010;
+        endcase
+    end
+
+    // AR Channel
+    assign dmem.araddr  = alu_result;
     assign dmem.arvalid = lsu_req_valid && dmem_ren;
+    assign dmem.arid    = 4'b0;
+    assign dmem.arlen   = 8'b0;      // Burst length = 1
+    assign dmem.arsize  = axsize;
+    assign dmem.arburst = 2'b01;     // INCR
+
+    // R Channel
+    assign dmem.rready  = lsu_resp_ready;
+
+    // AW Channel
+    assign dmem.awaddr  = alu_result;
     assign dmem.awvalid = lsu_req_valid && dmem_wen;
-    assign dmem.wvalid = lsu_req_valid && dmem_wen;
-    assign dmem.rready = lsu_resp_ready;
-    assign dmem.bready = lsu_resp_ready;
+    assign dmem.awid    = 4'b0;
+    assign dmem.awlen   = 8'b0;
+    assign dmem.awsize  = axsize;
+    assign dmem.awburst = 2'b01;
+
+    // W Channel
+    assign dmem.wdata   = gpr_rdata2;
+    assign dmem.wvalid  = lsu_req_valid && dmem_wen;
+    assign dmem.wlast   = 1'b1;      // Single beat
+
+    // B Channel
+    assign dmem.bready  = lsu_resp_ready;
 
     // LSU握手逻辑
     assign lsu_req_ready = 1'b1;
@@ -771,11 +809,11 @@ module LSU (
     // 写掩码生成
     always_comb begin
         unique case (funct3)
-            3'b000: dmem.wstrb = 8'h1;  // SB
-            3'b001: dmem.wstrb = 8'h3;  // SH
-            3'b010: dmem.wstrb = 8'hF;  // SW
+            3'b000: dmem.wstrb = 4'h1;  // SB
+            3'b001: dmem.wstrb = 4'h3;  // SH
+            3'b010: dmem.wstrb = 4'hF;  // SW
             default: begin
-                dmem.wstrb = 8'h0;
+                dmem.wstrb = 4'h0;
                 if (dmem_wen) NPCINV(pc);
             end
         endcase

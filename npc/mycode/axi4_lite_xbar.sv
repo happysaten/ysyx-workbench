@@ -3,15 +3,15 @@
 // AXI4-Lite Crossbar (1 master to N slaves)
 // 根据地址范围选择从设备
 
-module xbar #(
+module axi4_lite_xbar #(
     parameter int NUM_SLAVES = 2,
     parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_BASE = {32'ha00003f8, 32'h80000000},
     parameter logic [NUM_SLAVES-1:0][31:0] SLAVE_SIZE = {32'h00000004, 32'h08000000}
 ) (
     input logic              clk,
     input logic              reset,
-          axi4_if.slave       m,                 // 1 个 Master (从crossbar角度看是slave接口)
-          axi4_if.master      s    [NUM_SLAVES]  // N 个 Slave 接口
+          axi4_lite_if.slave  m,                 // 1 个 Master (从crossbar角度看是slave接口)
+          axi4_lite_if.master s    [NUM_SLAVES]  // N 个 Slave 接口
 );
 
     // 定义读状态
@@ -75,7 +75,7 @@ module xbar #(
     always_ff @(posedge clk) begin
         if (reset) select_rd_reg <= '0;
         else if (m.arvalid && m.arready) select_rd_reg <= select_rd;
-        else if (m.rvalid && m.rready && m.rlast) select_rd_reg <= '0;
+        else if (m.rvalid && m.rready) select_rd_reg <= '0;
     end
 
 
@@ -100,7 +100,7 @@ module xbar #(
                 next_rd_state = (m.arvalid && m.arready) ? WAIT_RRESP : IDLE_RD;
             end
             WAIT_RRESP: begin
-                next_rd_state = (m.rvalid && m.rready && m.rlast) ? IDLE_RD : WAIT_RRESP;
+                next_rd_state = (m.rvalid && m.rready) ? IDLE_RD : WAIT_RRESP;
             end
             default: next_rd_state = IDLE_RD;
         endcase
@@ -126,10 +126,6 @@ module xbar #(
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_read_addr
             assign s[i].arvalid = m.arvalid && select_rd[i];
             assign s[i].araddr = m.araddr;
-            assign s[i].arid    = m.arid;
-            assign s[i].arlen   = m.arlen;
-            assign s[i].arsize  = m.arsize;
-            assign s[i].arburst = m.arburst;
             assign s_arready_vec[i] = s[i].arready && select_rd[i];
         end
     endgenerate
@@ -149,29 +145,20 @@ module xbar #(
 
     logic [NUM_SLAVES-1:0][31:0] rdata_array;
     logic [NUM_SLAVES-1:0][ 1:0] rresp_array;
-    logic [NUM_SLAVES-1:0]       rlast_array;
-    logic [NUM_SLAVES-1:0][ 3:0] rid_array;
-
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_rdata_array
             assign rdata_array[i] = s[i].rdata;
             assign rresp_array[i] = s[i].rresp;
-            assign rlast_array[i] = s[i].rlast;
-            assign rid_array[i]   = s[i].rid;
         end
     endgenerate
 
     always_comb begin
         m.rdata = '0;
         m.rresp = 2'b00;
-        m.rlast = 1'b0;
-        m.rid   = 4'b0;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (select_rd_reg[j]) begin
                 m.rdata = rdata_array[j];
                 m.rresp = rresp_array[j];
-                m.rlast = rlast_array[j];
-                m.rid   = rid_array[j];
             end
         end
     end
@@ -183,10 +170,6 @@ module xbar #(
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_write_addr
             assign s[i].awvalid = m.awvalid && select_wr[i];
             assign s[i].awaddr = m.awaddr;
-            assign s[i].awid    = m.awid;
-            assign s[i].awlen   = m.awlen;
-            assign s[i].awsize  = m.awsize;
-            assign s[i].awburst = m.awburst;
             assign s_awready_vec[i] = s[i].awready && select_wr[i];
         end
     endgenerate
@@ -199,7 +182,6 @@ module xbar #(
             assign s[i].wvalid = m.wvalid && (wr_state == IDLE_WR ? select_wr[i] : select_wr_reg[i]);
             assign s[i].wdata = m.wdata;
             assign s[i].wstrb = m.wstrb;
-            assign s[i].wlast = m.wlast;
             assign s_wready_vec[i] = s[i].wready && (wr_state == IDLE_WR ? select_wr[i] : select_wr_reg[i]);
         end
     endgenerate
@@ -218,22 +200,17 @@ module xbar #(
     assign m.bvalid = |s_bvalid_vec;
 
     logic [NUM_SLAVES-1:0][1:0] bresp_array;
-    logic [NUM_SLAVES-1:0][3:0] bid_array;
-
     generate
         for (i = 0; i < NUM_SLAVES; i++) begin : gen_bresp_array
             assign bresp_array[i] = s[i].bresp;
-            assign bid_array[i]   = s[i].bid;
         end
     endgenerate
 
     always_comb begin
         m.bresp = 2'b00;
-        m.bid   = 4'b0;
         for (int j = 0; j < NUM_SLAVES; j++) begin
             if (select_wr_reg[j]) begin
                 m.bresp = bresp_array[j];
-                m.bid   = bid_array[j];
             end
         end
     end
