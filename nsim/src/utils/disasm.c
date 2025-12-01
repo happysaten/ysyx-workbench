@@ -15,6 +15,8 @@
 
 #include <capstone/capstone.h>
 #include <common.h>
+// #include <cstdio>
+// #include <cstdio>
 #include <dlfcn.h>
 
 static size_t (*cs_disasm_dl)(csh handle, const uint8_t *code, size_t code_size,
@@ -71,13 +73,37 @@ void init_disasm() {
 #endif
 }
 
+// void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte) {
+//     cs_insn *insn;
+//     size_t count = cs_disasm_dl(handle, code, nbyte, pc, 0, &insn);
+//     // printf("disasm count: %zu\n", count);
+//     // assert(count == 1);
+//     // int ret = snprintf(str, size, "%s", insn->mnemonic);
+//     // if (insn->op_str[0] != '\0') {
+//     //     snprintf(str + ret, size - ret, "\t%s", insn->op_str);
+//     // }
+//     cs_free_dl(insn, count);
+// }
+
+// 更安全的实现
+// 把 cs_disasm_dl 的 count 参数设为 1（如果确实只需一条指令），并检查返回值 count > 0。
+// 在访问 insn 前做空指针和 count 检查。
+// 使用安全的剩余缓冲计算：size_t rem = (ret < size) ? (size - ret) : 0; 并仅在 rem > 1 时调用追加 snprintf，以保留至少一个字节放终止 NUL。也可用 strncat 或手工处理尾部指针以避免转换问题。
+// 可记录并处理 snprintf 的截断情况（例如返回码 >= 可用大小表示被截断）。
+// 在释放 insn 前确保 insn 非空且 count 合理，然后使用 cs_free_dl 释放。
 void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte) {
-    cs_insn *insn;
-    size_t count = cs_disasm_dl(handle, code, nbyte, pc, 0, &insn);
-    // assert(count == 1);
-    int ret = snprintf(str, size, "%s", insn->mnemonic);
-    if (insn->op_str[0] != '\0') {
-        snprintf(str + ret, size - ret, "\t%s", insn->op_str);
+    cs_insn *insn = NULL;
+    size_t count = cs_disasm_dl(handle, code, nbyte, pc, 1, &insn); // 请求一条指令
+    if (count == 0 || insn == NULL) {
+        if (size > 0) str[0] = '\0';
+        return;
     }
+    int ret = snprintf(str, size, "%s", insn->mnemonic);
+    size_t rem = (ret < size) ? (size - (size_t)ret) : 0;
+    if (rem > 1 && insn->op_str[0] != '\0') {
+        /* 保证至少留一个字节给终止 NUL */
+        snprintf(str + ((ret < size) ? ret : size - 1), rem, "\t%s", insn->op_str);
+    }
+
     cs_free_dl(insn, count);
 }
