@@ -50,6 +50,7 @@ extern "C" void finish_simulation() {
            context->time()); // 打印仿真结束时间
 }
 
+bool inst_done = false;
 // 执行单条CPU指令
 extern "C" void exec_one_cpu() {
     // for (int i = 0; i < 2; i++) {
@@ -72,7 +73,8 @@ extern "C" void exec_one_cpu() {
             break;
         }
     // } while ((top->npc_req_ready && top->npc_resp_valid) != 1);
-    } while (0);
+    } while (!inst_done);
+    // } while (0);
 }
 
 bool DPI_EN = false; // 定义并初始化

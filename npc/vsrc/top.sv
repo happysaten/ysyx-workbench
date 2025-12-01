@@ -124,6 +124,9 @@ module ysyx_25050142 (
     assign npc_req_ready = ifu_req_ready;
     assign npc_req_valid = npc_req_valid_init || npc_resp_valid;
 
+    import "DPI-C" function void report_done_npc(input logic done);
+    always_comb report_done_npc(npc_req_ready && npc_resp_valid);
+
     logic ifu_error, gpr_error, csr_error, lsu_error;
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
