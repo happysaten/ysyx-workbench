@@ -1,6 +1,5 @@
 #include "../include/verilator.h"
 #include "../include/npc_callback.h"
-#include <Vtop__Dpi.h>
 #include <common.h>
 #include <svdpi.h>
 

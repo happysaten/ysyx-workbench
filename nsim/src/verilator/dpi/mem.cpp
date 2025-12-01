@@ -1,5 +1,4 @@
 #include "../include/verilator.h"
-#include <Vtop__Dpi.h>
 #include <common.h>
 #include <cstdint>
 #include <memory/paddr.h>

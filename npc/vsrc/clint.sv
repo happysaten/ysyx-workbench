@@ -51,7 +51,7 @@ module clint #(
         endcase
     end
 
-    import "DPI-C" function void difftest_skip_ref();
+    // import "DPI-C" function void difftest_skip_ref();
 
     // 读地址通道
     assign s.arready = (rd_state == IDLE_RD);
@@ -82,7 +82,7 @@ module clint #(
     assign s.rlast  = 1'b1;
     assign s.rid    = rid_reg;
 
-    always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
+    // always_comb if (rd_state == WAIT_RRESP) difftest_skip_ref();
 
     // 写通道 - CLINT不支持写操作
     assign s.awready = 1'b0;

@@ -13,13 +13,91 @@ typedef enum logic [2:0] {
 
 /* verilator lint_off DECLFILENAME */
 
-module top (
-    input clk,  // 时钟信号
-    input reset,  // 复位信号
-    output logic npc_req_ready,
-    output logic npc_resp_valid,
-    output logic npc_error
+module ysyx_25050142 (
+    // input clk,  // 时钟信号
+    // input reset,  // 复位信号
+    // output logic npc_req_ready,
+    // output logic npc_resp_valid,
+    // output logic npc_error,
+    input clock,        // 时钟（原 clk）
+    input reset,        // 复位（高电平有效）
+    input io_interrupt, // 外部中断
+
+    // AXI4 Master 总线（CPU 作为 master 对外）
+    input         io_master_awready,
+    output        io_master_awvalid,
+    output [31:0] io_master_awaddr,
+    output [ 3:0] io_master_awid,
+    output [ 7:0] io_master_awlen,
+    output [ 2:0] io_master_awsize,
+    output [ 1:0] io_master_awburst,
+
+    input         io_master_wready,
+    output        io_master_wvalid,
+    output [31:0] io_master_wdata,
+    output [ 3:0] io_master_wstrb,
+    output        io_master_wlast,
+
+    output       io_master_bready,
+    input        io_master_bvalid,
+    input  [1:0] io_master_bresp,
+    input  [3:0] io_master_bid,
+
+    input         io_master_arready,
+    output        io_master_arvalid,
+    output [31:0] io_master_araddr,
+    output [ 3:0] io_master_arid,
+    output [ 7:0] io_master_arlen,
+    output [ 2:0] io_master_arsize,
+    output [ 1:0] io_master_arburst,
+
+    output        io_master_rready,
+    input         io_master_rvalid,
+    input  [ 1:0] io_master_rresp,
+    input  [31:0] io_master_rdata,
+    input         io_master_rlast,
+    input  [ 3:0] io_master_rid,
+
+    // AXI4 Slave 总线（可忽略）
+    output        io_slave_awready,
+    input         io_slave_awvalid,
+    input  [31:0] io_slave_awaddr,
+    input  [ 3:0] io_slave_awid,
+    input  [ 7:0] io_slave_awlen,
+    input  [ 2:0] io_slave_awsize,
+    input  [ 1:0] io_slave_awburst,
+
+    output        io_slave_wready,
+    input         io_slave_wvalid,
+    input  [31:0] io_slave_wdata,
+    input  [ 3:0] io_slave_wstrb,
+    input         io_slave_wlast,
+
+    input        io_slave_bready,
+    output       io_slave_bvalid,
+    output [1:0] io_slave_bresp,
+    output [3:0] io_slave_bid,
+
+    output        io_slave_arready,
+    input         io_slave_arvalid,
+    input  [31:0] io_slave_araddr,
+    input  [ 3:0] io_slave_arid,
+    input  [ 7:0] io_slave_arlen,
+    input  [ 2:0] io_slave_arsize,
+    input  [ 1:0] io_slave_arburst,
+
+    input         io_slave_rready,
+    output        io_slave_rvalid,
+    output [ 1:0] io_slave_rresp,
+    output [31:0] io_slave_rdata,
+    output        io_slave_rlast,
+    output [ 3:0] io_slave_rid
 );
+
+    logic clk;
+    assign clk = clock;
+
+    logic npc_req_ready, npc_resp_valid, npc_error;
 
     // IFU：负责 PC 和取指
     logic [31:0] pc, snpc, jump_target;  // pc renamed to ifu_raddr, snpc, 跳转目标地址
@@ -50,11 +128,14 @@ module top (
     assign npc_error = ifu_error | gpr_error | csr_error | lsu_error;
 
     // Crossbar 参数定义
-    localparam int XBAR_NUM_SLAVES = 3;
-    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_BASE = {
-        32'ha0000048, 32'ha00003f8, 32'h80000000
-    };
-    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
+    // localparam int XBAR_NUM_SLAVES = 3;
+    // localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_BASE = {
+    //     32'ha0000048, 32'ha00003f8, 32'h80000000
+    // };
+    // localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h8, 32'h08000000};
+    localparam int XBAR_NUM_SLAVES = 2;
+    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_BASE = {32'ha0000048, 32'h80000000};
+    localparam logic [XBAR_NUM_SLAVES-1:0][31:0] XBAR_SLAVE_SIZE = {32'h8, 32'h08000000};
     // 创建AXI接口实例
     axi4_if imem_if ();  // IFU(取指)接口
     axi4_if dmem_if ();  // LSU(访存)接口
@@ -62,6 +143,45 @@ module top (
     // axi4_lite_if uart_if ();  // UART接口
     // axi4_lite_if mem_if ();  // 统一内存接口
     axi4_if xbar_if[XBAR_NUM_SLAVES] ();
+
+    assign xbar_if[0].awready = io_master_awready;
+    assign io_master_awvalid = xbar_if[0].awvalid;
+    assign io_master_awaddr = xbar_if[0].awaddr;
+    assign io_master_awid = xbar_if[0].awid;
+    assign io_master_awlen = xbar_if[0].awlen;
+    assign io_master_awsize = xbar_if[0].awsize;
+    assign io_master_awburst = xbar_if[0].awburst;
+
+    assign xbar_if[0].wready = io_master_wready;
+    assign io_master_wvalid = xbar_if[0].wvalid;
+    assign io_master_wdata = xbar_if[0].wdata;
+    assign io_master_wstrb = xbar_if[0].wstrb;
+    assign io_master_wlast = xbar_if[0].wlast;
+    assign io_master_bready = xbar_if[0].bready;
+    assign xbar_if[0].bvalid = io_master_bvalid;
+    assign xbar_if[0].bresp = io_master_bresp;
+    assign xbar_if[0].bid = io_master_bid;
+
+    assign xbar_if[0].arready = io_master_arready;
+    assign io_master_arvalid = xbar_if[0].arvalid;
+    assign io_master_araddr = xbar_if[0].araddr;
+    assign io_master_arid = xbar_if[0].arid;
+    assign io_master_arlen = xbar_if[0].arlen;
+    assign io_master_arsize = xbar_if[0].arsize;
+    assign io_master_arburst = xbar_if[0].arburst;
+
+    assign io_master_rready = xbar_if[0].rready;
+    assign xbar_if[0].rvalid = io_master_rvalid;
+    assign xbar_if[0].rresp = io_master_rresp;
+    assign xbar_if[0].rdata = io_master_rdata;
+    assign xbar_if[0].rlast = io_master_rlast;
+    assign xbar_if[0].rid = io_master_rid;
+
+    assign {io_slave_awready,io_slave_wready,io_slave_bvalid,io_slave_bresp,io_slave_bid,
+            io_slave_arready,io_slave_rvalid,io_slave_rresp,io_slave_rdata,io_slave_rlast,io_slave_rid} =
+           '0;
+
+
 
     // 实例化AXI仲裁器
     axi_arbiter u_arbiter (
@@ -86,33 +206,33 @@ module top (
         .s    (xbar_if.master)
     );
 
-    // 实例化统一内存模块
-    MEM u_mem (
-        .clk(clk),
-        .reset(reset_sync),
-        // .s  (mem_if.slave)
-        .s(xbar_if[0].slave)
-    );
+    // // 实例化统一内存模块
+    // MEM u_mem (
+    //     .clk(clk),
+    //     .reset(reset_sync),
+    //     // .s  (mem_if.slave)
+    //     .s(xbar_if[0].slave)
+    // );
 
-    // 实例化UART模块
-    uart #(
-        .UART_ADDR(XBAR_SLAVE_BASE[1]),
-        .UART_SIZE(XBAR_SLAVE_SIZE[1])
+    // // 实例化UART模块
+    // uart #(
+    //     .UART_ADDR(XBAR_SLAVE_BASE[1]),
+    //     .UART_SIZE(XBAR_SLAVE_SIZE[1])
 
-    ) u_uart (
-        .clk  (clk),
-        .reset(reset_sync),
-        // .s    (uart_if.slave)
-        .s    (xbar_if[1].slave)
-    );
+    // ) u_uart (
+    //     .clk  (clk),
+    //     .reset(reset_sync),
+    //     // .s    (uart_if.slave)
+    //     .s    (xbar_if[1].slave)
+    // );
 
     clint #(
-        .MTIME_ADDR(XBAR_SLAVE_BASE[2]),
-        .MTIME_SIZE(XBAR_SLAVE_SIZE[2])
+        .MTIME_ADDR(XBAR_SLAVE_BASE[1]),
+        .MTIME_SIZE(XBAR_SLAVE_SIZE[1])
     ) u_clint (
         .clk  (clk),
         .reset(reset_sync),
-        .s    (xbar_if[2].slave)
+        .s    (xbar_if[1].slave)
     );
 
     IFU u_ifu (
@@ -254,48 +374,48 @@ endmodule
 
 // IFU(Instruction Fetch Unit) 负责PC管理和取指
 module IFU (
-    input                            clk,
-    input                            reset,
-    input                            ifu_req_valid,
-    output logic                     ifu_req_ready,
-    input                            jump_en,
-    input                     [31:0] jump_target,
-    output logic              [31:0] ifu_rdata,
-    output logic                     ifu_resp_valid,
-    input                            ifu_resp_ready,
-    output logic              [31:0] pc,
-    output logic              [31:0] snpc,
-    output logic              [31:0] dnpc,
-    output logic                     ifu_error,
+    input                        clk,
+    input                        reset,
+    input                        ifu_req_valid,
+    output logic                 ifu_req_ready,
+    input                        jump_en,
+    input                 [31:0] jump_target,
+    output logic          [31:0] ifu_rdata,
+    output logic                 ifu_resp_valid,
+    input                        ifu_resp_ready,
+    output logic          [31:0] pc,
+    output logic          [31:0] snpc,
+    output logic          [31:0] dnpc,
+    output logic                 ifu_error,
     // IMEM接口 - 使用interface
-           axi4_if.master             imem
+           axi4_if.master        imem
 );
 
     // snpc / dnpc 选择逻辑
-    assign snpc = pc + 4;
-    assign dnpc = jump_en ? jump_target : snpc;
+    assign snpc          = pc + 4;
+    assign dnpc          = jump_en ? jump_target : snpc;
 
     // IMEM访问控制 - 只使用读通道
-    assign imem.araddr = dnpc;
-    assign imem.arvalid = ifu_req_valid;
-    assign imem.arid    = 4'b0;
-    assign imem.arlen   = 8'b0;      // Burst length = 1
-    assign imem.arsize  = 3'b010;    // 4 bytes
-    assign imem.arburst = 2'b01;     // INCR
-    assign imem.rready = ifu_resp_ready;
+    assign imem.araddr   = dnpc;
+    assign imem.arvalid  = ifu_req_valid;
+    assign imem.arid     = 4'b0;
+    assign imem.arlen    = 8'b0;  // Burst length = 1
+    assign imem.arsize   = 3'b010;  // 4 bytes
+    assign imem.arburst  = 2'b01;  // INCR
+    assign imem.rready   = ifu_resp_ready;
 
     // 写通道全部置为无效
-    assign imem.awvalid = 1'b0;
-    assign imem.awaddr = 32'h0;
-    assign imem.awid    = 4'b0;
-    assign imem.awlen   = 8'b0;
-    assign imem.awsize  = 3'b000;
-    assign imem.awburst = 2'b00;
-    assign imem.wvalid = 1'b0;
-    assign imem.wdata = 32'h0;
-    assign imem.wstrb = 4'h0;
-    assign imem.wlast   = 1'b0;
-    assign imem.bready = 1'b0;
+    assign imem.awvalid  = 1'b0;
+    assign imem.awaddr   = 32'h0;
+    assign imem.awid     = 4'b0;
+    assign imem.awlen    = 8'b0;
+    assign imem.awsize   = 3'b000;
+    assign imem.awburst  = 2'b00;
+    assign imem.wvalid   = 1'b0;
+    assign imem.wdata    = 32'h0;
+    assign imem.wstrb    = 4'h0;
+    assign imem.wlast    = 1'b0;
+    assign imem.bready   = 1'b0;
 
     assign ifu_req_ready = imem.arready;
     always @(posedge clk) ifu_resp_valid <= imem.rvalid;
@@ -740,22 +860,22 @@ endmodule
 
 // LSU(Load Store Unit) 负责根据控制信号控制存储器, 从存储器中读出数据, 或将数据写入存储器
 module LSU (
-    input                            clk,
-    input                            reset,
-    input                            lsu_req_valid,
-    output logic                     lsu_req_ready,
-    input  inst_t                    inst_type,
-    input                     [ 6:0] opcode,
-    input                     [ 2:0] funct3,
-    input                     [31:0] pc,
-    input                     [31:0] alu_result,
-    input                     [31:0] gpr_rdata2,
-    output logic                     lsu_resp_valid,
-    input                            lsu_resp_ready,
-    output logic              [31:0] lsu_rdata,
-    output logic                     lsu_error,
+    input                        clk,
+    input                        reset,
+    input                        lsu_req_valid,
+    output logic                 lsu_req_ready,
+    input  inst_t                inst_type,
+    input                 [ 6:0] opcode,
+    input                 [ 2:0] funct3,
+    input                 [31:0] pc,
+    input                 [31:0] alu_result,
+    input                 [31:0] gpr_rdata2,
+    output logic                 lsu_resp_valid,
+    input                        lsu_resp_ready,
+    output logic          [31:0] lsu_rdata,
+    output logic                 lsu_error,
     // DMEM接口 - 使用interface
-           axi4_if.master             dmem
+           axi4_if.master        dmem
 );
     import "DPI-C" function void NPCINV(input int pc);
 
@@ -768,42 +888,42 @@ module LSU (
     logic [2:0] axsize;
     always_comb begin
         case (funct3[1:0])
-            2'b00: axsize = 3'b000; // Byte
-            2'b01: axsize = 3'b001; // Half
-            2'b10: axsize = 3'b010; // Word
+            2'b00:   axsize = 3'b000;  // Byte
+            2'b01:   axsize = 3'b001;  // Half
+            2'b10:   axsize = 3'b010;  // Word
             default: axsize = 3'b010;
         endcase
     end
 
     // AR Channel
-    assign dmem.araddr  = alu_result;
-    assign dmem.arvalid = lsu_req_valid && dmem_ren;
-    assign dmem.arid    = 4'b0;
-    assign dmem.arlen   = 8'b0;      // Burst length = 1
-    assign dmem.arsize  = axsize;
-    assign dmem.arburst = 2'b01;     // INCR
+    assign dmem.araddr    = alu_result;
+    assign dmem.arvalid   = lsu_req_valid && dmem_ren;
+    assign dmem.arid      = 4'b0;
+    assign dmem.arlen     = 8'b0;  // Burst length = 1
+    assign dmem.arsize    = axsize;
+    assign dmem.arburst   = 2'b01;  // INCR
 
     // R Channel
-    assign dmem.rready  = lsu_resp_ready;
+    assign dmem.rready    = lsu_resp_ready;
 
     // AW Channel
-    assign dmem.awaddr  = alu_result;
-    assign dmem.awvalid = lsu_req_valid && dmem_wen;
-    assign dmem.awid    = 4'b0;
-    assign dmem.awlen   = 8'b0;
-    assign dmem.awsize  = axsize;
-    assign dmem.awburst = 2'b01;
+    assign dmem.awaddr    = alu_result;
+    assign dmem.awvalid   = lsu_req_valid && dmem_wen;
+    assign dmem.awid      = 4'b0;
+    assign dmem.awlen     = 8'b0;
+    assign dmem.awsize    = axsize;
+    assign dmem.awburst   = 2'b01;
 
     // W Channel
-    assign dmem.wdata   = gpr_rdata2;
-    assign dmem.wvalid  = lsu_req_valid && dmem_wen;
-    assign dmem.wlast   = 1'b1;      // Single beat
+    assign dmem.wdata     = gpr_rdata2;
+    assign dmem.wvalid    = lsu_req_valid && dmem_wen;
+    assign dmem.wlast     = 1'b1;  // Single beat
 
     // B Channel
-    assign dmem.bready  = lsu_resp_ready;
+    assign dmem.bready    = lsu_resp_ready;
 
     // LSU握手逻辑
-    assign lsu_req_ready = 1'b1;
+    assign lsu_req_ready  = 1'b1;
     assign lsu_resp_valid = dmem_ren ? dmem.rvalid : (dmem_wen ? dmem.bvalid : lsu_req_valid);
 
     // 写掩码生成

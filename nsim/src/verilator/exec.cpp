@@ -1,6 +1,5 @@
 #include "../include/npc_callback.h"
 #include "../include/verilator.h"
-#include <Vtop__Dpi.h>
 #include <common.h>
 #include <cpu/cpu.h>
 #include <cstdio>
@@ -18,14 +17,14 @@ extern VerilatedFstC *tfp;
 // 每次调用模拟一个完整的时钟周期（上升沿+下降沿）
 static void step() {
     context->timeInc(1); // 仿真时间递增
-    top->clk = HIGH;     // 设置时钟高电平
+    top->clock = HIGH;     // 设置时钟高电平
     top->eval();         // 计算仿真
 #ifdef CONFIG_WTRACE
     tfp->dump(context->time()); // 波形记录
 #endif
 
     context->timeInc(1); // 仿真时间递增
-    top->clk = LOW;      // 设置时钟低电平
+    top->clock = LOW;      // 设置时钟低电平
     top->eval();         // 计算仿真
 #ifdef CONFIG_WTRACE
     tfp->dump(context->time()); // 波形记录
@@ -72,8 +71,8 @@ extern "C" void exec_one_cpu() {
             finish_simulation();
             break;
         }
-    } while ((top->npc_req_ready && top->npc_resp_valid) != 1);
-    // } while (0);
+    // } while ((top->npc_req_ready && top->npc_resp_valid) != 1);
+    } while (0);
 }
 
 bool DPI_EN = false; // 定义并初始化
@@ -106,3 +105,6 @@ void NPCINV(int pc) {
         return;
     INV((vaddr_t)pc); // 调用无效指令处理函数
 }
+
+extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
+extern "C" void mrom_read(int32_t addr, int32_t *data) { assert(0); }
