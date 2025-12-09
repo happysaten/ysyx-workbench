@@ -109,4 +109,7 @@ void NPCINV(int pc) {
 }
 
 extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
-extern "C" void mrom_read(int32_t addr, int32_t *data) { assert(0); }
+extern "C" void mrom_read(int32_t addr, int32_t *data) {
+    // 返回 ebreak 指令：二进制 000000000001 00000 000 00000 1110011 -> 0x00100073
+    *data = 0x00100073;
+}

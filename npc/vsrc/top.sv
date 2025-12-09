@@ -436,7 +436,8 @@ module IFU (
         input int inst,
         input int dnpc
     );
-    localparam int RESET_PC = 32'h80000000;
+    // localparam int RESET_PC = 32'h8000_0000;
+    localparam int RESET_PC = 32'h2000_0000;
 
     // PC 寄存器更新 - 握手成功时更新
     always_ff @(posedge clk) begin
