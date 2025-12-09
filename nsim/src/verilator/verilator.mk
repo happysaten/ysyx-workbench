@@ -13,6 +13,6 @@ CVCFLAGS =
 endif
 
 wv:
-	gtkwave $(NSIM_HOME)/build/trace.fst &
+	gtkwave $(NSIM_HOME)/build/nsim-wave.fst &
 
 .PHONY: wv
